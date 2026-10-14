@@ -109,7 +109,7 @@ button { font: inherit; }
 .seat.top .piles { top: 12px; }
 .seat.bottom .piles { bottom: 34px; }
 
-.pile { position: relative; width: 80px; height: 112px; border-radius: 9px; transition: box-shadow 0.15s, background 0.15s; }
+.pile { position: relative; width: 80px; height: 112px; border-radius: 9px; cursor: help; transition: box-shadow 0.15s, background 0.15s; }
 .seat.top .pile { width: 62px; height: 87px; }
 .pile-label {
   position: absolute;
@@ -254,6 +254,8 @@ button { font: inherit; }
 }
 .sect-top { background: rgba(166, 124, 0, 0.16); border: 1px solid rgba(166, 124, 0, 0.5); }
 .sect-bottom { background: rgba(142, 42, 42, 0.13); border: 1px solid rgba(142, 42, 42, 0.5); }
+.sect-none { background: rgba(0, 0, 0, 0.06); border: 1px dashed rgba(43, 29, 16, 0.3); }
+.sect-none .sect-label { font-style: italic; opacity: 0.5; }
 .sect-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.7; }
 
 .kws { display: flex; flex-wrap: wrap; justify-content: center; gap: 3px; }
@@ -276,6 +278,7 @@ button { font: inherit; }
 .kw-schild { --edge: #546e8a; }
 .kw-trek { --edge: #6a3d8f; }
 .kw-vertraag { --edge: #0277bd; }
+.kw-vernietig { --edge: #37474f; }
 
 .ghost {
   position: fixed;
@@ -311,7 +314,22 @@ button { font: inherit; }
   background: rgba(0, 0, 0, 0.14);
   transition: box-shadow 0.15s, border-color 0.15s, background 0.15s;
 }
-.zcards { height: 112px; display: flex; justify-content: center; align-items: center; }
+.zcards { position: relative; height: 112px; display: flex; justify-content: center; align-items: center; }
+.zcount {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid currentColor;
+  font-size: 12px;
+  font-weight: bold;
+}
+.zcount.p0 { color: var(--p0); }
+.zcount.p1 { color: var(--p1); }
+.zcount.full { background: rgba(198, 40, 40, 0.6); color: #fff; border-color: #ff5252; }
 .zslot { position: relative; flex-shrink: 0; width: 78px; height: 109px; margin-left: -30px; }
 .zslot:first-child { margin-left: 0; }
 .zslot .card { position: absolute; left: 0; top: 0; transform-origin: 0 0; transform: scale(0.52); }
@@ -374,16 +392,21 @@ button { font: inherit; }
 .zone-banner.p1 b { color: var(--p1); }
 
 /* Tijdens het slepen lichten de plekken op waar je de kaart kunt neerleggen. */
-.is-dragging .zone-area:not(.closed),
+.is-dragging .zone-area:not(.closed):not(.no-drop),
 .is-dragging .pile[data-drop] {
   border: 2px dashed var(--gold);
   background: rgba(230, 192, 104, 0.08);
 }
+.is-dragging .zone-area.no-drop { opacity: 0.45; }
 .drop-hover {
   box-shadow: 0 0 0 3px var(--gold), 0 0 30px 6px rgba(230, 192, 104, 0.6);
   background: rgba(230, 192, 104, 0.2) !important;
 }
-.zone-area.closed.drop-hover { box-shadow: 0 0 0 3px #ff5252; }
+.zone-area.closed.drop-hover,
+.zone-area.no-drop.drop-hover {
+  box-shadow: 0 0 0 3px #ff5252;
+  background: rgba(198, 40, 40, 0.15) !important;
+}
 
 /* ---------- Winkel ---------- */
 
@@ -632,3 +655,6 @@ button { font: inherit; }
 }
 #tip.show { opacity: 1; }
 #tip b { color: var(--gold); }
+.tip-row { display: flex; justify-content: space-between; gap: 18px; padding: 2px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+.tip-row:first-of-type { margin-top: 6px; }
+.tip-note { margin-top: 6px; font-size: 12px; font-style: italic; color: var(--ink-dim); }

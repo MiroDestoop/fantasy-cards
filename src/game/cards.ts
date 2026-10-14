@@ -1,9 +1,9 @@
-import { ZONE_HP } from './rules';
+import { MAX_ZONE_CARDS, ZONE_HP } from './rules';
 import type { CardDef, Effect, Keyword } from './types';
 
 const kaarten = (n: number) => (n === 1 ? '1 kaart' : `${n} kaarten`);
 
-export const KEYWORDS: Record<Keyword, { label: string; explain: (n: number) => string }> = {
+export const KEYWORDS: Record<Keyword, { label: string; noAmount?: boolean; explain: (n: number) => string }> = {
   goud: {
     label: 'Goud',
     explain: (n) => `Krijg ${n} goud. Daarmee koop je kaarten in de winkel. Goud blijft bewaard tot je het uitgeeft.`,
@@ -32,6 +32,12 @@ export const KEYWORDS: Record<Keyword, { label: string; explain: (n: number) => 
     label: 'Vertraag',
     explain: (n) => `Je tegenstander trekt volgende beurt ${kaarten(n)} minder.`,
   },
+  vernietig: {
+    label: 'Vernietig',
+    noAmount: true,
+    explain: () =>
+      `Haal al je kaarten uit deze zone terug naar je aflegstapel. Zo maak je plaats: je mag maar ${MAX_ZONE_CARDS} kaarten per zone hebben.`,
+  },
 };
 
 const fx = (kw: Keyword, amount: number): Effect => ({ kw, amount });
@@ -40,7 +46,7 @@ const fx = (kw: Keyword, amount: number): Effect => ({ kw, amount });
 // `top` krijg je door de kaart naar je aflegstapel te slepen, `bottom` door ze in een zone te spelen.
 const CARD_LIST: CardDef[] = [
   // Startkaarten
-  { id: 'koper', name: 'Koperen Munt', icon: '🪙', color: '#b87333', top: [fx('goud', 1)], bottom: [fx('aanval', 1)] },
+  { id: 'koper', name: 'Koperen Munt', icon: '🪙', color: '#b87333', top: [fx('goud', 1)], bottom: [] },
   { id: 'zilver', name: 'Zilveren Munt', icon: '💰', color: '#9e9e9e', top: [fx('goud', 2)], bottom: [fx('aanval', 1)] },
   { id: 'rekruut', name: 'Rekruut', icon: '🗡️', color: '#6b8e23', top: [fx('goud', 1)], bottom: [fx('aanval', 2)] },
 
@@ -57,6 +63,8 @@ const CARD_LIST: CardDef[] = [
   { id: 'golem', name: 'Steengolem', price: 4, icon: '🗿', color: '#757575', top: [fx('goud', 1)], bottom: [fx('schild', 5)] },
   { id: 'bron', name: 'Helende Bron', price: 3, icon: '💧', color: '#00897b', top: [fx('goud', 1)], bottom: [fx('herstel', 4)] },
   { id: 'schat', name: 'Drakenschat', price: 5, icon: '👑', color: '#c9a227', top: [fx('goud', 4)], bottom: [fx('aanval', 2)] },
+  { id: 'offervuur', name: 'Offervuur', price: 4, icon: '🕯️', color: '#d84315', top: [fx('goud', 1)], bottom: [fx('vernietig', 0), fx('aanval', 3)] },
+  { id: 'terugtocht', name: 'Terugtocht', price: 3, icon: '🏳️', color: '#607d8b', top: [fx('trek', 1)], bottom: [fx('vernietig', 0), fx('schild', 2)] },
 ];
 
 export const CARDS: Record<string, CardDef> = Object.fromEntries(CARD_LIST.map((c) => [c.id, c]));
@@ -70,10 +78,11 @@ export function getCard(id: string): CardDef {
 const expand = (counts: [string, number][]) => counts.flatMap(([id, n]) => Array<string>(n).fill(id));
 
 /** Beginstapel van 10 kaarten; beide spelers krijgen dezelfde. */
-export const STARTER_DECK = expand([['koper', 6], ['zilver', 2], ['rekruut', 2]]);
+export const STARTER_DECK = expand([['koper', 5], ['rekruut', 3], ['zilver', 2]]);
 
 /** De gedeelde voorraad van de winkel. */
 export const SHOP_SUPPLY = expand([
   ['vuurbal', 3], ['trol', 3], ['draak', 2], ['storm', 3], ['vampier', 3], ['uil', 3],
   ['inzicht', 3], ['heks', 3], ['zandloper', 2], ['golem', 3], ['bron', 3], ['schat', 3],
+  ['offervuur', 3], ['terugtocht', 3],
 ]);

@@ -4,6 +4,8 @@ export const HAND_SIZE = 5;
 export const ZONE_HP = 10;
 /** Aantal veroverde zones om te winnen. */
 export const ZONES_TO_WIN = 2;
+/** Zoveel kaarten mag elke speler in één zone hebben liggen. */
+export const MAX_ZONE_CARDS = 4;
 export const MARKET_SIZE = 5;
 export const MAX_HAND = 10;
 

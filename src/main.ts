@@ -1,8 +1,10 @@
 import './style.css';
 import { getCard, KEYWORDS } from './game/cards';
-import { applyAction, createGame, other, whyCantBuy, zonesOwnedBy } from './game/engine';
-import { HAND_SIZE, ZONE_HP, ZONES_TO_WIN } from './game/rules';
-import type { Action, CardDef, Effect, GameState, Keyword, PlayerId, PlayTarget } from './game/types';
+import {
+  applyAction, createGame, other, whyCantBuy, whyCantPlay, zoneCardCount, zonesOwnedBy,
+} from './game/engine';
+import { HAND_SIZE, MAX_ZONE_CARDS, ZONE_HP, ZONES_TO_WIN } from './game/rules';
+import type { Action, CardDef, CardInstance, Effect, GameState, Keyword, PlayerId, PlayTarget } from './game/types';
 
 const HERO_ICONS = ['🧙‍♂️', '🧝‍♀️'] as const;
 const STAGE_W = 1600;
@@ -47,6 +49,7 @@ function renderStart(): string {
         <li>Verover <b>${ZONES_TO_WIN} van de 3 zones</b> om te winnen. Een zone is van jou als je er als eerste ${ZONE_HP} schade doet.</li>
         <li>Elke beurt trek je ${HAND_SIZE} kaarten. Elke kaart heeft twee helften:
           sleep ze naar je <b>aflegstapel</b> voor het bovenste effect, of naar een <b>zone</b> voor het onderste.</li>
+        <li>Kaarten in een zone blijven liggen, maximaal ${MAX_ZONE_CARDS} per speler per zone. Met <b>Vernietig</b> haal je ze terug.</li>
         <li>Met goud koop je sterkere kaarten in de winkel. Is je stapel leeg, dan wordt je aflegstapel geschud.</li>
         <li>Hover over een keyword zoals <b>Aanval(2)</b> om te zien wat het doet.</li>
       </ul>
@@ -106,12 +109,12 @@ function renderPiles(g: GameState, pid: PlayerId, mine: boolean): string {
   const stackDepth = Math.min(3, Math.ceil(p.deck.length / 4));
   return `
   <div class="piles">
-    <div class="pile deck" title="Trekstapel: ${p.deck.length} kaart(en)">
+    <div class="pile deck" data-pile="deck:${pid}">
       ${p.deck.length ? `<div class="stack">${'<div class="back"></div>'.repeat(stackDepth)}</div>` : '<div class="empty-slot"></div>'}
       <div class="pile-count">${p.deck.length}</div>
       <div class="pile-label">Stapel</div>
     </div>
-    <div class="pile discard" ${mine ? 'data-drop="discard"' : ''} title="Aflegstapel: ${p.discard.length} kaart(en)">
+    <div class="pile discard" ${mine ? 'data-drop="discard"' : ''} data-pile="discard:${pid}">
       ${topDiscard ? renderMini(getCard(topDiscard.defId)) : '<div class="empty-slot"></div>'}
       <div class="pile-count">${p.discard.length}</div>
       <div class="pile-label">Aflegstapel</div>
@@ -135,9 +138,13 @@ function renderHand(g: GameState, pid: PlayerId): string {
     .join('');
 }
 
+function keywordText(kw: Keyword, n: number): string {
+  return KEYWORDS[kw].noAmount ? KEYWORDS[kw].label : `${KEYWORDS[kw].label}(${n})`;
+}
+
 function renderKeywords(effects: Effect[]): string {
   return effects
-    .map((e) => `<span class="kw kw-${e.kw}" data-kw="${e.kw}" data-n="${e.amount}">${KEYWORDS[e.kw].label}(${e.amount})</span>`)
+    .map((e) => `<span class="kw kw-${e.kw}" data-kw="${e.kw}" data-n="${e.amount}">${keywordText(e.kw, e.amount)}</span>`)
     .join(' ');
 }
 
@@ -149,10 +156,12 @@ function renderFace(def: CardDef): string {
       <div class="sect-label">⤓ Afleggen</div>
       <div class="kws">${renderKeywords(def.top)}</div>
     </div>
-    <div class="sect sect-bottom">
-      <div class="sect-label">⚔ In een zone</div>
-      <div class="kws">${renderKeywords(def.bottom)}</div>
-    </div>`;
+    ${def.bottom.length
+      ? `<div class="sect sect-bottom">
+          <div class="sect-label">⚔ In een zone</div>
+          <div class="kws">${renderKeywords(def.bottom)}</div>
+        </div>`
+      : '<div class="sect sect-none"><div class="sect-label">Alleen afleggen</div></div>'}`;
 }
 
 function renderMini(def: CardDef): string {
@@ -166,14 +175,20 @@ function renderBacks(n: number): string {
 function renderZone(g: GameState, i: number, bottom: PlayerId, prev: GameState | null): string {
   const z = g.zones[i];
   const top = other(bottom);
-  const row = (pid: PlayerId) =>
-    z.cards
+  const row = (pid: PlayerId) => {
+    const cards = z.cards
       .filter((c) => c.player === pid)
       .map((c) => {
         const isNew = !seenZoneCards.has(`${c.card.uid}@${c.turn}`);
         return `<div class="zslot"><div class="card ${isNew ? (pid === bottom ? 'enter-up' : 'enter-down') : ''}">${renderFace(getCard(c.card.defId))}</div></div>`;
       })
       .join('');
+    const n = zoneCardCount(g, i, pid);
+    const count = z.owner === null
+      ? `<span class="zcount p${pid} ${n >= MAX_ZONE_CARDS ? 'full' : ''}" title="${esc(g.players[pid].name)} heeft ${n} van max. ${MAX_ZONE_CARDS} kaarten in deze zone">${n}/${MAX_ZONE_CARDS}</span>`
+      : '';
+    return `${cards}${count}`;
+  };
   const bar = (pid: PlayerId) => {
     const dmg = z.damage[pid];
     const before = prev && prev !== g ? prev.zones[i].damage[pid] : dmg;
@@ -226,7 +241,8 @@ function renderSidePanel(g: GameState): string {
   <div class="side-panel">
     <div class="turn-info">Beurt ${g.turn}<br><b>${esc(p.name)}</b> is aan zet</div>
     <button class="end-turn" data-click="end-turn" ${locked ? 'disabled' : ''}>Einde<br>beurt</button>
-    <div class="hint">Sleep een kaart naar je <b>aflegstapel</b> (bovenste effect) of naar een <b>zone</b> (onderste effect).</div>
+    <div class="hint">Sleep een kaart naar je <b>aflegstapel</b> (bovenste effect) of naar een <b>zone</b> (onderste effect).
+      Hover over een stapel om te zien wat erin zit.</div>
     <div class="log">${g.log.slice(-16).reverse().map((l) => `<div>${esc(l)}</div>`).join('')}</div>
   </div>`;
 }
@@ -316,6 +332,10 @@ window.addEventListener('pointermove', (e) => {
     drag.slot.classList.add('dragging');
     document.body.classList.add('is-dragging');
     hideTip();
+    // Zones waar deze kaart niet heen kan (veroverd, vol, of alleen afleggen) lichten niet op.
+    for (const el of app.querySelectorAll<HTMLElement>('.zone-area')) {
+      el.classList.toggle('no-drop', !!game && !!whyCantPlay(game, drag.uid, parseDrop(el)!));
+    }
   }
   drag.ghost.style.transform =
     `translate(${e.clientX - (CARD_W * scale) / 2}px, ${e.clientY - (CARD_H * scale) / 2}px) scale(${scale}) rotate(-4deg)`;
@@ -343,6 +363,7 @@ function endDrag(): void {
   drag.hover?.classList.remove('drop-hover');
   drag.slot.classList.remove('dragging');
   document.body.classList.remove('is-dragging');
+  for (const el of app.querySelectorAll('.no-drop')) el.classList.remove('no-drop');
   drag = null;
 }
 
@@ -357,15 +378,42 @@ function parseDrop(el: HTMLElement | null): PlayTarget | null {
   return null;
 }
 
-// ---------- Uitleg bij keywords ----------
+// ---------- Tooltips: uitleg bij keywords en inhoud van stapels ----------
 
 app.addEventListener('mouseover', (e) => {
-  const kw = (e.target as HTMLElement).closest<HTMLElement>('[data-kw]');
-  if (!kw || drag?.ghost) return hideTip();
-  const info = KEYWORDS[kw.dataset.kw as Keyword];
-  tipEl.innerHTML = `<b>${info.label}(${kw.dataset.n})</b><br>${info.explain(Number(kw.dataset.n))}`;
+  if (drag?.ghost) return hideTip();
+  const target = e.target as HTMLElement;
+  const kw = target.closest<HTMLElement>('[data-kw]');
+  const pile = target.closest<HTMLElement>('[data-pile]');
+  if (kw) {
+    const key = kw.dataset.kw as Keyword;
+    const n = Number(kw.dataset.n);
+    tipEl.innerHTML = `<b>${keywordText(key, n)}</b><br>${KEYWORDS[key].explain(n)}`;
+  } else if (pile && game) {
+    const [kind, pid] = pile.dataset.pile!.split(':');
+    tipEl.innerHTML = pileTip(game.players[Number(pid)].name, kind as 'deck' | 'discard', kind === 'deck'
+      ? game.players[Number(pid)].deck
+      : game.players[Number(pid)].discard);
+  } else {
+    return hideTip();
+  }
   tipEl.classList.add('show');
 });
+
+function pileTip(owner: string, kind: 'deck' | 'discard', cards: CardInstance[]): string {
+  const title = `${kind === 'deck' ? 'Stapel' : 'Aflegstapel'} van ${esc(owner)} (${cards.length})`;
+  if (!cards.length) return `<b>${title}</b><br><i>Leeg</i>`;
+  const counts = new Map<string, number>();
+  for (const c of cards) counts.set(c.defId, (counts.get(c.defId) ?? 0) + 1);
+  const rows = [...counts]
+    .map(([id, n]) => ({ def: getCard(id), n }))
+    .sort((a, b) => b.n - a.n || a.def.name.localeCompare(b.def.name))
+    .map(({ def, n }) => `<div class="tip-row"><span>${def.icon} ${esc(def.name)}</span><span>×${n}</span></div>`)
+    .join('');
+  // De volgorde van de trekstapel blijft geheim; enkel wat erin zit, is te zien.
+  const note = kind === 'deck' ? '<div class="tip-note">Volgorde blijft geheim</div>' : '';
+  return `<b>${title}</b>${rows}${note}`;
+}
 app.addEventListener('mouseleave', hideTip);
 window.addEventListener('mousemove', (e) => {
   if (!tipEl.classList.contains('show')) return;

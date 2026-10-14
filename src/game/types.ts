@@ -1,6 +1,6 @@
 export type PlayerId = 0 | 1;
 
-export type Keyword = 'goud' | 'aanval' | 'storm' | 'herstel' | 'schild' | 'trek' | 'vertraag';
+export type Keyword = 'goud' | 'aanval' | 'storm' | 'herstel' | 'schild' | 'trek' | 'vertraag' | 'vernietig';
 
 /** Eén keyword met zijn waarde, zoals Aanval(2). */
 export interface Effect {
@@ -18,7 +18,7 @@ export interface CardDef {
   color: string;
   /** Effect als je de kaart naar je aflegstapel sleept. */
   top: Effect[];
-  /** Effect als je de kaart in een zone speelt. */
+  /** Effect als je de kaart in een zone speelt. Leeg: de kaart kan je alleen afleggen. */
   bottom: Effect[];
 }
 
@@ -39,6 +39,7 @@ export interface PlayerState {
   slow: number;
 }
 
+/** Een kaart in een zone. Ze blijft liggen tot Vernietig of tot de zone veroverd wordt. */
 export interface ZoneCard {
   player: PlayerId;
   card: CardInstance;

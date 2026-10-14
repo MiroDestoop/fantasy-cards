@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { getCard } from './cards';
 import { applyAction, createGame } from './engine';
-import { HAND_SIZE, MARKET_SIZE, ZONE_HP } from './rules';
+import { HAND_SIZE, MARKET_SIZE, MAX_ZONE_CARDS, ZONE_HP } from './rules';
 import type { Action, GameState, PlayerId, PlayTarget } from './types';
 
 let counter = 0;
@@ -56,13 +56,37 @@ describe('kaarten spelen', () => {
     expect(s.zones[1].cards.map((c) => c.card.defId)).toEqual(['rekruut']);
   });
 
-  it('zonekaarten blijven liggen tot het begin van je volgende beurt', () => {
+  it('zonekaarten blijven liggen, ook over beurten heen', () => {
     let s = createGame(['Ana', 'Bo'], 42);
-    s = play(s, 'koper', zone(0));
-    s = act(s, { type: 'endTurn' });
+    s = play(s, 'rekruut', zone(0));
+    for (let i = 0; i < 4; i++) s = act(s, { type: 'endTurn' });
     expect(s.zones[0].cards).toHaveLength(1);
-    s = act(s, { type: 'endTurn' });
-    expect(s.zones[0].cards).toHaveLength(0);
+  });
+
+  it(`je mag maximaal ${MAX_ZONE_CARDS} kaarten per zone leggen`, () => {
+    let s = createGame(['Ana', 'Bo'], 42);
+    for (let i = 0; i < MAX_ZONE_CARDS; i++) s = play(s, 'zilver', zone(0));
+    const r = applyAction(s, { type: 'play', handUid: give(s, 0, 'zilver'), target: zone(0) });
+    expect(r.ok).toBe(false);
+    // In een andere zone kan het nog wel.
+    expect(applyAction(s, { type: 'play', handUid: give(s, 0, 'zilver'), target: zone(1) }).ok).toBe(true);
+  });
+
+  it('Vernietig haalt je eigen kaarten uit de zone terug naar je aflegstapel', () => {
+    let s = createGame(['Ana', 'Bo'], 42);
+    for (let i = 0; i < MAX_ZONE_CARDS; i++) s = play(s, 'zilver', zone(0));
+    s.zones[0].cards.push({ player: 1, card: { uid: 'bo-1', defId: 'rekruut' }, turn: 0 });
+    const discardBefore = s.players[0].discard.length;
+    s = play(s, 'offervuur', zone(0));
+    expect(s.zones[0].cards.map((c) => c.card.defId).sort()).toEqual(['offervuur', 'rekruut']);
+    expect(s.players[0].discard).toHaveLength(discardBefore + MAX_ZONE_CARDS);
+    expect(s.zones[0].damage[0]).toBe(MAX_ZONE_CARDS + 3);
+  });
+
+  it('kaarten zonder onderste effect kan je alleen afleggen', () => {
+    const s = createGame(['Ana', 'Bo'], 42);
+    expect(applyAction(s, { type: 'play', handUid: give(s, 0, 'koper'), target: zone(0) }).ok).toBe(false);
+    expect(applyAction(s, { type: 'play', handUid: give(s, 0, 'koper'), target: DISCARD }).ok).toBe(true);
   });
 
   it('Storm raakt elke open zone', () => {
@@ -99,7 +123,7 @@ describe('kaarten spelen', () => {
   it('een veroverde zone is gesloten', () => {
     const s = createGame(['Ana', 'Bo'], 42);
     s.zones[0].owner = 1;
-    const r = applyAction(s, { type: 'play', handUid: give(s, 0, 'koper'), target: zone(0) });
+    const r = applyAction(s, { type: 'play', handUid: give(s, 0, 'rekruut'), target: zone(0) });
     expect(r.ok).toBe(false);
   });
 });
@@ -146,9 +170,14 @@ describe('winnen', () => {
   it(`${ZONE_HP} schade verovert een zone, 2 zones winnen het spel`, () => {
     let s = createGame(['Ana', 'Bo'], 42);
     s.zones[0].damage = [ZONE_HP - 1, 0];
-    s = play(s, 'koper', zone(0));
+    s.zones[0].cards.push({ player: 1, card: { uid: 'bo-1', defId: 'rekruut' }, turn: 0 });
+    s = play(s, 'zilver', zone(0));
     expect(s.zones[0].owner).toBe(0);
     expect(s.winner).toBeNull();
+    // Bij een verovering gaan alle kaarten in die zone terug naar hun eigenaar.
+    expect(s.zones[0].cards).toHaveLength(0);
+    expect(s.players[1].discard.map((c) => c.uid)).toContain('bo-1');
+    expect(s.players[0].discard.at(-1)?.defId).toBe('zilver');
     s.zones[1].damage = [ZONE_HP - 2, 5];
     s = play(s, 'rekruut', zone(1));
     expect(s.winner).toBe(0);

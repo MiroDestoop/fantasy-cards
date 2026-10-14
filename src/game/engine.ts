@@ -1,5 +1,5 @@
 import { getCard, SHOP_SUPPLY, STARTER_DECK } from './cards';
-import { HAND_SIZE, MARKET_SIZE, MAX_HAND, ZONE_HP, ZONE_SETUP, ZONES_TO_WIN } from './rules';
+import { HAND_SIZE, MARKET_SIZE, MAX_HAND, MAX_ZONE_CARDS, ZONE_HP, ZONE_SETUP, ZONES_TO_WIN } from './rules';
 import type {
   Action, ActionResult, CardInstance, Effect, GameState, PlayerId, PlayerState, PlayTarget,
 } from './types';
@@ -58,13 +58,25 @@ export function applyAction(state: GameState, action: Action): ActionResult {
 }
 
 export function whyCantPlay(state: GameState, handUid: string, target: PlayTarget): string | null {
-  if (!state.players[state.active].hand.some((c) => c.uid === handUid)) return 'Die kaart zit niet in je hand.';
+  const card = state.players[state.active].hand.find((c) => c.uid === handUid);
+  if (!card) return 'Die kaart zit niet in je hand.';
   if (target.kind === 'zone') {
+    const def = getCard(card.defId);
     const zone = state.zones[target.zone];
     if (!zone) return 'Die zone bestaat niet.';
+    if (def.bottom.length === 0) return `${def.name} kan je alleen afleggen.`;
     if (zone.owner !== null) return `${zone.name} is al veroverd.`;
+    const mine = zone.cards.filter((c) => c.player === state.active).length;
+    // Een kaart met Vernietig ruimt eerst de zone op, dus die mag altijd.
+    if (mine >= MAX_ZONE_CARDS && !def.bottom.some((e) => e.kw === 'vernietig')) {
+      return `Je hebt al ${MAX_ZONE_CARDS} kaarten in ${zone.name}. Gebruik Vernietig om plaats te maken.`;
+    }
   }
   return null;
+}
+
+export function zoneCardCount(state: GameState, zoneIdx: number, pid: PlayerId): number {
+  return state.zones[zoneIdx].cards.filter((c) => c.player === pid).length;
 }
 
 export function whyCantBuy(state: GameState, marketUid: string): string | null {
@@ -96,10 +108,22 @@ function playCard(s: GameState, handUid: string, target: PlayTarget): string | n
   } else {
     const zone = s.zones[target.zone];
     log(s, `${p.name} speelt ${def.name} in ${zone.name}.`);
+    // Vernietig gaat eerst, zodat de kaart zelf blijft liggen in de opgeruimde zone.
+    const clears = def.bottom.filter((e) => e.kw === 'vernietig');
+    for (const e of clears) applyEffect(s, pid, e, target.zone);
     zone.cards.push({ player: pid, card, turn: s.turn });
-    for (const e of def.bottom) applyEffect(s, pid, e, target.zone);
+    for (const e of def.bottom) if (e.kw !== 'vernietig') applyEffect(s, pid, e, target.zone);
   }
   return null;
+}
+
+/** Stuurt kaarten uit een zone terug naar de aflegstapel van hun eigenaar. */
+function returnZoneCards(s: GameState, zoneIdx: number, onlyPlayer?: PlayerId): number {
+  const zone = s.zones[zoneIdx];
+  const leaving = zone.cards.filter((c) => onlyPlayer === undefined || c.player === onlyPlayer);
+  for (const c of leaving) s.players[c.player].discard.push(c.card);
+  zone.cards = zone.cards.filter((c) => !leaving.includes(c));
+  return leaving.length;
 }
 
 /** `zoneIdx` is de zone waarin de kaart gespeeld werd, of null bij afleggen. */
@@ -132,6 +156,12 @@ function applyEffect(s: GameState, pid: PlayerId, e: Effect, zoneIdx: number | n
     case 'schild':
       if (zoneIdx !== null) s.zones[zoneIdx].shield[pid] += e.amount;
       break;
+    case 'vernietig':
+      if (zoneIdx !== null) {
+        const n = returnZoneCards(s, zoneIdx, pid);
+        log(s, `${p.name} haalt ${n} kaart(en) weg uit ${s.zones[zoneIdx].name}.`);
+      }
+      break;
   }
 }
 
@@ -146,6 +176,8 @@ function dealDamage(s: GameState, zoneIdx: number, pid: PlayerId, amount: number
   if (zone.damage[pid] >= ZONE_HP) {
     zone.owner = pid;
     log(s, `🚩 ${s.players[pid].name} verovert ${zone.name}!`);
+    // De zone sluit: alle kaarten die er lagen gaan terug naar hun eigenaar.
+    returnZoneCards(s, zoneIdx);
   }
 }
 
@@ -179,11 +211,6 @@ function startTurn(s: GameState): void {
   const pid = s.active;
   const p = s.players[pid];
   log(s, `— ${p.name} is aan de beurt —`);
-  // Kaarten die je vorige beurt in zones legde, gaan nu naar je aflegstapel.
-  for (const zone of s.zones) {
-    p.discard.push(...zone.cards.filter((c) => c.player === pid).map((c) => c.card));
-    zone.cards = zone.cards.filter((c) => c.player !== pid);
-  }
   const count = Math.max(0, HAND_SIZE - p.slow);
   p.slow = 0;
   for (let i = 0; i < count; i++) drawCard(s, p);
