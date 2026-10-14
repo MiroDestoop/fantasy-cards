@@ -49,7 +49,8 @@ function renderStart(): string {
         <li>Verover <b>${ZONES_TO_WIN} van de 3 zones</b> om te winnen. Een zone is van jou als je er als eerste ${ZONE_HP} schade doet.</li>
         <li>Elke beurt trek je ${HAND_SIZE} kaarten. Elke kaart heeft twee helften:
           sleep ze naar je <b>aflegstapel</b> voor het bovenste effect, of naar een <b>zone</b> voor het onderste.</li>
-        <li>Kaarten in een zone blijven liggen, maximaal ${MAX_ZONE_CARDS} per speler per zone. Met <b>Vernietig</b> haal je ze terug.</li>
+        <li>Kaarten in een zone blijven liggen, maximaal ${MAX_ZONE_CARDS} per speler per zone.
+          Met <b>Terugroep</b> haal je ze terug naar je aflegstapel, met <b>Vernietig</b> verban je ze uit het spel.</li>
         <li>Met goud koop je sterkere kaarten in de winkel. Is je stapel leeg, dan wordt je aflegstapel geschud.</li>
         <li>Hover over een keyword zoals <b>Aanval(2)</b> om te zien wat het doet.</li>
       </ul>

@@ -1,6 +1,7 @@
 export type PlayerId = 0 | 1;
 
-export type Keyword = 'goud' | 'aanval' | 'storm' | 'herstel' | 'schild' | 'trek' | 'vertraag' | 'vernietig';
+export type Keyword =
+  | 'goud' | 'aanval' | 'storm' | 'herstel' | 'schild' | 'trek' | 'vertraag' | 'vernietig' | 'terugroep' | 'ververs';
 
 /** Eén keyword met zijn waarde, zoals Aanval(2). */
 export interface Effect {
@@ -39,7 +40,7 @@ export interface PlayerState {
   slow: number;
 }
 
-/** Een kaart in een zone. Ze blijft liggen tot Vernietig of tot de zone veroverd wordt. */
+/** Een kaart in een zone. Ze blijft liggen tot Terugroep of Vernietig, ook nadat de zone veroverd is. */
 export interface ZoneCard {
   player: PlayerId;
   card: CardInstance;

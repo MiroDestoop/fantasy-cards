@@ -52,7 +52,7 @@ describe('kaarten spelen', () => {
     let s = createGame(['Ana', 'Bo'], 42);
     s = play(s, 'rekruut', zone(1));
     expect(s.players[0].gold).toBe(0);
-    expect(s.zones[1].damage).toEqual([2, 0]);
+    expect(s.zones[1].damage).toEqual([1, 0]);
     expect(s.zones[1].cards.map((c) => c.card.defId)).toEqual(['rekruut']);
   });
 
@@ -72,15 +72,43 @@ describe('kaarten spelen', () => {
     expect(applyAction(s, { type: 'play', handUid: give(s, 0, 'zilver'), target: zone(1) }).ok).toBe(true);
   });
 
-  it('Vernietig haalt je eigen kaarten uit de zone terug naar je aflegstapel', () => {
+  it('Vernietig verbant je eigen kaarten in de zone uit het spel', () => {
     let s = createGame(['Ana', 'Bo'], 42);
     for (let i = 0; i < MAX_ZONE_CARDS; i++) s = play(s, 'zilver', zone(0));
     s.zones[0].cards.push({ player: 1, card: { uid: 'bo-1', defId: 'rekruut' }, turn: 0 });
     const discardBefore = s.players[0].discard.length;
     s = play(s, 'offervuur', zone(0));
     expect(s.zones[0].cards.map((c) => c.card.defId).sort()).toEqual(['offervuur', 'rekruut']);
-    expect(s.players[0].discard).toHaveLength(discardBefore + MAX_ZONE_CARDS);
+    expect(s.players[0].discard).toHaveLength(discardBefore);
     expect(s.zones[0].damage[0]).toBe(MAX_ZONE_CARDS + 3);
+  });
+
+  it('Terugroep haalt je oudste kaart in de zone terug naar je aflegstapel', () => {
+    let s = createGame(['Ana', 'Bo'], 42);
+    s = play(s, 'zilver', zone(0));
+    const oldest = s.zones[0].cards[0].card.uid;
+    s = play(s, 'schat', zone(0));
+    s = play(s, 'rekruut', zone(0));
+    expect(s.zones[0].cards.map((c) => c.card.defId)).toEqual(['schat', 'rekruut']);
+    expect(s.players[0].discard.at(-1)?.uid).toBe(oldest);
+  });
+
+  it('Terugroep mag ook in een volle zone', () => {
+    let s = createGame(['Ana', 'Bo'], 42);
+    for (let i = 0; i < MAX_ZONE_CARDS; i++) s = play(s, 'zilver', zone(0));
+    s = play(s, 'rekruut', zone(0));
+    expect(s.zones[0].cards.filter((c) => c.player === 0)).toHaveLength(MAX_ZONE_CARDS);
+  });
+
+  it('Ververs vervangt de hele winkel', () => {
+    let s = createGame(['Ana', 'Bo'], 42);
+    const before = s.shop.market.map((c) => c.uid);
+    const pileBefore = s.shop.pile.length;
+    s = play(s, 'marskramer', DISCARD);
+    expect(s.shop.market).toHaveLength(MARKET_SIZE);
+    expect(s.shop.market.some((c) => before.includes(c.uid))).toBe(false);
+    expect(s.shop.pile).toHaveLength(pileBefore);
+    expect(s.shop.pile.slice(0, MARKET_SIZE).map((c) => c.uid)).toEqual(before);
   });
 
   it('kaarten zonder onderste effect kan je alleen afleggen', () => {
@@ -174,12 +202,10 @@ describe('winnen', () => {
     s = play(s, 'zilver', zone(0));
     expect(s.zones[0].owner).toBe(0);
     expect(s.winner).toBeNull();
-    // Bij een verovering gaan alle kaarten in die zone terug naar hun eigenaar.
-    expect(s.zones[0].cards).toHaveLength(0);
-    expect(s.players[1].discard.map((c) => c.uid)).toContain('bo-1');
-    expect(s.players[0].discard.at(-1)?.defId).toBe('zilver');
+    // Bij een verovering blijven de kaarten in die zone liggen.
+    expect(s.zones[0].cards.map((c) => c.card.defId).sort()).toEqual(['rekruut', 'zilver']);
     s.zones[1].damage = [ZONE_HP - 2, 5];
-    s = play(s, 'rekruut', zone(1));
+    s = play(s, 'vuurbal', zone(1));
     expect(s.winner).toBe(0);
   });
 });

@@ -36,7 +36,17 @@ export const KEYWORDS: Record<Keyword, { label: string; noAmount?: boolean; expl
     label: 'Vernietig',
     noAmount: true,
     explain: () =>
-      `Haal al je kaarten uit deze zone terug naar je aflegstapel. Zo maak je plaats: je mag maar ${MAX_ZONE_CARDS} kaarten per zone hebben.`,
+      `Verban al je kaarten in deze zone uit het spel. Zo maak je plaats (max. ${MAX_ZONE_CARDS} per zone) en raak je zwakke kaarten voorgoed kwijt.`,
+  },
+  terugroep: {
+    label: 'Terugroep',
+    explain: (n) =>
+      `Haal ${n === 1 ? 'je oudste kaart' : `je ${n} oudste kaarten`} in deze zone terug naar je aflegstapel, voordat deze kaart gelegd wordt.`,
+  },
+  ververs: {
+    label: 'Ververs',
+    noAmount: true,
+    explain: () => 'Vervang alle kaarten in de winkel door nieuwe. De oude gaan onderaan de voorraad.',
   },
 };
 
@@ -48,7 +58,7 @@ const CARD_LIST: CardDef[] = [
   // Startkaarten
   { id: 'koper', name: 'Koperen Munt', icon: '🪙', color: '#b87333', top: [fx('goud', 1)], bottom: [] },
   { id: 'zilver', name: 'Zilveren Munt', icon: '💰', color: '#9e9e9e', top: [fx('goud', 2)], bottom: [fx('aanval', 1)] },
-  { id: 'rekruut', name: 'Rekruut', icon: '🗡️', color: '#6b8e23', top: [fx('goud', 1)], bottom: [fx('aanval', 2)] },
+  { id: 'rekruut', name: 'Rekruut', icon: '🗡️', color: '#6b8e23', top: [fx('goud', 1)], bottom: [fx('aanval', 1), fx('terugroep', 1)] },
 
   // Winkelkaarten
   { id: 'vuurbal', name: 'Vuurbal', price: 4, icon: '🔥', color: '#e65100', top: [fx('storm', 1)], bottom: [fx('aanval', 4)] },
@@ -65,6 +75,9 @@ const CARD_LIST: CardDef[] = [
   { id: 'schat', name: 'Drakenschat', price: 5, icon: '👑', color: '#c9a227', top: [fx('goud', 4)], bottom: [fx('aanval', 2)] },
   { id: 'offervuur', name: 'Offervuur', price: 4, icon: '🕯️', color: '#d84315', top: [fx('goud', 1)], bottom: [fx('vernietig', 0), fx('aanval', 3)] },
   { id: 'terugtocht', name: 'Terugtocht', price: 3, icon: '🏳️', color: '#607d8b', top: [fx('trek', 1)], bottom: [fx('vernietig', 0), fx('schild', 2)] },
+  { id: 'koerier', name: 'Koerier', price: 3, icon: '🐎', color: '#8d6e63', top: [fx('trek', 1)], bottom: [fx('aanval', 2), fx('terugroep', 1)] },
+  { id: 'hoornblazer', name: 'Hoornblazer', price: 5, icon: '📯', color: '#bf8f00', top: [fx('goud', 2)], bottom: [fx('aanval', 3), fx('terugroep', 2)] },
+  { id: 'marskramer', name: 'Marskramer', price: 2, icon: '🛒', color: '#ad1457', top: [fx('goud', 1), fx('ververs', 0)], bottom: [fx('aanval', 1)] },
 ];
 
 export const CARDS: Record<string, CardDef> = Object.fromEntries(CARD_LIST.map((c) => [c.id, c]));
@@ -84,5 +97,5 @@ export const STARTER_DECK = expand([['koper', 5], ['rekruut', 3], ['zilver', 2]]
 export const SHOP_SUPPLY = expand([
   ['vuurbal', 3], ['trol', 3], ['draak', 2], ['storm', 3], ['vampier', 3], ['uil', 3],
   ['inzicht', 3], ['heks', 3], ['zandloper', 2], ['golem', 3], ['bron', 3], ['schat', 3],
-  ['offervuur', 3], ['terugtocht', 3],
+  ['offervuur', 3], ['terugtocht', 3], ['koerier', 3], ['hoornblazer', 3], ['marskramer', 3],
 ]);

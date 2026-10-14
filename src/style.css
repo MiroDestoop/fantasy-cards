@@ -279,6 +279,8 @@ button { font: inherit; }
 .kw-trek { --edge: #6a3d8f; }
 .kw-vertraag { --edge: #0277bd; }
 .kw-vernietig { --edge: #37474f; }
+.kw-terugroep { --edge: #5d4037; }
+.kw-ververs { --edge: #ad1457; }
 
 .ghost {
   position: fixed;
@@ -376,14 +378,18 @@ button { font: inherit; }
 }
 
 .zone-area.closed { filter: saturate(0.6); }
+/* Een strook over het midden, zodat de kaarten die blijven liggen zichtbaar blijven. */
 .zone-banner {
   position: absolute;
-  inset: 0;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 14px 0;
   display: grid;
   place-items: center;
   align-content: center;
-  border-radius: 20px;
-  background: rgba(10, 6, 3, 0.62);
+  background: rgba(10, 6, 3, 0.82);
   text-align: center;
   font-size: 18px;
 }
