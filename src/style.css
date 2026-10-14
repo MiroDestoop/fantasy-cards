@@ -103,6 +103,26 @@ button { font: inherit; }
 .flags { background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.3); }
 .slow { background: rgba(2, 119, 189, 0.3); border: 1px solid #4fc3f7; }
 
+/* Knop boven de spelerinfo: speel je hele hand af voor het bovenste effect. */
+.discard-all {
+  position: absolute;
+  left: 0;
+  bottom: 120px;
+  padding: 7px 16px;
+  border-radius: 999px;
+  border: 2px solid #a67c00;
+  background: linear-gradient(180deg, rgba(166, 124, 0, 0.35), rgba(60, 40, 10, 0.6));
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45);
+  transition: transform 0.12s, filter 0.12s;
+}
+.discard-all:hover { transform: translateY(-2px); filter: brightness(1.2); }
+.discard-all:active { transform: translateY(0); }
+.discard-all span { margin-left: 6px; color: #ffe082; }
+
 /* ---------- Stapels ---------- */
 
 .piles { position: absolute; right: 0; display: flex; gap: 18px; }

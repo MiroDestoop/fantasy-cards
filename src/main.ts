@@ -40,7 +40,7 @@ function render(): void {
 function renderStart(): string {
   return `
   <div class="start">
-    <h1>Rijk der Kaarten</h1>
+    <h1>Munt of Zwaard</h1>
     <p class="subtitle">Een fantasy-kaartduel voor twee spelers aan één tafel</p>
     <div class="names">
       <label>Speler 1 <input id="name0" maxlength="16" value="${esc(names[0])}"></label>
@@ -79,6 +79,7 @@ function renderGame(g: GameState): string {
     </div>
     <div class="zones">${g.zones.map((_, i) => renderZone(g, i, bottom, prev)).join('')}</div>
     <div class="seat bottom">
+      ${hidden ? '' : renderDiscardAllButton(g)}
       ${renderInfo(g, bottom)}
       <div class="hand mine">${hidden ? renderBacks(g.players[bottom].hand.length) : renderHand(g, bottom)}</div>
       ${renderPiles(g, bottom, true)}
@@ -106,6 +107,19 @@ function renderInfo(g: GameState, pid: PlayerId): string {
       </div>
     </div>
   </div>`;
+}
+
+function renderDiscardAllButton(g: GameState): string {
+  const hand = g.players[g.active].hand;
+  if (!hand.length || g.winner !== null) return '';
+  const gold = hand.reduce(
+    (t, c) => t + getCard(c.defId).top.filter((e) => e.kw === 'goud').reduce((s, e) => s + e.amount, 0),
+    0,
+  );
+  return `<button class="discard-all" data-click="discard-all"
+    title="Speel alle ${hand.length} kaarten in je hand af op je aflegstapel en krijg hun bovenste effect">
+    ⤓ Alles afleggen${gold ? ` <span>+${gold} 🪙</span>` : ''}
+  </button>`;
 }
 
 function renderPiles(g: GameState, pid: PlayerId, mine: boolean): string {
@@ -309,6 +323,9 @@ app.addEventListener('click', (e) => {
     case 'end-turn':
       dispatch({ type: 'endTurn' });
       break;
+    case 'discard-all':
+      if (handoff === null) dispatch({ type: 'discardAll' });
+      break;
     case 'buy':
       if (handoff === null) dispatch({ type: 'buy', marketUid: arg });
       break;
@@ -483,15 +500,18 @@ function playSounds(action: Action, before: GameState, after: GameState, flights
 
   if (action.type === 'endTurn') sfx.endTurn();
   if (action.type === 'buy') sfx.buy();
-  if (action.type === 'play') {
-    if (action.target.kind === 'zone') sfx.place();
-    else sfx.flick();
-    if (after.players[me].gold > before.players[me].gold) sfx.coin(0.08);
-    if (sum(after, (z) => z.damage[me]) > sum(before, (z) => z.damage[me])) sfx.hit(0.1);
-    if (sum(after, (z) => z.damage[opp]) < sum(before, (z) => z.damage[opp])) sfx.heal(0.15);
-    if (sum(after, (z) => z.shield[me]) > sum(before, (z) => z.shield[me])) sfx.shield(0.15);
-    const drawn = after.players[me].hand.length - (before.players[me].hand.length - 1);
-    if (drawn > 0) sfx.deal(drawn, 0.2);
+  const played = action.type === 'play' ? 1 : action.type === 'discardAll' ? before.players[me].hand.length : 0;
+  if (played) {
+    if (action.type === 'play' && action.target.kind === 'zone') sfx.place();
+    else for (let i = 0; i < played; i++) sfx.flick(i * 0.07);
+    // De volgende geluiden starten na het laatste kaartgeluid.
+    const t = (played - 1) * 0.07;
+    if (after.players[me].gold > before.players[me].gold) sfx.coin(t + 0.08);
+    if (sum(after, (z) => z.damage[me]) > sum(before, (z) => z.damage[me])) sfx.hit(t + 0.1);
+    if (sum(after, (z) => z.damage[opp]) < sum(before, (z) => z.damage[opp])) sfx.heal(t + 0.15);
+    if (sum(after, (z) => z.shield[me]) > sum(before, (z) => z.shield[me])) sfx.shield(t + 0.15);
+    const drawn = after.players[me].hand.length - (before.players[me].hand.length - played);
+    if (drawn > 0) sfx.deal(drawn, t + 0.2);
   }
 
   // Zelfde timing als de animaties in playEffects.

@@ -175,6 +175,35 @@ describe('beurten en stapel', () => {
   });
 });
 
+describe('alles afleggen', () => {
+  it('speelt elke kaart in je hand af voor het bovenste effect', () => {
+    let s = createGame(['Ana', 'Bo'], 42);
+    s.players[0].hand = [
+      { uid: 'a', defId: 'koper' },
+      { uid: 'b', defId: 'zilver' },
+      { uid: 'c', defId: 'rekruut' },
+    ];
+    s = act(s, { type: 'discardAll' });
+    expect(s.players[0].gold).toBe(4);
+    expect(s.players[0].hand).toHaveLength(0);
+    expect(s.players[0].discard.map((c) => c.uid)).toEqual(['a', 'b', 'c']);
+    expect(s.zones.every((z) => z.cards.length === 0)).toBe(true);
+  });
+
+  it('laat kaarten die onderweg getrokken worden in je hand', () => {
+    let s = createGame(['Ana', 'Bo'], 42);
+    s.players[0].hand = [{ uid: 'a', defId: 'inzicht' }];
+    s = act(s, { type: 'discardAll' });
+    expect(s.players[0].hand).toHaveLength(3);
+  });
+
+  it('weigert met een lege hand', () => {
+    const s = createGame(['Ana', 'Bo'], 42);
+    s.players[0].hand = [];
+    expect(applyAction(s, { type: 'discardAll' }).ok).toBe(false);
+  });
+});
+
 describe('handlimiet', () => {
   it(`legt kaarten boven de limiet van ${MAX_HAND} meteen af`, () => {
     let s = createGame(['Ana', 'Bo'], 42);

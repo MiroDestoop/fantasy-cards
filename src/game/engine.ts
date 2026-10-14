@@ -47,6 +47,9 @@ export function applyAction(state: GameState, action: Action): ActionResult {
     case 'play':
       error = playCard(s, action.handUid, action.target);
       break;
+    case 'discardAll':
+      error = discardAll(s);
+      break;
     case 'buy':
       error = buyCard(s, action.marketUid);
       break;
@@ -114,6 +117,16 @@ function playCard(s: GameState, handUid: string, target: PlayTarget): string | n
     for (const e of def.bottom) if (BEFORE_PLACING.includes(e.kw)) applyEffect(s, pid, e, target.zone);
     zone.cards.push({ player: pid, card, turn: s.turn });
     for (const e of def.bottom) if (!BEFORE_PLACING.includes(e.kw)) applyEffect(s, pid, e, target.zone);
+  }
+  return null;
+}
+
+function discardAll(s: GameState): string | null {
+  // Alleen de kaarten die er nu zitten: wat Trek onderweg bijbrengt, blijft in je hand.
+  const uids = s.players[s.active].hand.map((c) => c.uid);
+  if (!uids.length) return 'Je hebt geen kaarten in je hand.';
+  for (const uid of uids) {
+    if (s.players[s.active].hand.some((c) => c.uid === uid)) playCard(s, uid, { kind: 'discard' });
   }
   return null;
 }

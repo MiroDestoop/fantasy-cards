@@ -83,6 +83,8 @@ export type PlayTarget = { kind: 'discard' } | { kind: 'zone'; zone: number };
 
 export type Action =
   | { type: 'play'; handUid: string; target: PlayTarget }
+  /** Speel elke kaart die nu in je hand zit af op je aflegstapel (bovenste effect). */
+  | { type: 'discardAll' }
   | { type: 'buy'; marketUid: string }
   | { type: 'endTurn' };
 
