@@ -246,6 +246,7 @@ function drawCard(s: GameState, p: PlayerState): void {
   const card = p.deck.pop()!;
   if (p.hand.length >= MAX_HAND) {
     p.discard.push(card);
+    log(s, `${p.name} heeft al ${MAX_HAND} kaarten: ${getCard(card.defId).name} gaat naar de aflegstapel.`);
     return;
   }
   p.hand.push(card);

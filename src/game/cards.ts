@@ -1,4 +1,4 @@
-import { MAX_ZONE_CARDS, ZONE_HP } from './rules';
+import { MAX_HAND, MAX_ZONE_CARDS, ZONE_HP } from './rules';
 import type { CardDef, Effect, Keyword } from './types';
 
 const kaarten = (n: number) => (n === 1 ? '1 kaart' : `${n} kaarten`);
@@ -26,7 +26,8 @@ export const KEYWORDS: Record<Keyword, { label: string; noAmount?: boolean; expl
   },
   trek: {
     label: 'Trek',
-    explain: (n) => `Trek ${kaarten(n)}. Is je stapel leeg, dan wordt je aflegstapel geschud tot een nieuwe stapel.`,
+    explain: (n) =>
+      `Trek ${kaarten(n)}. Is je stapel leeg, dan wordt je aflegstapel geschud. Je hand heeft een limiet van ${MAX_HAND}: wat je daarboven trekt, gaat naar je aflegstapel.`,
   },
   vertraag: {
     label: 'Vertraag',
@@ -78,6 +79,11 @@ const CARD_LIST: CardDef[] = [
   { id: 'koerier', name: 'Koerier', price: 3, icon: '🐎', color: '#8d6e63', top: [fx('trek', 1)], bottom: [fx('aanval', 2), fx('terugroep', 1)] },
   { id: 'hoornblazer', name: 'Hoornblazer', price: 5, icon: '📯', color: '#bf8f00', top: [fx('goud', 2)], bottom: [fx('aanval', 3), fx('terugroep', 2)] },
   { id: 'marskramer', name: 'Marskramer', price: 2, icon: '🛒', color: '#ad1457', top: [fx('goud', 1), fx('ververs', 0)], bottom: [fx('aanval', 1)] },
+  { id: 'bard', name: 'Zwervende Bard', price: 3, icon: '🪕', color: '#7b1fa2', top: [fx('ververs', 0), fx('trek', 1)], bottom: [fx('aanval', 1), fx('terugroep', 2)] },
+  { id: 'valkenier', name: 'Valkenier', price: 4, icon: '🦅', color: '#8d6e63', top: [fx('ververs', 0), fx('goud', 1)], bottom: [fx('aanval', 2), fx('terugroep', 2)] },
+  { id: 'getijde', name: 'Getijdenmagiër', price: 5, icon: '🌊', color: '#00695c', top: [fx('ververs', 0), fx('goud', 2)], bottom: [fx('terugroep', 3), fx('schild', 3)] },
+  { id: 'bol', name: 'Kristallen Bol', price: 4, icon: '🔮', color: '#5e35b1', top: [fx('goud', 2)], bottom: [fx('ververs', 0), fx('aanval', 2)] },
+  { id: 'generaal', name: 'Generaal', price: 7, icon: '🎖️', color: '#4e342e', top: [fx('goud', 3)], bottom: [fx('aanval', 4), fx('terugroep', 3)] },
 ];
 
 export const CARDS: Record<string, CardDef> = Object.fromEntries(CARD_LIST.map((c) => [c.id, c]));
@@ -98,4 +104,5 @@ export const SHOP_SUPPLY = expand([
   ['vuurbal', 3], ['trol', 3], ['draak', 2], ['storm', 3], ['vampier', 3], ['uil', 3],
   ['inzicht', 3], ['heks', 3], ['zandloper', 2], ['golem', 3], ['bron', 3], ['schat', 3],
   ['offervuur', 3], ['terugtocht', 3], ['koerier', 3], ['hoornblazer', 3], ['marskramer', 3],
+  ['bard', 3], ['valkenier', 3], ['getijde', 2], ['bol', 2], ['generaal', 2],
 ]);

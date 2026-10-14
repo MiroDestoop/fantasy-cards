@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { getCard } from './cards';
 import { applyAction, createGame } from './engine';
-import { HAND_SIZE, MARKET_SIZE, MAX_ZONE_CARDS, ZONE_HP } from './rules';
+import { HAND_SIZE, MARKET_SIZE, MAX_HAND, MAX_ZONE_CARDS, ZONE_HP } from './rules';
 import type { Action, GameState, PlayerId, PlayTarget } from './types';
 
 let counter = 0;
@@ -172,6 +172,21 @@ describe('beurten en stapel', () => {
     const ana = s.players[0];
     expect(ana.hand).toHaveLength(HAND_SIZE);
     expect(ana.hand.length + ana.deck.length + ana.discard.length).toBe(10);
+  });
+});
+
+describe('handlimiet', () => {
+  it(`legt kaarten boven de limiet van ${MAX_HAND} meteen af`, () => {
+    let s = createGame(['Ana', 'Bo'], 42);
+    s.players[0].deck.push(...Array.from({ length: 6 }, (_, i) => ({ uid: `extra-${i}`, defId: 'koper' })));
+    const discardBefore = s.players[0].discard.length;
+    // Eerste Arcaan Inzicht: hand 5 → 8. Tweede: hand blijft 8, alle 3 getrokken kaarten passen niet meer.
+    s = play(s, 'inzicht', DISCARD);
+    expect(s.players[0].hand).toHaveLength(MAX_HAND);
+    s = play(s, 'inzicht', DISCARD);
+    expect(s.players[0].hand).toHaveLength(MAX_HAND);
+    // 2 afgelegde Inzicht-kaarten + 3 getrokken kaarten die niet meer pasten.
+    expect(s.players[0].discard).toHaveLength(discardBefore + 5);
   });
 });
 

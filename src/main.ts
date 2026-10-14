@@ -5,12 +5,16 @@ import {
 } from './game/engine';
 import { HAND_SIZE, MAX_ZONE_CARDS, ZONE_HP, ZONES_TO_WIN } from './game/rules';
 import type { Action, CardDef, CardInstance, Effect, GameState, Keyword, PlayerId, PlayTarget } from './game/types';
+import { isMuted, sfx, toggleMute } from './sound';
+import { ZONE_ART } from './zoneArt';
 
 const HERO_ICONS = ['🧙‍♂️', '🧝‍♀️'] as const;
 const STAGE_W = 1600;
 const STAGE_H = 900;
 const CARD_W = 150;
 const CARD_H = 210;
+/** Breedte van de handzone tussen spelerinfo en stapels (zie .hand.mine in style.css). */
+const HAND_WIDTH = 640;
 
 const stage = document.querySelector<HTMLDivElement>('#stage')!;
 const app = document.querySelector<HTMLDivElement>('#app')!;
@@ -126,7 +130,9 @@ function renderPiles(g: GameState, pid: PlayerId, mine: boolean): string {
 function renderHand(g: GameState, pid: PlayerId): string {
   const hand = g.players[pid].hand;
   const n = hand.length;
-  const overlap = n <= 5 ? -16 : Math.max(-80, -16 - (n - 5) * 14);
+  // De kaarten schuiven verder over elkaar naarmate de hand groeit, zodat ze altijd tussen de stapels passen.
+  const step = n > 1 ? Math.min(CARD_W - 16, (HAND_WIDTH - CARD_W) / (n - 1)) : 0;
+  const overlap = step - CARD_W;
   return hand
     .map((card, i) => {
       const off = i - (n - 1) / 2;
@@ -181,7 +187,7 @@ function renderZone(g: GameState, i: number, bottom: PlayerId, prev: GameState |
       .filter((c) => c.player === pid)
       .map((c) => {
         const isNew = !seenZoneCards.has(`${c.card.uid}@${c.turn}`);
-        return `<div class="zslot"><div class="card ${isNew ? (pid === bottom ? 'enter-up' : 'enter-down') : ''}">${renderFace(getCard(c.card.defId))}</div></div>`;
+        return `<div class="zslot" data-zcard="${c.card.uid}"><div class="card ${isNew ? (pid === bottom ? 'enter-up' : 'enter-down') : ''}">${renderFace(getCard(c.card.defId))}</div></div>`;
       })
       .join('');
     const n = zoneCardCount(g, i, pid);
@@ -204,6 +210,7 @@ function renderZone(g: GameState, i: number, bottom: PlayerId, prev: GameState |
   };
   return `
   <div class="zone-area ${z.owner !== null ? 'closed' : ''}" data-drop="zone:${i}">
+    <div class="zone-art">${ZONE_ART[z.name] ?? ''}</div>
     <div class="zcards">${row(top)}</div>
     <div class="zone-mid">
       ${bar(top)}
@@ -218,10 +225,10 @@ function renderZone(g: GameState, i: number, bottom: PlayerId, prev: GameState |
 function renderShop(g: GameState): string {
   const canShop = handoff === null;
   const slots = g.shop.market
-    .map((card) => {
+    .map((card, i) => {
       const def = getCard(card.defId);
       const affordable = canShop && !whyCantBuy(g, card.uid);
-      return `<div class="shop-slot ${affordable ? 'affordable' : ''}" data-click="buy:${card.uid}">
+      return `<div class="shop-slot ${affordable ? 'affordable' : ''} ${shopDeal ? 'deal-in' : ''}" style="--i:${i}" data-click="buy:${card.uid}">
         <div class="card">${renderFace(def)}</div>
         <div class="price" title="Prijs in goud">${def.price}</div>
       </div>`;
@@ -245,6 +252,7 @@ function renderSidePanel(g: GameState): string {
     <div class="hint">Sleep een kaart naar je <b>aflegstapel</b> (bovenste effect) of naar een <b>zone</b> (onderste effect).
       Hover over een stapel om te zien wat erin zit.</div>
     <div class="log">${g.log.slice(-16).reverse().map((l) => `<div>${esc(l)}</div>`).join('')}</div>
+    <button class="sound-toggle" data-click="sound">${isMuted() ? '🔇 Geluid uit' : '🔊 Geluid aan'}</button>
   </div>`;
 }
 
@@ -291,6 +299,12 @@ app.addEventListener('click', (e) => {
     case 'continue':
       handoff = null;
       render();
+      if (game) sfx.deal(game.players[game.active].hand.length);
+      break;
+    case 'sound':
+      toggleMute();
+      render();
+      sfx.coin();
       break;
     case 'end-turn':
       dispatch({ type: 'endTurn' });
@@ -446,12 +460,155 @@ function dispatch(action: Action): void {
   const r = applyAction(game, action);
   if (!r.ok) {
     showToast(r.error);
+    sfx.error();
     render();
     return;
   }
+  const before = game;
   game = r.state;
+  // Wat er gaat verdwijnen, moet vastgelegd worden voordat de tafel opnieuw getekend wordt.
+  const flights = captureEffects(before, game);
   if (action.type === 'endTurn' && game.winner === null) handoff = game.active;
   render();
+  shopDeal = false;
+  playEffects(flights);
+  playSounds(action, before, game, flights);
+}
+
+/** Kiest de geluiden bij een actie door de toestand voor en na te vergelijken. */
+function playSounds(action: Action, before: GameState, after: GameState, flights: Flight[]): void {
+  const me = before.active;
+  const opp = other(me);
+  const sum = (g: GameState, f: (z: GameState['zones'][number]) => number) => g.zones.reduce((t, z) => t + f(z), 0);
+
+  if (action.type === 'endTurn') sfx.endTurn();
+  if (action.type === 'buy') sfx.buy();
+  if (action.type === 'play') {
+    if (action.target.kind === 'zone') sfx.place();
+    else sfx.flick();
+    if (after.players[me].gold > before.players[me].gold) sfx.coin(0.08);
+    if (sum(after, (z) => z.damage[me]) > sum(before, (z) => z.damage[me])) sfx.hit(0.1);
+    if (sum(after, (z) => z.damage[opp]) < sum(before, (z) => z.damage[opp])) sfx.heal(0.15);
+    if (sum(after, (z) => z.shield[me]) > sum(before, (z) => z.shield[me])) sfx.shield(0.15);
+    const drawn = after.players[me].hand.length - (before.players[me].hand.length - 1);
+    if (drawn > 0) sfx.deal(drawn, 0.2);
+  }
+
+  // Zelfde timing als de animaties in playEffects.
+  for (const f of flights) {
+    if (f.kind === 'return') sfx.whoosh(f.index * 0.11);
+    if (f.kind === 'banish') sfx.burn(f.index * 0.09);
+  }
+  if (flights.some((f) => f.kind === 'shop-out')) sfx.shuffle(0.05);
+
+  const conquered = after.zones.some((z, i) => z.owner !== null && before.zones[i].owner === null);
+  if (after.winner !== null) sfx.victory(0.4);
+  else if (conquered) sfx.conquer(0.3);
+}
+
+// ---------- Animaties voor Terugroep, Vernietig en Ververs ----------
+
+interface Flight {
+  clone: HTMLElement;
+  from: DOMRect;
+  kind: 'return' | 'banish' | 'shop-out';
+  pid: PlayerId;
+  index: number;
+}
+/** Laat de nieuwe winkelkaarten bij de volgende weergave één voor één binnenkomen. */
+let shopDeal = false;
+
+function captureEffects(before: GameState, after: GameState): Flight[] {
+  const flights: Flight[] = [];
+  const grab = (el: HTMLElement, kind: Flight['kind'], pid: PlayerId) =>
+    flights.push({ clone: el.cloneNode(true) as HTMLElement, from: el.getBoundingClientRect(), kind, pid, index: flights.length });
+
+  before.zones.forEach((zone, zi) => {
+    for (const zc of zone.cards) {
+      if (after.zones[zi].cards.some((c) => c.card.uid === zc.card.uid)) continue;
+      const el = app.querySelector<HTMLElement>(`[data-zcard="${zc.card.uid}"] .card`);
+      if (!el) continue;
+      // Teruggeroepen kaarten liggen nu op de aflegstapel; vernietigde zijn nergens meer.
+      const returned = after.players[zc.player].discard.some((c) => c.uid === zc.card.uid);
+      grab(el, returned ? 'return' : 'banish', zc.player);
+    }
+  });
+
+  // Een aankoop vervangt één kaart; Ververs vervangt ze allemaal.
+  const oldMarket = before.shop.market.map((c) => c.uid);
+  if (oldMarket.length && !after.shop.market.some((c) => oldMarket.includes(c.uid))) {
+    shopDeal = true;
+    const start = flights.length;
+    app.querySelectorAll<HTMLElement>('.shop-slot .card').forEach((el) => grab(el, 'shop-out', after.active));
+    flights.slice(start).forEach((f, i) => (f.index = i));
+  }
+  return flights;
+}
+
+function playEffects(flights: Flight[]): void {
+  for (const f of flights) {
+    const c = f.clone;
+    c.classList.remove('enter-up', 'enter-down');
+    c.classList.add('fx-card');
+    document.body.appendChild(c);
+    const s0 = f.from.width / CARD_W;
+    const start = `translate(${f.from.left}px, ${f.from.top}px) scale(${s0})`;
+    let anim: Animation;
+
+    if (f.kind === 'return') {
+      const pile = app.querySelector(`[data-pile="discard:${f.pid}"]`)!.getBoundingClientRect();
+      const s1 = pile.width / CARD_W;
+      const midX = (f.from.left + pile.left) / 2;
+      const midY = Math.min(f.from.top, pile.top) - 90 * scale;
+      anim = c.animate(
+        [
+          { transform: start },
+          { transform: `translate(${midX}px, ${midY}px) scale(${((s0 + s1) / 2) * 1.2}) rotate(-14deg)`, offset: 0.45 },
+          { transform: `translate(${pile.left}px, ${pile.top}px) scale(${s1}) rotate(0deg)` },
+        ],
+        { duration: 700, delay: f.index * 110, easing: 'cubic-bezier(.45,0,.25,1)', fill: 'both' },
+      );
+    } else if (f.kind === 'banish') {
+      anim = c.animate(
+        [
+          { transform: start, filter: 'none', opacity: 1 },
+          { transform: `${start} translateY(-8px)`, filter: 'brightness(1.7) sepia(1) saturate(5) hue-rotate(-25deg)', opacity: 1, offset: 0.35 },
+          { transform: `${start} translateY(-40px) scale(1.12)`, filter: 'brightness(0.2) sepia(1) blur(3px)', opacity: 0 },
+        ],
+        { duration: 900, delay: f.index * 90, easing: 'ease-in', fill: 'both' },
+      );
+      spawnEmbers(f.from, f.index * 90);
+    } else {
+      anim = c.animate(
+        [
+          { transform: start, opacity: 1 },
+          { transform: `${start} translate(-220px, 30px) rotate(-30deg)`, opacity: 0 },
+        ],
+        { duration: 450, delay: f.index * 60, easing: 'ease-in', fill: 'both' },
+      );
+    }
+    anim.onfinish = () => c.remove();
+  }
+}
+
+/** Vonken die opstijgen uit een vernietigde kaart. */
+function spawnEmbers(r: DOMRect, delay: number): void {
+  for (let i = 0; i < 14; i++) {
+    const ember = document.createElement('div');
+    ember.className = 'ember';
+    document.body.appendChild(ember);
+    const x = r.left + Math.random() * r.width;
+    const y = r.top + r.height * (0.3 + Math.random() * 0.7);
+    ember
+      .animate(
+        [
+          { transform: `translate(${x}px, ${y}px) scale(1)`, opacity: 1 },
+          { transform: `translate(${x + (Math.random() - 0.5) * 70}px, ${y - 60 - Math.random() * 90}px) scale(0.2)`, opacity: 0 },
+        ],
+        { duration: 700 + Math.random() * 500, delay: delay + 200 + Math.random() * 250, easing: 'ease-out', fill: 'both' },
+      )
+      .onfinish = () => ember.remove();
+  }
 }
 
 // ---------- Hulpjes ----------

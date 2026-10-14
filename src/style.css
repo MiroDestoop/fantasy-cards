@@ -176,7 +176,8 @@ button { font: inherit; }
 
 .hand { position: absolute; left: 230px; right: 210px; display: flex; justify-content: center; }
 .hand.opp { top: -50px; transform: rotate(180deg); }
-.hand.mine { bottom: 14px; align-items: flex-end; }
+/* Boven de stapels en de spelerinfo, zodat een volle hand nooit verdwijnt. */
+.hand.mine { bottom: 14px; align-items: flex-end; z-index: 4; }
 
 .backs { display: flex; }
 .backs .back { margin-left: -24px; }
@@ -293,6 +294,39 @@ button { font: inherit; }
 }
 .ghost * { pointer-events: none !important; }
 
+/* Kopieën van kaarten die wegvliegen of verbranden (Terugroep, Vernietig, Ververs). */
+.fx-card {
+  position: fixed;
+  left: 0;
+  top: 0;
+  margin: 0;
+  transform-origin: 0 0;
+  pointer-events: none;
+  z-index: 140;
+}
+.fx-card * { pointer-events: none !important; }
+.ember {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff3c4, #ff9800 50%, #d84315);
+  box-shadow: 0 0 8px 2px rgba(255, 152, 0, 0.8);
+  pointer-events: none;
+  z-index: 141;
+}
+
+/* Na Ververs worden de nieuwe winkelkaarten er één voor één ingelegd. */
+.shop-slot.deal-in .card {
+  animation: deal-in 0.45s cubic-bezier(0.2, 1.1, 0.4, 1) backwards;
+  animation-delay: calc(var(--i) * 100ms + 250ms);
+}
+@keyframes deal-in {
+  from { transform: translate(-80px, 0) scale(0.62) rotateY(90deg); opacity: 0; }
+}
+
 /* ---------- Zones ---------- */
 
 .zones {
@@ -316,7 +350,25 @@ button { font: inherit; }
   background: rgba(0, 0, 0, 0.14);
   transition: box-shadow 0.15s, border-color 0.15s, background 0.15s;
 }
-.zcards { position: relative; height: 112px; display: flex; justify-content: center; align-items: center; }
+/* De illustratie ligt achter alles in de zone, gedimd zodat kaarten en balken leesbaar blijven. */
+.zone-art {
+  position: absolute;
+  inset: 0;
+  border-radius: 20px;
+  overflow: hidden;
+  opacity: 0.55;
+  pointer-events: none;
+}
+.zone-art svg { display: block; width: 100%; height: 100%; }
+.zone-art::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.35), transparent 70%);
+}
+.zone-area.drop-hover .zone-art { opacity: 0.8; }
+.zone-mid { position: relative; z-index: 1; }
+.zcards { position: relative; z-index: 1; height: 112px; display: flex; justify-content: center; align-items: center; }
 .zcount {
   position: absolute;
   left: 0;
@@ -524,6 +576,17 @@ button { font: inherit; }
 }
 .log div { padding: 2px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
 .log div:first-child { color: var(--gold); }
+
+.sound-toggle {
+  padding: 6px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(230, 192, 104, 0.4);
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--ink);
+  font-size: 14px;
+  cursor: pointer;
+}
+.sound-toggle:hover { background: rgba(230, 192, 104, 0.15); }
 
 /* ---------- Effecten ---------- */
 
