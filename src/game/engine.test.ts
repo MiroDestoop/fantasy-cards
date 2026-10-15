@@ -359,3 +359,16 @@ describe('speciale effecten', () => {
     }
   });
 });
+
+describe('bonusgoud', () => {
+  it('geeft een speler met bonus elke beurt extra goud, de andere niet', () => {
+    let s = createGame(['Ana', 'Computer'], 42, { bonusGold: [0, 1] });
+    expect(s.players[0].gold).toBe(0);
+    s = act(s, { type: 'endTurn' });
+    expect(s.players[1].gold).toBe(1);
+    s = act(s, { type: 'endTurn' });
+    s = act(s, { type: 'endTurn' });
+    expect(s.players[1].gold).toBe(2);
+    expect(s.players[0].gold).toBe(0);
+  });
+});

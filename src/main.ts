@@ -1,5 +1,5 @@
 import './style.css';
-import { chooseAction } from './game/ai';
+import { AI_LEVELS, chooseAction, type AiLevel } from './game/ai';
 import { getCard, KEYWORDS } from './game/cards';
 import { getSpecial } from './game/specials';
 import {
@@ -17,6 +17,7 @@ const COMPUTER: PlayerId = 1;
 /** Wachttijd van de computer vóór haar eerste zet en tussen haar zetten, zodat je kunt volgen wat ze doet. */
 const COMPUTER_THINK_MS = 1000;
 const COMPUTER_STEP_MS = 750;
+const LEVEL_KEY = 'fantasy-cards-niveau';
 const STAGE_W = 1600;
 const STAGE_H = 900;
 const CARD_W = 150;
@@ -32,6 +33,8 @@ const tipEl = document.querySelector<HTMLDivElement>('#tip')!;
 let names: [string, string] = ['Speler 1', 'Speler 2'];
 /** Speel je tegen de computer in plaats van tegen een tweede speler aan dezelfde tafel? */
 let vsComputer = false;
+/** Het niveau van de computer; onthouden voor de volgende keer. */
+let computerLevel: AiLevel = loadLevel();
 let game: GameState | null = null;
 /** Verhoogt bij elk nieuw spel, zodat een geplande zet van de computer uit een oud spel niets meer doet. */
 let gameId = 0;
@@ -58,10 +61,17 @@ function renderStart(): string {
       <button class="${vsComputer ? '' : 'on'}" data-click="mode:pvp">👥 Twee spelers</button>
       <button class="${vsComputer ? 'on' : ''}" data-click="mode:ai">${COMPUTER_ICON} Tegen de computer</button>
     </div>
+    ${vsComputer
+      ? `<div class="mode levels">${AI_LEVELS.map((l) =>
+          `<button class="${l.id === computerLevel ? 'on' : ''}" data-click="level:${l.id}">${l.icon} ${l.label}</button>`).join('')}</div>
+        ${levelInfo().bonusGold
+          ? `<p class="level-note">${levelInfo().icon} ${levelInfo().label} speelt zoals Extreem, maar krijgt elke beurt ${levelInfo().bonusGold} extra goud.</p>`
+          : ''}`
+      : ''}
     <div class="names">
       <label>${vsComputer ? 'Jouw naam' : 'Speler 1'} <input id="name0" maxlength="16" value="${esc(names[0])}"></label>
       ${vsComputer
-        ? `<label>Tegenstander <div class="computer-name">${COMPUTER_ICON} Computer</div></label>`
+        ? `<label>Tegenstander <div class="computer-name">${levelInfo().icon} ${esc(computerName())}</div></label>`
         : `<label>Speler 2 <input id="name1" maxlength="16" value="${esc(names[1])}"></label>`}
     </div>
     <button class="btn" data-click="start">Aan tafel!</button>
@@ -96,7 +106,7 @@ function humanCanAct(): boolean {
 }
 
 function heroIcon(pid: PlayerId): string {
-  return vsComputer && pid === COMPUTER ? COMPUTER_ICON : HERO_ICONS[pid];
+  return vsComputer && pid === COMPUTER ? levelInfo().icon : HERO_ICONS[pid];
 }
 
 function renderGame(g: GameState): string {
@@ -141,6 +151,7 @@ function renderInfo(g: GameState, pid: PlayerId): string {
       <div class="badges">
         <span class="gold" title="Goud om kaarten te kopen in de winkel">🪙 ${p.gold}</span>
         <span class="flags" title="Veroverde zones">🚩 ${zonesOwnedBy(g, pid)}/${ZONES_TO_WIN}</span>
+        ${p.bonusGold ? `<span class="bonus" title="Bonus: krijgt elke beurt ${p.bonusGold} extra goud">+${p.bonusGold} 🪙/beurt</span>` : ''}
         ${p.slow ? `<span class="slow" title="Trekt volgende beurt ${p.slow} kaart(en) minder">⏳ −${p.slow}</span>` : ''}
       </div>
     </div>
@@ -322,7 +333,7 @@ function renderSidePanel(g: GameState): string {
   return `
   <div class="side-panel">
     <div class="turn-info ${thinking ? 'thinking' : ''}">Beurt ${g.turn}<br>${thinking
-      ? `${COMPUTER_ICON} <b>${esc(p.name)}</b> denkt na…`
+      ? `${levelInfo().icon} <b>${esc(p.name)}</b> denkt na…`
       : `<b>${esc(p.name)}</b> is aan zet`}</div>
     <button class="end-turn" data-click="end-turn" ${locked ? 'disabled' : ''}>Einde<br>beurt</button>
     <div class="hint">Sleep een kaart naar je <b>aflegstapel</b> (bovenste effect) of naar een <b>zone</b> (onderste effect).
@@ -350,7 +361,7 @@ function renderWinner(g: GameState): string {
   return `
   <div class="overlay">
     <div class="panel">
-      <div class="big-icon">${vsComputer && w === COMPUTER ? COMPUTER_ICON : '🏆'}</div>
+      <div class="big-icon">${vsComputer && w === COMPUTER ? levelInfo().icon : '🏆'}</div>
       <h2>${vsComputer && w === COMPUTER ? 'De computer wint!' : `${esc(g.players[w].name)} wint!`}</h2>
       <p>Veroverde ${zones}.</p>
       <button class="btn" data-click="restart">Nieuw spel</button>
@@ -370,6 +381,12 @@ app.addEventListener('click', (e) => {
     case 'mode':
       readNames();
       vsComputer = arg === 'ai';
+      render();
+      break;
+    case 'level':
+      readNames();
+      computerLevel = arg as AiLevel;
+      saveLevel();
       render();
       break;
     case 'restart':
@@ -564,9 +581,37 @@ function readNames(): void {
   }) as [string, string];
 }
 
+function levelInfo(): (typeof AI_LEVELS)[number] {
+  return AI_LEVELS.find((l) => l.id === computerLevel)!;
+}
+
+function computerName(): string {
+  return `Computer (${levelInfo().label})`;
+}
+
+function loadLevel(): AiLevel {
+  try {
+    const saved = localStorage.getItem(LEVEL_KEY);
+    if (AI_LEVELS.some((l) => l.id === saved)) return saved as AiLevel;
+  } catch {
+    // Lezen lukt niet (bv. privévenster): dan het standaardniveau.
+  }
+  return 'normaal';
+}
+
+function saveLevel(): void {
+  try {
+    localStorage.setItem(LEVEL_KEY, computerLevel);
+  } catch {
+    // Opslaan lukt niet: de keuze geldt dan alleen voor deze sessie.
+  }
+}
+
 function startGame(): void {
   readNames();
-  game = createGame(vsComputer ? [names[0], 'Computer'] : names);
+  game = vsComputer
+    ? createGame([names[0], computerName()], undefined, { bonusGold: [0, levelInfo().bonusGold] })
+    : createGame(names);
   gameId++;
   prevRendered = null;
   seenZoneCards.clear();
@@ -605,7 +650,7 @@ function scheduleComputer(delay: number): void {
   const id = gameId;
   window.setTimeout(() => {
     if (id !== gameId || !game || !computerTurn(game) || game.winner !== null) return;
-    const action = chooseAction(game);
+    const action = chooseAction(game, computerLevel);
     dispatch(action);
     if (action.type !== 'endTurn' && game && computerTurn(game) && game.winner === null) scheduleComputer(COMPUTER_STEP_MS);
   }, delay);

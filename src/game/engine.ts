@@ -13,7 +13,16 @@ export function other(p: PlayerId): PlayerId {
   return p === 0 ? 1 : 0;
 }
 
-export function createGame(names: [string, string], seed = Math.floor(Math.random() * 2 ** 31)): GameState {
+export interface GameOptions {
+  /** Extra goud per beurt voor elke speler, bv. [0, 1] voor een computer met een bonus. */
+  bonusGold?: [number, number];
+}
+
+export function createGame(
+  names: [string, string],
+  seed = Math.floor(Math.random() * 2 ** 31),
+  options: GameOptions = {},
+): GameState {
   const makePlayer = (name: string, pid: PlayerId): PlayerState => ({
     name,
     deck: STARTER_DECK.map((defId, i) => ({ uid: `p${pid}-${i}`, defId })),
@@ -22,6 +31,7 @@ export function createGame(names: [string, string], seed = Math.floor(Math.rando
     played: [],
     gold: 0,
     recalls: 0,
+    bonusGold: options.bonusGold?.[pid] ?? 0,
     slow: 0,
   });
   const s: GameState = {
@@ -301,6 +311,10 @@ function startTurn(s: GameState): void {
   const pid = s.active;
   const p = s.players[pid];
   log(s, `— ${p.name} is aan de beurt —`);
+  if (p.bonusGold) {
+    p.gold += p.bonusGold;
+    log(s, `${p.name} krijgt ${p.bonusGold} bonusgoud.`);
+  }
   const count = Math.max(0, HAND_SIZE - p.slow);
   p.slow = 0;
   for (let i = 0; i < count; i++) drawCard(s, p);

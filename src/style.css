@@ -102,6 +102,7 @@ button { font: inherit; }
 .gold { background: rgba(255, 213, 79, 0.18); border: 1px solid #c9a227; color: #ffe082; }
 .flags { background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.3); }
 .slow { background: rgba(2, 119, 189, 0.3); border: 1px solid #4fc3f7; }
+.bonus { background: rgba(120, 60, 160, 0.35); border: 1px dashed #c9a227; color: #ffe082; font-size: 12px !important; }
 
 /* Knop boven de spelerinfo: speel je hele hand af voor het bovenste effect. */
 .discard-all {
@@ -751,6 +752,8 @@ button { font: inherit; }
 }
 .mode button:hover { color: var(--ink); }
 .mode button.on { background: #8a6a3a; color: var(--ink); font-weight: bold; }
+.mode.levels button { padding: 7px 16px; font-size: 15px; }
+.level-note { margin: -10px 0 0; font-size: 15px; font-style: italic; color: var(--gold); }
 .computer-name {
   width: 240px;
   padding: 10px 14px;

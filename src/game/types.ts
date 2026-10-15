@@ -43,6 +43,8 @@ export interface PlayerState {
   gold: number;
   /** Hoe vaak deze speler al een kaart uit een zone teruggetrokken heeft; elke keer wordt het 1 goud duurder. */
   recalls: number;
+  /** Extra goud aan het begin van elke beurt (de openlijke bonus van de computer op Legendarisch). */
+  bonusGold: number;
   /** Zoveel kaarten minder trekken bij de volgende beurt (door Vertraag). */
   slow: number;
 }

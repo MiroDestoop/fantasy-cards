@@ -53,8 +53,8 @@ Een kaart in een zone wordt **eerst gelegd**, daarna werken haar effecten. Terug
 | `src/game/specials.ts` | Speciale effecten zonder keyword (`SPECIALS`): een korte tekst en een `run`-functie |
 | `src/game/engine.ts` | Spelregels: `createGame`, `applyAction`, `whyCantPlay`, `whyCantBuy`, `whyCantRecall` |
 | `src/game/engine.test.ts` | Tests voor de regels |
-| `src/game/ai.ts` | Computertegenstander: `chooseAction(state)` geeft één actie voor de speler aan zet |
-| `src/game/ai.test.ts` | Tests voor de computertegenstander |
+| `src/game/ai.ts` | Computertegenstander in vier niveaus: `chooseAction(state, level, rnd)` geeft één actie voor de speler aan zet |
+| `src/game/ai.test.ts` | Tests voor de computertegenstander (duren ~20 s door de sterke niveaus) |
 | `src/main.ts` | Weergave, klikken, slepen, tooltips, animaties, geluid-triggers |
 | `src/style.css` | Alle stijlen |
 | `src/sound.ts` | Geluidseffecten via Web Audio (geen bestanden), aan/uit bewaard in localStorage |
@@ -72,7 +72,15 @@ Een kaart in een zone wordt **eerst gelegd**, daarna werken haar effecten. Terug
 - **Animaties:** `captureEffects` legt de DOM-posities vast vóór het opnieuw tekenen. `playEffects` laat daarna kopieën vliegen of verbranden.
 - **Geluiden:** `playSounds` kiest de geluiden door de toestand voor en na een actie te vergelijken.
 - **Hotseat:** na "Einde beurt" verschijnt een wisselscherm (`handoff`) dat de hand verbergt. De speler die aan zet is, zit altijd onderaan.
-- **Tegen de computer:** keuze op het startscherm (`vsComputer`). De mens is speler 0 en zit altijd onderaan, er is geen wisselscherm. `scheduleComputer` laat de computer zet per zet spelen via `dispatch`, met een pauze ertussen. De computer speelt eerst haar hele hand: voor elke kaart probeert ze elke bestemming op een kopie uit en kiest ze de beste toestand volgens `evaluate`. Daarna koopt ze de duurste betaalbare kaart (vanaf 3 goud) en eindigt ze haar beurt.
+- **Tegen de computer:** keuze op het startscherm (`vsComputer`), met een niveau (`computerLevel`, onthouden in localStorage). De mens is speler 0 en zit altijd onderaan, er is geen wisselscherm. `scheduleComputer` laat de computer zet per zet spelen via `dispatch`, met een pauze ertussen.
+- **Computerniveaus** (`PROFILES` in `ai.ts`); elk niveau bouwt verder op het vorige:
+  - **Normaal:** speelt haar hand kaart per kaart: voor elke kaart probeert ze elke bestemming op een kopie uit en kiest ze de beste toestand volgens `evaluate`. Daarna koopt ze de duurste betaalbare kaart (vanaf 3 goud).
+  - **Moeilijk:** zoekt de beste volgorde voor haar hele hand met een beam search (6 beste tussenstanden), trekt kaarten terug als dat helpt, koopt slim (`smartBuy`: naar de situatie, en soms sparen) en verdedigt meer (`threatWeight`).
+  - **Extreem:** speelt de 4 beste beurten uit de beam search 2 rondes verder na (4 keer), met de tegenstander als Normaal, en kiest de beurt waarna ze er gemiddeld het best voor staat.
+  - **Legendarisch:** speelt zoals Extreem, met een openlijke bonus van 1 goud per beurt (`bonusGold` in `AI_LEVELS`, doorgegeven via `createGame(names, seed, { bonusGold })`; de engine geeft het aan het begin van de beurt en zet het in het logboek). Meer denkwerk (meer kandidaten, meer simulaties, een sterker model van de tegenstander) leverde boven Extreem niets meetbaars meer op: de grens ligt bij `evaluate`.
+  - Gemeten: Moeilijk wint ~67% van Normaal, Extreem ~61% van Moeilijk, Legendarisch ~60% van Extreem. Denktijd per beurt: Moeilijk ~30 ms, Extreem en Legendarisch ~0,4 s.
+  - **Niet valsspelen:** de beam search plant niet verder na een zet die iets onthult (kaarten trekken, een nieuwe winkelkaart). Bij het naspelen worden verborgen kaarten (haar stapelvolgorde, hand en stapel van de tegenstander, winkelvoorraad) eerst gesorteerd en dan willekeurig verdeeld (`determinize`). Alle kandidaten krijgen dezelfde trekkingen, zodat geluk de vergelijking niet verstoort.
+  - **Plan per beurt:** de beam search berekent de beurt één keer; de volgende zetten komen uit `plans` (per niveau, op `stateKey`). Omdat de engine voorspelbaar is, klopt het plan tot er iets onthuld wordt; dan plant ze opnieuw.
 
 **Een kaart, speciaal effect of keyword toevoegen**
 - **Kaart:** voeg ze toe aan `CARD_LIST` en aan `SHOP_SUPPLY` (of aan `STARTER_DECK`).
@@ -92,8 +100,14 @@ Een kaart in een zone wordt **eerst gelegd**, daarna werken haar effecten. Terug
 - Controleer na elke wijziging met `npx tsc`, `npx vitest run` en `npx vite build`.
 - Zeg eerlijk dat je visuals en geluid niet zelf kunt zien of horen: de gebruiker test in de browser.
 - **Commit en push alleen na akkoord.** Stel na een wijziging een Nederlandse commitboodschap voor en vraag of je mag committen en pushen. "push" of "ok" van de gebruiker is dat akkoord.
+- Open het spel na een wijziging in de browser voor de gebruiker (dev-server op poort 5173, start ze als ze niet draait).
+- Op deze machine is er **geen Python**: schrijf hulpscripts in Node (`node script.mjs`).
+- **Stop nooit alle Node-processen** (`taskkill /IM node.exe`): dat stopt ook de dev-server van de gebruiker. Stop alleen je eigen achtergrondtaak.
+- De computer sterker maken? Meet het met duels tussen niveaus (vaste seeds, zitplaatsen afwisselen, minstens 40 spellen; minder is ruis). Lange metingen draai je op de achtergrond.
 
 ## Ideeën en mogelijke volgende stappen
 
 - `ideeen/characterTypesImages.jpg`: een plaat met 12 personagetypes (paladin, archer, mage, druid, bard, necromancer, shaman, warrior, elementalist, thief, barbarian, priest). Dat is mogelijk inspiratie voor klassen of helden. Nog niet besproken of gebouwd.
-- Eerder geopperd, nog niet gebouwd: moeilijkheidsgraden voor de computer, online multiplayer (de engine is al los van de UI), balans van kaartprijzen en waarden, echte illustraties voor kaarten.
+- Eerder geopperd, nog niet gebouwd: online multiplayer (de engine is al los van de UI), balans van kaartprijzen en waarden, echte illustraties voor kaarten.
+- Een sterkere computer zonder bonus kan alleen nog via een betere `evaluate` in `ai.ts`, bijvoorbeeld door de gewichten af te stellen met veel zelfspel. Dat is veel rekenwerk met een onzeker resultaat.
+- De computer ontwikkelt zich nog niet mee met nieuwe speciale effecten; ze ziet alleen het resultaat via haar simulaties.
