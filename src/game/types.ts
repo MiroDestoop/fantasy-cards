@@ -34,6 +34,11 @@ export interface PlayerState {
   deck: CardInstance[];
   hand: CardInstance[];
   discard: CardInstance[];
+  /**
+   * Kaarten die je deze beurt afgelegd hebt. Ze gaan pas bij Einde beurt naar je aflegstapel,
+   * zodat Trek ze niet opnieuw kan trekken in dezelfde beurt.
+   */
+  played: CardInstance[];
   /** Goud blijft bewaard over beurten heen. */
   gold: number;
   /** Zoveel kaarten minder trekken bij de volgende beurt (door Vertraag). */

@@ -1,4 +1,5 @@
 import './style.css';
+import { chooseAction } from './game/ai';
 import { getCard, KEYWORDS } from './game/cards';
 import {
   applyAction, createGame, other, whyCantBuy, whyCantPlay, zoneCardCount, zonesOwnedBy,
@@ -9,6 +10,12 @@ import { isMuted, sfx, toggleMute } from './sound';
 import { ZONE_ART } from './zoneArt';
 
 const HERO_ICONS = ['🧙‍♂️', '🧝‍♀️'] as const;
+const COMPUTER_ICON = '🤖';
+/** In een spel tegen de computer is de mens speler 0 en de computer speler 1. */
+const COMPUTER: PlayerId = 1;
+/** Wachttijd van de computer vóór haar eerste zet en tussen haar zetten, zodat je kunt volgen wat ze doet. */
+const COMPUTER_THINK_MS = 1000;
+const COMPUTER_STEP_MS = 750;
 const STAGE_W = 1600;
 const STAGE_H = 900;
 const CARD_W = 150;
@@ -22,7 +29,11 @@ const toastEl = document.querySelector<HTMLDivElement>('#toast')!;
 const tipEl = document.querySelector<HTMLDivElement>('#tip')!;
 
 let names: [string, string] = ['Speler 1', 'Speler 2'];
+/** Speel je tegen de computer in plaats van tegen een tweede speler aan dezelfde tafel? */
+let vsComputer = false;
 let game: GameState | null = null;
+/** Verhoogt bij elk nieuw spel, zodat een geplande zet van de computer uit een oud spel niets meer doet. */
+let gameId = 0;
 /** Op een gedeeld scherm: de speler die het scherm moet krijgen voor diens hand zichtbaar wordt. */
 let handoff: PlayerId | null = null;
 /** Voor animaties: wat stond er bij de vorige weergave op tafel? */
@@ -41,10 +52,16 @@ function renderStart(): string {
   return `
   <div class="start">
     <h1>Munt of Zwaard</h1>
-    <p class="subtitle">Een fantasy-kaartduel voor twee spelers aan één tafel</p>
+    <p class="subtitle">Een fantasy-kaartduel aan één tafel, met z'n tweeën of tegen de computer</p>
+    <div class="mode">
+      <button class="${vsComputer ? '' : 'on'}" data-click="mode:pvp">👥 Twee spelers</button>
+      <button class="${vsComputer ? 'on' : ''}" data-click="mode:ai">${COMPUTER_ICON} Tegen de computer</button>
+    </div>
     <div class="names">
-      <label>Speler 1 <input id="name0" maxlength="16" value="${esc(names[0])}"></label>
-      <label>Speler 2 <input id="name1" maxlength="16" value="${esc(names[1])}"></label>
+      <label>${vsComputer ? 'Jouw naam' : 'Speler 1'} <input id="name0" maxlength="16" value="${esc(names[0])}"></label>
+      ${vsComputer
+        ? `<label>Tegenstander <div class="computer-name">${COMPUTER_ICON} Computer</div></label>`
+        : `<label>Speler 2 <input id="name1" maxlength="16" value="${esc(names[1])}"></label>`}
     </div>
     <button class="btn" data-click="start">Aan tafel!</button>
     <div class="rules">
@@ -62,12 +79,31 @@ function renderStart(): string {
   </div>`;
 }
 
+/** Onderaan zit de speler die aan zet is; tegen de computer zit de mens altijd onderaan. */
+function bottomSeat(g: GameState): PlayerId {
+  return vsComputer ? other(COMPUTER) : g.active;
+}
+
+function computerTurn(g: GameState): boolean {
+  return vsComputer && g.active === COMPUTER;
+}
+
+/** Mag de mens nu kaarten spelen, kopen of de beurt beëindigen? */
+function humanCanAct(): boolean {
+  return !!game && handoff === null && game.winner === null && !computerTurn(game);
+}
+
+function heroIcon(pid: PlayerId): string {
+  return vsComputer && pid === COMPUTER ? COMPUTER_ICON : HERO_ICONS[pid];
+}
+
 function renderGame(g: GameState): string {
-  const bottom = g.active;
+  const bottom = bottomSeat(g);
   const top = other(bottom);
   const prev = prevRendered;
   prevRendered = g;
   const hidden = handoff !== null;
+  const myTurn = humanCanAct();
 
   const html = `
   <div class="table">
@@ -79,10 +115,10 @@ function renderGame(g: GameState): string {
     </div>
     <div class="zones">${g.zones.map((_, i) => renderZone(g, i, bottom, prev)).join('')}</div>
     <div class="seat bottom">
-      ${hidden ? '' : renderDiscardAllButton(g)}
+      ${myTurn ? renderDiscardAllButton(g) : ''}
       ${renderInfo(g, bottom)}
       <div class="hand mine">${hidden ? renderBacks(g.players[bottom].hand.length) : renderHand(g, bottom)}</div>
-      ${renderPiles(g, bottom, true)}
+      ${renderPiles(g, bottom, myTurn)}
     </div>
     ${renderSidePanel(g)}
   </div>
@@ -97,7 +133,7 @@ function renderInfo(g: GameState, pid: PlayerId): string {
   const p = g.players[pid];
   return `
   <div class="info p${pid} ${pid === g.active ? 'active' : ''}">
-    <div class="portrait">${HERO_ICONS[pid]}</div>
+    <div class="portrait">${heroIcon(pid)}</div>
     <div>
       <div class="player-name">${esc(p.name)}</div>
       <div class="badges">
@@ -124,8 +160,12 @@ function renderDiscardAllButton(g: GameState): string {
 
 function renderPiles(g: GameState, pid: PlayerId, mine: boolean): string {
   const p = g.players[pid];
-  const topDiscard = p.discard.at(-1);
+  // Wat je deze beurt speelde, ligt bovenop de aflegstapel maar telt pas mee na Einde beurt.
+  const topDiscard = p.played.at(-1) ?? p.discard.at(-1);
   const stackDepth = Math.min(3, Math.ceil(p.deck.length / 4));
+  const played = p.played.length
+    ? `<div class="pile-played" title="${p.played.length} deze beurt gespeeld: ze gaan bij Einde beurt naar de aflegstapel">+${p.played.length}</div>`
+    : '';
   return `
   <div class="piles">
     <div class="pile deck" data-pile="deck:${pid}">
@@ -136,6 +176,7 @@ function renderPiles(g: GameState, pid: PlayerId, mine: boolean): string {
     <div class="pile discard" ${mine ? 'data-drop="discard"' : ''} data-pile="discard:${pid}">
       ${topDiscard ? renderMini(getCard(topDiscard.defId)) : '<div class="empty-slot"></div>'}
       <div class="pile-count">${p.discard.length}</div>
+      ${played}
       <div class="pile-label">Aflegstapel</div>
     </div>
   </div>`;
@@ -232,12 +273,18 @@ function renderZone(g: GameState, i: number, bottom: PlayerId, prev: GameState |
       ${bar(bottom)}
     </div>
     <div class="zcards">${row(bottom)}</div>
-    ${z.owner !== null ? `<div class="zone-banner p${z.owner}">🚩 Veroverd door<br><b>${esc(g.players[z.owner].name)}</b></div>` : ''}
+    ${z.owner !== null
+      ? `<div class="zone-banner p${z.owner}">
+          <div class="zone-banner-name">${z.icon} ${esc(z.name)}</div>
+          <div>🚩 Veroverd door</div>
+          <b>${esc(g.players[z.owner].name)}</b>
+        </div>`
+      : ''}
   </div>`;
 }
 
 function renderShop(g: GameState): string {
-  const canShop = handoff === null;
+  const canShop = humanCanAct();
   const slots = g.shop.market
     .map((card, i) => {
       const def = getCard(card.defId);
@@ -258,10 +305,13 @@ function renderShop(g: GameState): string {
 
 function renderSidePanel(g: GameState): string {
   const p = g.players[g.active];
-  const locked = handoff !== null || g.winner !== null;
+  const locked = !humanCanAct();
+  const thinking = computerTurn(g) && g.winner === null;
   return `
   <div class="side-panel">
-    <div class="turn-info">Beurt ${g.turn}<br><b>${esc(p.name)}</b> is aan zet</div>
+    <div class="turn-info ${thinking ? 'thinking' : ''}">Beurt ${g.turn}<br>${thinking
+      ? `${COMPUTER_ICON} <b>${esc(p.name)}</b> denkt na…`
+      : `<b>${esc(p.name)}</b> is aan zet`}</div>
     <button class="end-turn" data-click="end-turn" ${locked ? 'disabled' : ''}>Einde<br>beurt</button>
     <div class="hint">Sleep een kaart naar je <b>aflegstapel</b> (bovenste effect) of naar een <b>zone</b> (onderste effect).
       Hover over een stapel om te zien wat erin zit.</div>
@@ -274,7 +324,7 @@ function renderHandoff(g: GameState, to: PlayerId): string {
   return `
   <div class="overlay">
     <div class="panel">
-      <div class="big-icon">${HERO_ICONS[to]}</div>
+      <div class="big-icon">${heroIcon(to)}</div>
       <h2>${esc(g.players[to].name)}, jij bent aan zet</h2>
       <p>De andere speler kijkt even weg 🙈</p>
       <button class="btn" data-click="continue">Toon mijn hand</button>
@@ -288,8 +338,8 @@ function renderWinner(g: GameState): string {
   return `
   <div class="overlay">
     <div class="panel">
-      <div class="big-icon">🏆</div>
-      <h2>${esc(g.players[w].name)} wint!</h2>
+      <div class="big-icon">${vsComputer && w === COMPUTER ? COMPUTER_ICON : '🏆'}</div>
+      <h2>${vsComputer && w === COMPUTER ? 'De computer wint!' : `${esc(g.players[w].name)} wint!`}</h2>
       <p>Veroverde ${zones}.</p>
       <button class="btn" data-click="restart">Nieuw spel</button>
     </div>
@@ -305,7 +355,13 @@ app.addEventListener('click', (e) => {
     case 'start':
       startGame();
       break;
+    case 'mode':
+      readNames();
+      vsComputer = arg === 'ai';
+      render();
+      break;
     case 'restart':
+      gameId++;
       game = null;
       prevRendered = null;
       render();
@@ -321,13 +377,13 @@ app.addEventListener('click', (e) => {
       sfx.coin();
       break;
     case 'end-turn':
-      dispatch({ type: 'endTurn' });
+      if (humanCanAct()) dispatch({ type: 'endTurn' });
       break;
     case 'discard-all':
-      if (handoff === null) dispatch({ type: 'discardAll' });
+      if (humanCanAct()) dispatch({ type: 'discardAll' });
       break;
     case 'buy':
-      if (handoff === null) dispatch({ type: 'buy', marketUid: arg });
+      if (humanCanAct()) dispatch({ type: 'buy', marketUid: arg });
       break;
   }
 });
@@ -345,7 +401,7 @@ interface Drag {
 let drag: Drag | null = null;
 
 app.addEventListener('pointerdown', (e) => {
-  if (e.button !== 0 || !game || handoff !== null || game.winner !== null) return;
+  if (e.button !== 0 || !humanCanAct()) return;
   const slot = (e.target as HTMLElement).closest<HTMLElement>('[data-drag]');
   if (!slot) return;
   e.preventDefault();
@@ -423,28 +479,34 @@ app.addEventListener('mouseover', (e) => {
     tipEl.innerHTML = `<b>${keywordText(key, n)}</b><br>${KEYWORDS[key].explain(n)}`;
   } else if (pile && game) {
     const [kind, pid] = pile.dataset.pile!.split(':');
-    tipEl.innerHTML = pileTip(game.players[Number(pid)].name, kind as 'deck' | 'discard', kind === 'deck'
-      ? game.players[Number(pid)].deck
-      : game.players[Number(pid)].discard);
+    const p = game.players[Number(pid)];
+    tipEl.innerHTML = kind === 'deck' ? pileTip(p.name, 'deck', p.deck) : pileTip(p.name, 'discard', p.discard, p.played);
   } else {
     return hideTip();
   }
   tipEl.classList.add('show');
 });
 
-function pileTip(owner: string, kind: 'deck' | 'discard', cards: CardInstance[]): string {
+function pileTip(owner: string, kind: 'deck' | 'discard', cards: CardInstance[], played: CardInstance[] = []): string {
   const title = `${kind === 'deck' ? 'Stapel' : 'Aflegstapel'} van ${esc(owner)} (${cards.length})`;
-  if (!cards.length) return `<b>${title}</b><br><i>Leeg</i>`;
+  const rows = cards.length ? tipRows(cards) : '<br><i>Leeg</i>';
+  // De volgorde van de trekstapel blijft geheim; enkel wat erin zit, is te zien.
+  const note = kind === 'deck' ? '<div class="tip-note">Volgorde blijft geheim</div>' : '';
+  const playedPart = played.length
+    ? `<div class="tip-section"><b>Deze beurt gespeeld (${played.length})</b>${tipRows(played)}
+        <div class="tip-note">Gaan bij Einde beurt naar de aflegstapel</div></div>`
+    : '';
+  return `<b>${title}</b>${rows}${note}${playedPart}`;
+}
+
+function tipRows(cards: CardInstance[]): string {
   const counts = new Map<string, number>();
   for (const c of cards) counts.set(c.defId, (counts.get(c.defId) ?? 0) + 1);
-  const rows = [...counts]
+  return [...counts]
     .map(([id, n]) => ({ def: getCard(id), n }))
     .sort((a, b) => b.n - a.n || a.def.name.localeCompare(b.def.name))
     .map(({ def, n }) => `<div class="tip-row"><span>${def.icon} ${esc(def.name)}</span><span>×${n}</span></div>`)
     .join('');
-  // De volgorde van de trekstapel blijft geheim; enkel wat erin zit, is te zien.
-  const note = kind === 'deck' ? '<div class="tip-note">Volgorde blijft geheim</div>' : '';
-  return `<b>${title}</b>${rows}${note}`;
 }
 app.addEventListener('mouseleave', hideTip);
 window.addEventListener('mousemove', (e) => {
@@ -460,16 +522,24 @@ function hideTip(): void {
 
 // ---------- Spelverloop ----------
 
-function startGame(): void {
+/** Onthoudt de ingevulde namen, ook als het startscherm opnieuw getekend wordt. */
+function readNames(): void {
   names = [0, 1].map((i) => {
-    const v = document.querySelector<HTMLInputElement>(`#name${i}`)?.value.trim();
-    return v || `Speler ${i + 1}`;
+    const input = document.querySelector<HTMLInputElement>(`#name${i}`);
+    return input ? input.value.trim() || `Speler ${i + 1}` : names[i];
   }) as [string, string];
-  game = createGame(names);
+}
+
+function startGame(): void {
+  readNames();
+  game = createGame(vsComputer ? [names[0], 'Computer'] : names);
+  gameId++;
   prevRendered = null;
   seenZoneCards.clear();
-  handoff = 0;
+  // Tegen de computer hoeft niemand weg te kijken.
+  handoff = vsComputer ? null : 0;
   render();
+  if (vsComputer) sfx.deal(game.players[game.active].hand.length);
 }
 
 function dispatch(action: Action): void {
@@ -485,11 +555,26 @@ function dispatch(action: Action): void {
   game = r.state;
   // Wat er gaat verdwijnen, moet vastgelegd worden voordat de tafel opnieuw getekend wordt.
   const flights = captureEffects(before, game);
-  if (action.type === 'endTurn' && game.winner === null) handoff = game.active;
+  if (action.type === 'endTurn' && game.winner === null && !vsComputer) handoff = game.active;
   render();
   shopDeal = false;
   playEffects(flights);
   playSounds(action, before, game, flights);
+  if (vsComputer && action.type === 'endTurn' && game.winner === null) {
+    if (computerTurn(game)) scheduleComputer(COMPUTER_THINK_MS);
+    else sfx.deal(game.players[game.active].hand.length, 0.3);
+  }
+}
+
+/** De computer speelt haar beurt zet per zet, met een pauze ertussen zodat de animaties te volgen zijn. */
+function scheduleComputer(delay: number): void {
+  const id = gameId;
+  window.setTimeout(() => {
+    if (id !== gameId || !game || !computerTurn(game) || game.winner !== null) return;
+    const action = chooseAction(game);
+    dispatch(action);
+    if (action.type !== 'endTurn' && game && computerTurn(game) && game.winner === null) scheduleComputer(COMPUTER_STEP_MS);
+  }, delay);
 }
 
 /** Kiest de geluiden bij een actie door de toestand voor en na te vergelijken. */

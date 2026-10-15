@@ -27,7 +27,7 @@ export const KEYWORDS: Record<Keyword, { label: string; noAmount?: boolean; expl
   trek: {
     label: 'Trek',
     explain: (n) =>
-      `Trek ${kaarten(n)}. Is je stapel leeg, dan wordt je aflegstapel geschud. Je hand heeft een limiet van ${MAX_HAND}: wat je daarboven trekt, gaat naar je aflegstapel.`,
+      `Trek ${kaarten(n)}. Is je stapel leeg, dan wordt je aflegstapel geschud; kaarten die je deze beurt gespeeld hebt, zitten daar nog niet in. Je hand heeft een limiet van ${MAX_HAND}: wat je daarboven trekt, gaat naar je aflegstapel.`,
   },
   vertraag: {
     label: 'Vertraag',

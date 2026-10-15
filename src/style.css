@@ -131,6 +131,22 @@ button { font: inherit; }
 
 .pile { position: relative; width: 80px; height: 112px; border-radius: 9px; cursor: help; transition: box-shadow 0.15s, background 0.15s; }
 .seat.top .pile { width: 62px; height: 87px; }
+.pile-played {
+  position: absolute;
+  left: -8px;
+  top: -8px;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: #3a2a10;
+  border: 2px dashed var(--gold);
+  color: var(--gold);
+  font-size: 13px;
+  font-weight: bold;
+}
 .pile-label {
   position: absolute;
   left: -10px;
@@ -457,14 +473,18 @@ button { font: inherit; }
   right: 0;
   top: 50%;
   transform: translateY(-50%);
-  padding: 14px 0;
+  /* Boven de zonenaam en de balken (.zone-mid heeft z-index 1), anders loopt de tekst door elkaar. */
+  z-index: 2;
+  padding: 12px 0 14px;
   display: grid;
   place-items: center;
   align-content: center;
-  background: rgba(10, 6, 3, 0.82);
+  gap: 2px;
+  background: rgba(10, 6, 3, 0.94);
   text-align: center;
   font-size: 18px;
 }
+.zone-banner-name { font-size: 15px; font-weight: bold; color: var(--gold); letter-spacing: 0.04em; }
 .zone-banner b { font-size: 26px; }
 .zone-banner.p0 b { color: var(--p0); }
 .zone-banner.p1 b { color: var(--p1); }
@@ -562,6 +582,8 @@ button { font: inherit; }
 }
 .turn-info { text-align: center; font-size: 15px; color: var(--ink-dim); }
 .turn-info b { color: var(--gold); font-size: 19px; }
+.turn-info.thinking b { animation: denken 1.2s ease-in-out infinite; }
+@keyframes denken { 50% { opacity: 0.45; } }
 
 .end-turn {
   width: 140px;
@@ -687,6 +709,27 @@ button { font: inherit; }
 }
 .subtitle { margin: 0; font-size: 22px; font-style: italic; color: var(--ink-dim); }
 .names { display: flex; gap: 30px; }
+.mode { display: flex; gap: 6px; padding: 5px; border-radius: 999px; background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(230, 192, 104, 0.3); }
+.mode button {
+  padding: 9px 22px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-dim);
+  font: inherit;
+  font-size: 17px;
+  cursor: pointer;
+}
+.mode button:hover { color: var(--ink); }
+.mode button.on { background: #8a6a3a; color: var(--ink); font-weight: bold; }
+.computer-name {
+  width: 240px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 2px dashed #8a6a3a;
+  color: var(--ink);
+  font-size: 20px;
+}
 .names label { display: flex; flex-direction: column; gap: 6px; font-size: 16px; color: var(--ink-dim); }
 .names input {
   width: 240px;
@@ -747,3 +790,4 @@ button { font: inherit; }
 .tip-row { display: flex; justify-content: space-between; gap: 18px; padding: 2px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
 .tip-row:first-of-type { margin-top: 6px; }
 .tip-note { margin-top: 6px; font-size: 12px; font-style: italic; color: var(--ink-dim); }
+.tip-section { margin-top: 10px; padding-top: 6px; border-top: 1px solid rgba(230, 192, 104, 0.3); }

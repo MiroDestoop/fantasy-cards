@@ -18,6 +18,7 @@ export function createGame(names: [string, string], seed = Math.floor(Math.rando
     deck: STARTER_DECK.map((defId, i) => ({ uid: `p${pid}-${i}`, defId })),
     hand: [],
     discard: [],
+    played: [],
     gold: 0,
     slow: 0,
   });
@@ -108,7 +109,7 @@ function playCard(s: GameState, handUid: string, target: PlayTarget): string | n
 
   if (target.kind === 'discard') {
     log(s, `${p.name} legt ${def.name} af.`);
-    p.discard.push(card);
+    p.played.push(card);
     for (const e of def.top) applyEffect(s, pid, e, null);
   } else {
     const zone = s.zones[target.zone];
@@ -232,7 +233,8 @@ function buyCard(s: GameState, marketUid: string): string | null {
 
 function endTurn(s: GameState): void {
   const p = s.players[s.active];
-  p.discard.push(...p.hand);
+  p.discard.push(...p.played, ...p.hand);
+  p.played = [];
   p.hand = [];
   s.active = other(s.active);
   startTurn(s);

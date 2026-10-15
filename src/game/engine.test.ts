@@ -44,7 +44,7 @@ describe('kaarten spelen', () => {
     let s = createGame(['Ana', 'Bo'], 42);
     s = play(s, 'zilver', DISCARD);
     expect(s.players[0].gold).toBe(2);
-    expect(s.players[0].discard.at(-1)?.defId).toBe('zilver');
+    expect(s.players[0].played.at(-1)?.defId).toBe('zilver');
     expect(s.zones.every((z) => z.damage[0] === 0)).toBe(true);
   });
 
@@ -173,6 +173,33 @@ describe('beurten en stapel', () => {
     expect(ana.hand).toHaveLength(HAND_SIZE);
     expect(ana.hand.length + ana.deck.length + ana.discard.length).toBe(10);
   });
+
+  it('gespeelde kaarten gaan pas bij Einde beurt naar je aflegstapel', () => {
+    let s = createGame(['Ana', 'Bo'], 3);
+    s = play(s, 'zilver', DISCARD);
+    expect(s.players[0].played).toHaveLength(1);
+    const discardBefore = s.players[0].discard.length;
+    s = act(s, { type: 'endTurn' });
+    expect(s.players[0].played).toHaveLength(0);
+    expect(s.players[0].discard).toHaveLength(discardBefore + 1 + HAND_SIZE);
+  });
+
+  it('een kleine stapel met Trek geeft geen oneindige lus meer', () => {
+    // Alleen Drakenschat en Arcaan Inzicht: vroeger trok Inzicht ze allebei opnieuw, eindeloos.
+    let s = createGame(['Ana', 'Bo'], 3);
+    const ana = s.players[0];
+    ana.deck = [];
+    ana.discard = [];
+    ana.hand = [{ uid: 'schat', defId: 'schat' }, { uid: 'inzicht', defId: 'inzicht' }];
+    s = act(s, { type: 'play', handUid: 'schat', target: DISCARD });
+    s = act(s, { type: 'play', handUid: 'inzicht', target: DISCARD });
+    expect(s.players[0].hand).toHaveLength(0);
+    expect(s.players[0].gold).toBe(4);
+    // Volgende beurt zijn ze er gewoon weer.
+    s = act(s, { type: 'endTurn' });
+    s = act(s, { type: 'endTurn' });
+    expect(s.players[0].hand.map((c) => c.uid).sort()).toEqual(['inzicht', 'schat']);
+  });
 });
 
 describe('alles afleggen', () => {
@@ -186,7 +213,7 @@ describe('alles afleggen', () => {
     s = act(s, { type: 'discardAll' });
     expect(s.players[0].gold).toBe(4);
     expect(s.players[0].hand).toHaveLength(0);
-    expect(s.players[0].discard.map((c) => c.uid)).toEqual(['a', 'b', 'c']);
+    expect(s.players[0].played.map((c) => c.uid)).toEqual(['a', 'b', 'c']);
     expect(s.zones.every((z) => z.cards.length === 0)).toBe(true);
   });
 
@@ -214,8 +241,9 @@ describe('handlimiet', () => {
     expect(s.players[0].hand).toHaveLength(MAX_HAND);
     s = play(s, 'inzicht', DISCARD);
     expect(s.players[0].hand).toHaveLength(MAX_HAND);
-    // 2 afgelegde Inzicht-kaarten + 3 getrokken kaarten die niet meer pasten.
-    expect(s.players[0].discard).toHaveLength(discardBefore + 5);
+    // De 3 getrokken kaarten die niet meer pasten; de 2 Inzicht-kaarten liggen bij de gespeelde kaarten.
+    expect(s.players[0].discard).toHaveLength(discardBefore + 3);
+    expect(s.players[0].played).toHaveLength(2);
   });
 });
 
