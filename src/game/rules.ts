@@ -15,3 +15,5 @@ export const ZONE_SETUP = [
   { name: 'Elfenwoud', icon: '🌲' },
   { name: 'Kristalgrot', icon: '💎' },
 ];
+/** Een kaart uit een zone terugtrekken kost eerst zoveel goud; elke keer dat je het doet, wordt het 1 duurder. */
+export const RECALL_PRICE = 3;

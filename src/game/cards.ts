@@ -37,12 +37,12 @@ export const KEYWORDS: Record<Keyword, { label: string; noAmount?: boolean; expl
     label: 'Vernietig',
     noAmount: true,
     explain: () =>
-      `Verban al je kaarten in deze zone uit het spel. Zo maak je plaats (max. ${MAX_ZONE_CARDS} per zone) en raak je zwakke kaarten voorgoed kwijt.`,
+      `Verban al je andere kaarten in deze zone uit het spel; deze kaart blijft liggen. Zo maak je plaats (max. ${MAX_ZONE_CARDS} per zone) en raak je zwakke kaarten voorgoed kwijt. Je hebt wel een vrije plek nodig om ze te spelen.`,
   },
   terugroep: {
     label: 'Terugroep',
     explain: (n) =>
-      `Haal ${n === 1 ? 'je oudste kaart' : `je ${n} oudste kaarten`} in deze zone terug naar je aflegstapel, voordat deze kaart gelegd wordt.`,
+      `Haal ${n === 1 ? 'je oudste andere kaart' : `je ${n} oudste andere kaarten`} in deze zone terug naar je aflegstapel; deze kaart blijft liggen. Je hebt wel een vrije plek nodig om ze te spelen.`,
   },
   ververs: {
     label: 'Ververs',

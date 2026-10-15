@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { getCard } from './cards';
-import { applyAction, createGame } from './engine';
-import { HAND_SIZE, MARKET_SIZE, MAX_HAND, MAX_ZONE_CARDS, ZONE_HP } from './rules';
+import { applyAction, createGame, recallPrice } from './engine';
+import { HAND_SIZE, MARKET_SIZE, MAX_HAND, MAX_ZONE_CARDS, RECALL_PRICE, ZONE_HP } from './rules';
 import type { Action, GameState, PlayerId, PlayTarget } from './types';
 
 let counter = 0;
@@ -72,15 +72,15 @@ describe('kaarten spelen', () => {
     expect(applyAction(s, { type: 'play', handUid: give(s, 0, 'zilver'), target: zone(1) }).ok).toBe(true);
   });
 
-  it('Vernietig verbant je eigen kaarten in de zone uit het spel', () => {
+  it('Vernietig verbant je andere kaarten in de zone uit het spel', () => {
     let s = createGame(['Ana', 'Bo'], 42);
-    for (let i = 0; i < MAX_ZONE_CARDS; i++) s = play(s, 'zilver', zone(0));
+    for (let i = 0; i < MAX_ZONE_CARDS - 1; i++) s = play(s, 'zilver', zone(0));
     s.zones[0].cards.push({ player: 1, card: { uid: 'bo-1', defId: 'rekruut' }, turn: 0 });
     const discardBefore = s.players[0].discard.length;
     s = play(s, 'offervuur', zone(0));
     expect(s.zones[0].cards.map((c) => c.card.defId).sort()).toEqual(['offervuur', 'rekruut']);
     expect(s.players[0].discard).toHaveLength(discardBefore);
-    expect(s.zones[0].damage[0]).toBe(MAX_ZONE_CARDS + 3);
+    expect(s.zones[0].damage[0]).toBe(MAX_ZONE_CARDS - 1 + 3);
   });
 
   it('Terugroep haalt je oudste kaart in de zone terug naar je aflegstapel', () => {
@@ -93,11 +93,61 @@ describe('kaarten spelen', () => {
     expect(s.players[0].discard.at(-1)?.uid).toBe(oldest);
   });
 
-  it('Terugroep mag ook in een volle zone', () => {
+  it('Terugroep laat de gespeelde kaart zelf liggen, ook in een lege zone', () => {
+    let s = createGame(['Ana', 'Bo'], 42);
+    s = play(s, 'rekruut', zone(0));
+    expect(s.zones[0].cards.map((c) => c.card.defId)).toEqual(['rekruut']);
+  });
+
+  it('Terugroep en Vernietig mag je niet als vijfde kaart in een volle zone spelen', () => {
     let s = createGame(['Ana', 'Bo'], 42);
     for (let i = 0; i < MAX_ZONE_CARDS; i++) s = play(s, 'zilver', zone(0));
-    s = play(s, 'rekruut', zone(0));
-    expect(s.zones[0].cards.filter((c) => c.player === 0)).toHaveLength(MAX_ZONE_CARDS);
+    for (const defId of ['rekruut', 'offervuur']) {
+      const r = applyAction(s, { type: 'play', handUid: give(s, 0, defId), target: zone(0) });
+      expect(r.ok).toBe(false);
+    }
+  });
+});
+
+describe('terugtrekken', () => {
+  const fullZone = () => {
+    let s = createGame(['Ana', 'Bo'], 42);
+    for (let i = 0; i < MAX_ZONE_CARDS; i++) s = play(s, 'zilver', zone(0));
+    return s;
+  };
+
+  it(`kost eerst ${RECALL_PRICE} goud en legt de gekozen kaart op je aflegstapel`, () => {
+    let s = fullZone();
+    s.players[0].gold = 10;
+    const pick = s.zones[0].cards[2].card.uid;
+    s = act(s, { type: 'recall', zone: 0, cardUid: pick });
+    expect(s.players[0].gold).toBe(10 - RECALL_PRICE);
+    expect(s.zones[0].cards.some((c) => c.card.uid === pick)).toBe(false);
+    expect(s.players[0].discard.at(-1)?.uid).toBe(pick);
+  });
+
+  it('wordt elke keer 1 goud duurder, ook in latere beurten', () => {
+    let s = fullZone();
+    s.players[0].gold = 20;
+    s = act(s, { type: 'recall', zone: 0, cardUid: s.zones[0].cards[0].card.uid });
+    s = act(s, { type: 'recall', zone: 0, cardUid: s.zones[0].cards[0].card.uid });
+    expect(s.players[0].gold).toBe(20 - RECALL_PRICE - (RECALL_PRICE + 1));
+    s = act(s, { type: 'endTurn' });
+    s = act(s, { type: 'endTurn' });
+    expect(recallPrice(s, 0)).toBe(RECALL_PRICE + 2);
+    expect(recallPrice(s, 1)).toBe(RECALL_PRICE);
+  });
+
+  it('weigert zonder genoeg goud, met kaarten van de tegenstander en in een veroverde zone', () => {
+    const s = fullZone();
+    const mine = s.zones[0].cards[0].card.uid;
+    s.players[0].gold = RECALL_PRICE - 1;
+    expect(applyAction(s, { type: 'recall', zone: 0, cardUid: mine }).ok).toBe(false);
+    s.players[0].gold = 10;
+    s.zones[0].cards.push({ player: 1, card: { uid: 'bo-1', defId: 'rekruut' }, turn: 0 });
+    expect(applyAction(s, { type: 'recall', zone: 0, cardUid: 'bo-1' }).ok).toBe(false);
+    s.zones[0].owner = 1;
+    expect(applyAction(s, { type: 'recall', zone: 0, cardUid: mine }).ok).toBe(false);
   });
 
   it('Ververs vervangt de hele winkel', () => {

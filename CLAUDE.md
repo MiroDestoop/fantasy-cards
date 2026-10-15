@@ -21,7 +21,8 @@ Repository: https://github.com/MiroDestoop/fantasy-cards. `vite.config.ts` gebru
 - **Stapel:** je begint met 10 startkaarten: 5× Koperen Munt (alleen Goud 1), 3× Rekruut (Goud 1 / Aanval 1 + Terugroep 1), 2× Zilveren Munt (Goud 2 / Aanval 1).
 - **Beurt:** trek 5 kaarten (min Vertraag). Is je stapel leeg, dan wordt je aflegstapel geschud. Afgelegde kaarten liggen tot het einde van je beurt apart (`played`) en gaan pas bij Einde beurt, samen met je resterende hand, naar je aflegstapel. Zo kan Trek een kaart nooit twee keer in dezelfde beurt terugbrengen (vroeger gaf een kleine stapel met Trek een oneindige lus). Handlimiet 8: wat je daarboven trekt, gaat meteen naar je aflegstapel.
 - **Elke kaart heeft twee helften.** Sleep ze naar je **aflegstapel** voor het bovenste effect (`top`), of naar een **zone** voor het onderste effect (`bottom`). Een kaart zonder `bottom` kan je alleen afleggen. De knop "Alles afleggen" speelt je hele hand af voor het bovenste effect.
-- **Zones:** een kaart in een zone blijft daar liggen, maximaal 4 per speler per zone, ook nadat de zone veroverd is. Terugroep haalt ze terug, Vernietig verbant ze uit het spel.
+- **Zones:** een kaart in een zone blijft daar liggen, maximaal 4 per speler per zone (4 vaste vakjes op het scherm), ook nadat de zone veroverd is. Terugroep haalt ze terug, Vernietig verbant ze uit het spel.
+- **Terugtrekken:** tijdens je beurt kan je een eigen kaart uit een open zone terug naar je aflegstapel sturen voor goud (knop ↩ bij hover). Het kost eerst 3 goud (`RECALL_PRICE`) en elke keer dat je het doet, wordt het voor jou 1 goud duurder, voor de rest van het spel (`recalls` in `PlayerState`, actie `recall`).
 - **Winkel:** een gedeelde markt van 5 kaarten. Je koopt met goud; goud blijft bewaard over beurten heen. Een gekochte kaart gaat naar je aflegstapel en de vrije plek wordt aangevuld.
 - **Er is geen mana.** Dat systeem is bewust verwijderd.
 
@@ -40,7 +41,7 @@ Repository: https://github.com/MiroDestoop/fantasy-cards. `vite.config.ts` gebru
 | Vernietig | verban al je kaarten in deze zone uit het spel |
 | Ververs | vervang de hele winkel; de oude kaarten gaan onderaan de voorraad |
 
-Terugroep en Vernietig gebeuren **voordat** de kaart zelf in de zone gelegd wordt (`BEFORE_PLACING` in `engine.ts`). Daardoor mogen kaarten met die keywords ook in een volle zone gespeeld worden.
+Een kaart in een zone wordt **eerst gelegd**, daarna werken haar effecten. Terugroep en Vernietig slaan de kaart zelf over. Een kaart met die keywords heeft dus ook een vrije plek nodig: je kunt ze niet als vijfde kaart spelen.
 
 ## Code
 

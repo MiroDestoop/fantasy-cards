@@ -1,12 +1,12 @@
 import { getCard, SHOP_SUPPLY, STARTER_DECK } from './cards';
-import { HAND_SIZE, MARKET_SIZE, MAX_HAND, MAX_ZONE_CARDS, ZONE_HP, ZONE_SETUP, ZONES_TO_WIN } from './rules';
+import {
+  HAND_SIZE, MARKET_SIZE, MAX_HAND, MAX_ZONE_CARDS, RECALL_PRICE, ZONE_HP, ZONE_SETUP, ZONES_TO_WIN,
+} from './rules';
 import type {
-  Action, ActionResult, CardInstance, Effect, GameState, Keyword, PlayerId, PlayerState, PlayTarget,
+  Action, ActionResult, CardInstance, Effect, GameState, PlayerId, PlayerState, PlayTarget,
 } from './types';
 
 const MAX_LOG = 60;
-/** Effecten die de zone opruimen voordat de kaart zelf gelegd wordt. */
-const BEFORE_PLACING: Keyword[] = ['vernietig', 'terugroep'];
 
 export function other(p: PlayerId): PlayerId {
   return p === 0 ? 1 : 0;
@@ -20,6 +20,7 @@ export function createGame(names: [string, string], seed = Math.floor(Math.rando
     discard: [],
     played: [],
     gold: 0,
+    recalls: 0,
     slow: 0,
   });
   const s: GameState = {
@@ -54,6 +55,9 @@ export function applyAction(state: GameState, action: Action): ActionResult {
     case 'buy':
       error = buyCard(s, action.marketUid);
       break;
+    case 'recall':
+      error = recallCard(s, action.zone, action.cardUid);
+      break;
     case 'endTurn':
       endTurn(s);
       break;
@@ -72,12 +76,28 @@ export function whyCantPlay(state: GameState, handUid: string, target: PlayTarge
     if (!zone) return 'Die zone bestaat niet.';
     if (def.bottom.length === 0) return `${def.name} kan je alleen afleggen.`;
     if (zone.owner !== null) return `${zone.name} is al veroverd.`;
-    const mine = zone.cards.filter((c) => c.player === state.active).length;
-    // Een kaart met Vernietig of Terugroep ruimt eerst plaats op, dus die mag altijd.
-    if (mine >= MAX_ZONE_CARDS && !def.bottom.some((e) => BEFORE_PLACING.includes(e.kw))) {
-      return `Je hebt al ${MAX_ZONE_CARDS} kaarten in ${zone.name}. Gebruik Terugroep of Vernietig om plaats te maken.`;
+    // Ook een kaart met Terugroep of Vernietig moet eerst gelegd kunnen worden; pas daarna werkt haar effect.
+    if (zoneCardCount(state, target.zone, state.active) >= MAX_ZONE_CARDS) {
+      return `Je hebt al ${MAX_ZONE_CARDS} kaarten in ${zone.name}. Trek er eerst een terug om plaats te maken.`;
     }
   }
+  return null;
+}
+
+/** Wat het nu kost om een kaart uit een zone terug te trekken. */
+export function recallPrice(state: GameState, pid: PlayerId): number {
+  return RECALL_PRICE + state.players[pid].recalls;
+}
+
+export function whyCantRecall(state: GameState, zoneIdx: number, cardUid: string): string | null {
+  const zone = state.zones[zoneIdx];
+  if (!zone) return 'Die zone bestaat niet.';
+  if (!zone.cards.some((c) => c.card.uid === cardUid && c.player === state.active)) {
+    return 'Je kunt alleen je eigen kaarten terugtrekken.';
+  }
+  if (zone.owner !== null) return `${zone.name} is veroverd: de kaarten daar blijven liggen.`;
+  const price = recallPrice(state, state.active);
+  if (price > state.players[state.active].gold) return `Niet genoeg goud om terug te trekken (${price} nodig).`;
   return null;
 }
 
@@ -114,10 +134,9 @@ function playCard(s: GameState, handUid: string, target: PlayTarget): string | n
   } else {
     const zone = s.zones[target.zone];
     log(s, `${p.name} speelt ${def.name} in ${zone.name}.`);
-    // Opruimen gaat eerst, zodat de kaart zelf in de opgeruimde zone blijft liggen.
-    for (const e of def.bottom) if (BEFORE_PLACING.includes(e.kw)) applyEffect(s, pid, e, target.zone);
+    // Eerst wordt de kaart gelegd, dan pas werken haar effecten. Terugroep en Vernietig slaan de kaart zelf over.
     zone.cards.push({ player: pid, card, turn: s.turn });
-    for (const e of def.bottom) if (!BEFORE_PLACING.includes(e.kw)) applyEffect(s, pid, e, target.zone);
+    for (const e of def.bottom) applyEffect(s, pid, e, target.zone, card.uid);
   }
   return null;
 }
@@ -133,10 +152,10 @@ function discardAll(s: GameState): string | null {
 }
 
 /** Haalt de `count` oudste kaarten van een speler uit een zone (alles bij Infinity). */
-function takeZoneCards(s: GameState, zoneIdx: number, pid: PlayerId, count: number): CardInstance[] {
+function takeZoneCards(s: GameState, zoneIdx: number, pid: PlayerId, count: number, skipUid?: string): CardInstance[] {
   const zone = s.zones[zoneIdx];
   // Kaarten worden achteraan toegevoegd, dus de oudste staan vooraan.
-  const taken = zone.cards.filter((c) => c.player === pid).slice(0, count);
+  const taken = zone.cards.filter((c) => c.player === pid && c.card.uid !== skipUid).slice(0, count);
   zone.cards = zone.cards.filter((c) => !taken.includes(c));
   return taken.map((c) => c.card);
 }
@@ -149,8 +168,11 @@ function refreshShop(s: GameState): void {
   while (shop.market.length < MARKET_SIZE && shop.pile.length) shop.market.push(shop.pile.pop()!);
 }
 
-/** `zoneIdx` is de zone waarin de kaart gespeeld werd, of null bij afleggen. */
-function applyEffect(s: GameState, pid: PlayerId, e: Effect, zoneIdx: number | null): void {
+/**
+ * `zoneIdx` is de zone waarin de kaart gespeeld werd, of null bij afleggen.
+ * `selfUid` is de gespeelde kaart zelf, die Terugroep en Vernietig laten liggen.
+ */
+function applyEffect(s: GameState, pid: PlayerId, e: Effect, zoneIdx: number | null, selfUid?: string): void {
   const p = s.players[pid];
   const opp = other(pid);
   switch (e.kw) {
@@ -181,13 +203,13 @@ function applyEffect(s: GameState, pid: PlayerId, e: Effect, zoneIdx: number | n
       break;
     case 'vernietig':
       if (zoneIdx !== null) {
-        const n = takeZoneCards(s, zoneIdx, pid, Infinity).length;
+        const n = takeZoneCards(s, zoneIdx, pid, Infinity, selfUid).length;
         if (n) log(s, `${p.name} verbant ${n} kaart(en) uit ${s.zones[zoneIdx].name} uit het spel.`);
       }
       break;
     case 'terugroep':
       if (zoneIdx !== null) {
-        const back = takeZoneCards(s, zoneIdx, pid, e.amount);
+        const back = takeZoneCards(s, zoneIdx, pid, e.amount, selfUid);
         p.discard.push(...back);
         if (back.length) log(s, `${p.name} roept ${back.map((c) => getCard(c.defId).name).join(', ')} terug.`);
       }
@@ -228,6 +250,21 @@ function buyCard(s: GameState, marketUid: string): string | null {
   if (refill) s.shop.market.splice(idx, 1, refill);
   else s.shop.market.splice(idx, 1);
   log(s, `${p.name} koopt ${def.name} voor ${def.price} goud.`);
+  return null;
+}
+
+function recallCard(s: GameState, zoneIdx: number, cardUid: string): string | null {
+  const blocked = whyCantRecall(s, zoneIdx, cardUid);
+  if (blocked) return blocked;
+  const p = s.players[s.active];
+  const zone = s.zones[zoneIdx];
+  const price = recallPrice(s, s.active);
+  const zc = zone.cards.find((c) => c.card.uid === cardUid)!;
+  zone.cards = zone.cards.filter((c) => c !== zc);
+  p.discard.push(zc.card);
+  p.gold -= price;
+  p.recalls++;
+  log(s, `${p.name} trekt ${getCard(zc.card.defId).name} terug uit ${zone.name} voor ${price} goud.`);
   return null;
 }
 

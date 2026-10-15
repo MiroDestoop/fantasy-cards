@@ -2,9 +2,9 @@ import './style.css';
 import { chooseAction } from './game/ai';
 import { getCard, KEYWORDS } from './game/cards';
 import {
-  applyAction, createGame, other, whyCantBuy, whyCantPlay, zoneCardCount, zonesOwnedBy,
+  applyAction, createGame, other, recallPrice, whyCantBuy, whyCantPlay, zonesOwnedBy,
 } from './game/engine';
-import { HAND_SIZE, MAX_ZONE_CARDS, ZONE_HP, ZONES_TO_WIN } from './game/rules';
+import { HAND_SIZE, MAX_ZONE_CARDS, RECALL_PRICE, ZONE_HP, ZONES_TO_WIN } from './game/rules';
 import type { Action, CardDef, CardInstance, Effect, GameState, Keyword, PlayerId, PlayTarget } from './game/types';
 import { isMuted, sfx, toggleMute } from './sound';
 import { ZONE_ART } from './zoneArt';
@@ -71,7 +71,8 @@ function renderStart(): string {
         <li>Elke beurt trek je ${HAND_SIZE} kaarten. Elke kaart heeft twee helften:
           sleep ze naar je <b>aflegstapel</b> voor het bovenste effect, of naar een <b>zone</b> voor het onderste.</li>
         <li>Kaarten in een zone blijven liggen, maximaal ${MAX_ZONE_CARDS} per speler per zone.
-          Met <b>Terugroep</b> haal je ze terug naar je aflegstapel, met <b>Vernietig</b> verban je ze uit het spel.</li>
+          Met <b>Terugroep</b> haal je ze terug naar je aflegstapel, met <b>Vernietig</b> verban je ze uit het spel.
+          Of klik op <b>↩</b> bij een eigen kaart om ze terug te trekken voor ${RECALL_PRICE} goud; elke keer wordt dat 1 goud duurder.</li>
         <li>Met goud koop je sterkere kaarten in de winkel. Is je stapel leeg, dan wordt je aflegstapel geschud.</li>
         <li>Hover over een keyword zoals <b>Aanval(2)</b> om te zien wat het doet.</li>
       </ul>
@@ -237,19 +238,26 @@ function renderBacks(n: number): string {
 function renderZone(g: GameState, i: number, bottom: PlayerId, prev: GameState | null): string {
   const z = g.zones[i];
   const top = other(bottom);
+  // Je eigen kaarten in een open zone kan je tijdens je beurt terugtrekken voor goud.
+  const canRecall = z.owner === null && humanCanAct();
+  const price = recallPrice(g, bottom);
   const row = (pid: PlayerId) => {
-    const cards = z.cards
-      .filter((c) => c.player === pid)
+    const mine = z.cards.filter((c) => c.player === pid);
+    const cards = mine
       .map((c) => {
         const isNew = !seenZoneCards.has(`${c.card.uid}@${c.turn}`);
-        return `<div class="zslot" data-zcard="${c.card.uid}"><div class="card ${isNew ? (pid === bottom ? 'enter-up' : 'enter-down') : ''}">${renderFace(getCard(c.card.defId))}</div></div>`;
+        const recall = canRecall && pid === bottom
+          ? `<button class="recall ${price <= g.players[bottom].gold ? '' : 'too-expensive'}" data-click="recall:${i}:${c.card.uid}"
+              data-recall="${c.card.uid}">↩ ${price} 🪙</button>`
+          : '';
+        return `<div class="zslot" data-zcard="${c.card.uid}"><div class="card ${isNew ? (pid === bottom ? 'enter-up' : 'enter-down') : ''}">${renderFace(getCard(c.card.defId))}</div>${recall}</div>`;
       })
       .join('');
-    const n = zoneCardCount(g, i, pid);
-    const count = z.owner === null
-      ? `<span class="zcount p${pid} ${n >= MAX_ZONE_CARDS ? 'full' : ''}" title="${esc(g.players[pid].name)} heeft ${n} van max. ${MAX_ZONE_CARDS} kaarten in deze zone">${n}/${MAX_ZONE_CARDS}</span>`
-      : '';
-    return `${cards}${count}`;
+    // Vaste vakjes tonen in één oogopslag hoeveel plaats er nog is.
+    const free = Math.max(0, MAX_ZONE_CARDS - mine.length);
+    const empty = `<div class="zslot empty p${pid}"></div>`.repeat(free);
+    const full = z.owner === null && free === 0;
+    return `<div class="zrow ${full ? 'full' : ''}" title="${esc(g.players[pid].name)}: ${mine.length} van ${MAX_ZONE_CARDS} plaatsen bezet">${cards}${empty}</div>`;
   };
   const bar = (pid: PlayerId) => {
     const dmg = z.damage[pid];
@@ -314,7 +322,7 @@ function renderSidePanel(g: GameState): string {
       : `<b>${esc(p.name)}</b> is aan zet`}</div>
     <button class="end-turn" data-click="end-turn" ${locked ? 'disabled' : ''}>Einde<br>beurt</button>
     <div class="hint">Sleep een kaart naar je <b>aflegstapel</b> (bovenste effect) of naar een <b>zone</b> (onderste effect).
-      Hover over een stapel om te zien wat erin zit.</div>
+      Hover over een stapel om te zien wat erin zit. Hover over je kaart in een zone om ze terug te trekken (↩).</div>
     <div class="log">${g.log.slice(-16).reverse().map((l) => `<div>${esc(l)}</div>`).join('')}</div>
     <button class="sound-toggle" data-click="sound">${isMuted() ? '🔇 Geluid uit' : '🔊 Geluid aan'}</button>
   </div>`;
@@ -350,7 +358,7 @@ function renderWinner(g: GameState): string {
 
 app.addEventListener('click', (e) => {
   const el = (e.target as HTMLElement).closest<HTMLElement>('[data-click]');
-  const [kind, arg] = (el?.dataset.click ?? '').split(':');
+  const [kind, arg, arg2] = (el?.dataset.click ?? '').split(':');
   switch (kind) {
     case 'start':
       startGame();
@@ -384,6 +392,9 @@ app.addEventListener('click', (e) => {
       break;
     case 'buy':
       if (humanCanAct()) dispatch({ type: 'buy', marketUid: arg });
+      break;
+    case 'recall':
+      if (humanCanAct()) dispatch({ type: 'recall', zone: Number(arg), cardUid: arg2 });
       break;
   }
 });
@@ -473,7 +484,10 @@ app.addEventListener('mouseover', (e) => {
   const target = e.target as HTMLElement;
   const kw = target.closest<HTMLElement>('[data-kw]');
   const pile = target.closest<HTMLElement>('[data-pile]');
-  if (kw) {
+  const recall = target.closest<HTMLElement>('[data-recall]');
+  if (recall && game) {
+    tipEl.innerHTML = recallTip(game, recall.dataset.recall!);
+  } else if (kw) {
     const key = kw.dataset.kw as Keyword;
     const n = Number(kw.dataset.n);
     tipEl.innerHTML = `<b>${keywordText(key, n)}</b><br>${KEYWORDS[key].explain(n)}`;
@@ -486,6 +500,18 @@ app.addEventListener('mouseover', (e) => {
   }
   tipEl.classList.add('show');
 });
+
+function recallTip(g: GameState, uid: string): string {
+  const zone = g.zones.find((z) => z.cards.some((c) => c.card.uid === uid));
+  const card = zone?.cards.find((c) => c.card.uid === uid);
+  const price = recallPrice(g, g.active);
+  const gold = g.players[g.active].gold;
+  const name = card ? getCard(card.card.defId).name : 'deze kaart';
+  const short = gold < price ? `<div class="tip-note tip-warn">Je hebt maar ${gold} goud.</div>` : '';
+  return `<b>↩ Terugtrekken · ${price} goud</b><br>
+    Stuur ${esc(name)} uit ${esc(zone?.name ?? 'deze zone')} terug naar je aflegstapel. Zo maak je een plek vrij.
+    <div class="tip-note">Elke keer dat je terugtrekt, wordt het 1 goud duurder. Daarna kost het ${price + 1} goud.</div>${short}`;
+}
 
 function pileTip(owner: string, kind: 'deck' | 'discard', cards: CardInstance[], played: CardInstance[] = []): string {
   const title = `${kind === 'deck' ? 'Stapel' : 'Aflegstapel'} van ${esc(owner)} (${cards.length})`;

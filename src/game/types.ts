@@ -41,6 +41,8 @@ export interface PlayerState {
   played: CardInstance[];
   /** Goud blijft bewaard over beurten heen. */
   gold: number;
+  /** Hoe vaak deze speler al een kaart uit een zone teruggetrokken heeft; elke keer wordt het 1 goud duurder. */
+  recalls: number;
   /** Zoveel kaarten minder trekken bij de volgende beurt (door Vertraag). */
   slow: number;
 }
@@ -91,6 +93,8 @@ export type Action =
   /** Speel elke kaart die nu in je hand zit af op je aflegstapel (bovenste effect). */
   | { type: 'discardAll' }
   | { type: 'buy'; marketUid: string }
+  /** Trek een eigen kaart uit een open zone terug naar je aflegstapel, voor goud. */
+  | { type: 'recall'; zone: number; cardUid: string }
   | { type: 'endTurn' };
 
 export type ActionResult = { ok: true; state: GameState } | { ok: false; error: string };
