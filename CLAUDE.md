@@ -48,9 +48,10 @@ Een kaart in een zone wordt **eerst gelegd**, daarna werken haar effecten. Terug
 | Bestand | Rol |
 |---|---|
 | `src/game/rules.ts` | Constanten: handgrootte, levens per zone, zones om te winnen, max kaarten per zone, handlimiet, zones |
-| `src/game/types.ts` | Alle types: `GameState`, `Action`, `CardDef` (`top`/`bottom`), `Effect`, `Keyword` |
+| `src/game/types.ts` | Alle types: `GameState`, `Action`, `CardDef` (`top`/`bottom`), `Effect` (keyword of `speciaal`), `Keyword` |
 | `src/game/cards.ts` | `KEYWORDS` (label + uitleg), alle kaarten (`CARD_LIST`), `STARTER_DECK`, `SHOP_SUPPLY` |
-| `src/game/engine.ts` | Spelregels: `createGame`, `applyAction`, `whyCantPlay`, `whyCantBuy` |
+| `src/game/specials.ts` | Speciale effecten zonder keyword (`SPECIALS`): een korte tekst en een `run`-functie |
+| `src/game/engine.ts` | Spelregels: `createGame`, `applyAction`, `whyCantPlay`, `whyCantBuy`, `whyCantRecall` |
 | `src/game/engine.test.ts` | Tests voor de regels |
 | `src/game/ai.ts` | Computertegenstander: `chooseAction(state)` geeft één actie voor de speler aan zet |
 | `src/game/ai.test.ts` | Tests voor de computertegenstander |
@@ -65,7 +66,7 @@ Een kaart in een zone wordt **eerst gelegd**, daarna werken haar effecten. Terug
 
 **UI**
 - Elke wijziging tekent de hele tafel opnieuw via `innerHTML`.
-- Interactie via data-attributen: `data-click`, `data-drag` (handkaart), `data-drop` (`discard` / `zone:i`), `data-kw` (keyword-tooltip), `data-pile` (stapel-tooltip).
+- Interactie via data-attributen: `data-click`, `data-drag` (handkaart), `data-drop` (`discard` / `zone:i`), `data-kw` (keyword-tooltip), `data-special` (tooltip van een speciaal effect), `data-recall` (tooltip van de terugtrekknop), `data-pile` (stapel-tooltip).
 - De tafel heeft een vaste ontwerpgrootte van 1600×900 en wordt geschaald naar het venster (`--scale`).
 - **Hover zonder glitch:** de buitenste "slot" ligt stil en vangt de muis op; alleen de `.card` erin beweegt en heeft `pointer-events: none`. Keywords zetten `pointer-events` terug aan voor hun tooltip. Gebruik hetzelfde patroon voor nieuwe hover-effecten.
 - **Animaties:** `captureEffects` legt de DOM-posities vast vóór het opnieuw tekenen. `playEffects` laat daarna kopieën vliegen of verbranden.
@@ -73,8 +74,9 @@ Een kaart in een zone wordt **eerst gelegd**, daarna werken haar effecten. Terug
 - **Hotseat:** na "Einde beurt" verschijnt een wisselscherm (`handoff`) dat de hand verbergt. De speler die aan zet is, zit altijd onderaan.
 - **Tegen de computer:** keuze op het startscherm (`vsComputer`). De mens is speler 0 en zit altijd onderaan, er is geen wisselscherm. `scheduleComputer` laat de computer zet per zet spelen via `dispatch`, met een pauze ertussen. De computer speelt eerst haar hele hand: voor elke kaart probeert ze elke bestemming op een kopie uit en kiest ze de beste toestand volgens `evaluate`. Daarna koopt ze de duurste betaalbare kaart (vanaf 3 goud) en eindigt ze haar beurt.
 
-**Een kaart of keyword toevoegen**
+**Een kaart, speciaal effect of keyword toevoegen**
 - **Kaart:** voeg ze toe aan `CARD_LIST` en aan `SHOP_SUPPLY` (of aan `STARTER_DECK`).
+- **Speciaal effect** (hoort bij één of enkele kaarten, geen keyword waard): voeg een entry toe aan `SPECIALS` in `specials.ts` met een korte `text` (die staat op de kaart) en een `run({ me, opp, meId, oppId, zone, state, damage, draw, log })`. Zet het op een kaart met `special('naam')`, naast gewone keywords. `zone` is `null` bij afleggen. `damage` en `draw` volgen dezelfde regels als Aanval en Trek. Een onbekende naam geeft meteen een fout bij het laden. Voorbeelden: Alchemist (`dubbelgoud`) en Wrekende Geest (`wraak`).
 - **Keyword:** pas vier plekken aan:
   - de `Keyword`-union in `types.ts`
   - een entry in `KEYWORDS` in `cards.ts` (met `noAmount: true` als het geen getal heeft)

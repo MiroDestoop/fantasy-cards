@@ -3,11 +3,11 @@ export type PlayerId = 0 | 1;
 export type Keyword =
   | 'goud' | 'aanval' | 'storm' | 'herstel' | 'schild' | 'trek' | 'vertraag' | 'vernietig' | 'terugroep' | 'ververs';
 
-/** Eén keyword met zijn waarde, zoals Aanval(2). */
-export interface Effect {
-  kw: Keyword;
-  amount: number;
-}
+/**
+ * Eén effect op een kaart: een keyword met zijn waarde, zoals Aanval(2),
+ * of een speciaal effect uit `SPECIALS` in specials.ts.
+ */
+export type Effect = { kw: Keyword; amount: number } | { kw: 'speciaal'; id: string };
 
 export interface CardDef {
   id: string;

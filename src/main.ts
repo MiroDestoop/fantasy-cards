@@ -1,6 +1,7 @@
 import './style.css';
 import { chooseAction } from './game/ai';
 import { getCard, KEYWORDS } from './game/cards';
+import { getSpecial } from './game/specials';
 import {
   applyAction, createGame, other, recallPrice, whyCantBuy, whyCantPlay, zonesOwnedBy,
 } from './game/engine';
@@ -150,7 +151,7 @@ function renderDiscardAllButton(g: GameState): string {
   const hand = g.players[g.active].hand;
   if (!hand.length || g.winner !== null) return '';
   const gold = hand.reduce(
-    (t, c) => t + getCard(c.defId).top.filter((e) => e.kw === 'goud').reduce((s, e) => s + e.amount, 0),
+    (t, c) => t + getCard(c.defId).top.reduce((s, e) => s + (e.kw === 'goud' ? e.amount : 0), 0),
     0,
   );
   return `<button class="discard-all" data-click="discard-all"
@@ -207,7 +208,10 @@ function keywordText(kw: Keyword, n: number): string {
 
 function renderKeywords(effects: Effect[]): string {
   return effects
-    .map((e) => `<span class="kw kw-${e.kw}" data-kw="${e.kw}" data-n="${e.amount}">${keywordText(e.kw, e.amount)}</span>`)
+    .map((e) =>
+      e.kw === 'speciaal'
+        ? `<span class="kw kw-speciaal" data-special="${e.id}">${esc(getSpecial(e.id).text)}</span>`
+        : `<span class="kw kw-${e.kw}" data-kw="${e.kw}" data-n="${e.amount}">${keywordText(e.kw, e.amount)}</span>`)
     .join(' ');
 }
 
@@ -485,8 +489,12 @@ app.addEventListener('mouseover', (e) => {
   const kw = target.closest<HTMLElement>('[data-kw]');
   const pile = target.closest<HTMLElement>('[data-pile]');
   const recall = target.closest<HTMLElement>('[data-recall]');
+  const special = target.closest<HTMLElement>('[data-special]');
   if (recall && game) {
     tipEl.innerHTML = recallTip(game, recall.dataset.recall!);
+  } else if (special) {
+    tipEl.innerHTML = `<b>✨ Speciaal effect</b><br>${esc(getSpecial(special.dataset.special!).text)}
+      <div class="tip-note">Dit effect heeft geen keyword: het hoort alleen bij deze kaart.</div>`;
   } else if (kw) {
     const key = kw.dataset.kw as Keyword;
     const n = Number(kw.dataset.n);

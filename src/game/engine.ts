@@ -1,4 +1,5 @@
 import { getCard, SHOP_SUPPLY, STARTER_DECK } from './cards';
+import { getSpecial } from './specials';
 import {
   HAND_SIZE, MARKET_SIZE, MAX_HAND, MAX_ZONE_CARDS, RECALL_PRICE, ZONE_HP, ZONE_SETUP, ZONES_TO_WIN,
 } from './rules';
@@ -175,6 +176,24 @@ function refreshShop(s: GameState): void {
 function applyEffect(s: GameState, pid: PlayerId, e: Effect, zoneIdx: number | null, selfUid?: string): void {
   const p = s.players[pid];
   const opp = other(pid);
+  if (e.kw === 'speciaal') {
+    getSpecial(e.id).run({
+      state: s,
+      me: p,
+      meId: pid,
+      opp: s.players[opp],
+      oppId: opp,
+      zone: zoneIdx === null ? null : s.zones[zoneIdx],
+      damage: (amount) => {
+        if (zoneIdx !== null && amount > 0) dealDamage(s, zoneIdx, pid, amount);
+      },
+      draw: (count) => {
+        for (let i = 0; i < count; i++) drawCard(s, p);
+      },
+      log: (message) => log(s, message),
+    });
+    return;
+  }
   switch (e.kw) {
     case 'goud':
       p.gold += e.amount;

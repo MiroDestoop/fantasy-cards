@@ -1,4 +1,5 @@
 import { MAX_HAND, MAX_ZONE_CARDS, ZONE_HP } from './rules';
+import { getSpecial } from './specials';
 import type { CardDef, Effect, Keyword } from './types';
 
 const kaarten = (n: number) => (n === 1 ? '1 kaart' : `${n} kaarten`);
@@ -52,6 +53,8 @@ export const KEYWORDS: Record<Keyword, { label: string; noAmount?: boolean; expl
 };
 
 const fx = (kw: Keyword, amount: number): Effect => ({ kw, amount });
+/** Een speciaal effect uit specials.ts. Een tikfout in de naam geeft meteen een foutmelding. */
+const special = (id: string): Effect => (getSpecial(id), { kw: 'speciaal', id });
 
 // Kaarten: pas namen, prijzen en keywords hier gerust aan.
 // `top` krijg je door de kaart naar je aflegstapel te slepen, `bottom` door ze in een zone te spelen.
@@ -84,6 +87,10 @@ const CARD_LIST: CardDef[] = [
   { id: 'getijde', name: 'Getijdenmagiër', price: 5, icon: '🌊', color: '#00695c', top: [fx('ververs', 0), fx('goud', 2)], bottom: [fx('terugroep', 3), fx('schild', 3)] },
   { id: 'bol', name: 'Kristallen Bol', price: 4, icon: '🔮', color: '#5e35b1', top: [fx('goud', 2)], bottom: [fx('ververs', 0), fx('aanval', 2)] },
   { id: 'generaal', name: 'Generaal', price: 7, icon: '🎖️', color: '#4e342e', top: [fx('goud', 3)], bottom: [fx('aanval', 4), fx('terugroep', 3)] },
+
+  // Kaarten met een speciaal effect (zie specials.ts)
+  { id: 'alchemist', name: 'Alchemist', price: 6, icon: '⚗️', color: '#6a1b9a', top: [special('dubbelgoud')], bottom: [fx('aanval', 2)] },
+  { id: 'geest', name: 'Wrekende Geest', price: 4, icon: '👻', color: '#455a64', top: [fx('trek', 1)], bottom: [special('wraak')] },
 ];
 
 export const CARDS: Record<string, CardDef> = Object.fromEntries(CARD_LIST.map((c) => [c.id, c]));
@@ -105,4 +112,5 @@ export const SHOP_SUPPLY = expand([
   ['inzicht', 3], ['heks', 3], ['zandloper', 2], ['golem', 3], ['bron', 3], ['schat', 3],
   ['offervuur', 3], ['terugtocht', 3], ['koerier', 3], ['hoornblazer', 3], ['marskramer', 3],
   ['bard', 3], ['valkenier', 3], ['getijde', 2], ['bol', 2], ['generaal', 2],
+  ['alchemist', 2], ['geest', 3],
 ]);

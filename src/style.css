@@ -318,6 +318,16 @@ button { font: inherit; }
 .kw-vernietig { --edge: #37474f; }
 .kw-terugroep { --edge: #5d4037; }
 .kw-ververs { --edge: #ad1457; }
+/* Een speciaal effect is een korte zin in plaats van een keyword. */
+.kw-speciaal {
+  --edge: #4a2c6e;
+  padding: 2px 5px;
+  font-size: 10.5px;
+  font-weight: normal;
+  font-style: italic;
+  line-height: 1.15;
+  text-align: center;
+}
 
 .ghost {
   position: fixed;

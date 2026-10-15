@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { getCard } from './cards';
+import { getCard, SHOP_SUPPLY } from './cards';
+import { getSpecial } from './specials';
 import { applyAction, createGame, recallPrice } from './engine';
 import { HAND_SIZE, MARKET_SIZE, MAX_HAND, MAX_ZONE_CARDS, RECALL_PRICE, ZONE_HP } from './rules';
 import type { Action, GameState, PlayerId, PlayTarget } from './types';
@@ -329,5 +330,32 @@ describe('winnen', () => {
     s.zones[1].damage = [ZONE_HP - 2, 5];
     s = play(s, 'vuurbal', zone(1));
     expect(s.winner).toBe(0);
+  });
+});
+
+describe('speciale effecten', () => {
+  it('Alchemist verdubbelt je goud, met een maximum van +5', () => {
+    let s = createGame(['Ana', 'Bo'], 42);
+    s.players[0].gold = 3;
+    s = play(s, 'alchemist', DISCARD);
+    expect(s.players[0].gold).toBe(6);
+    s.players[0].gold = 8;
+    s = play(s, 'alchemist', DISCARD);
+    expect(s.players[0].gold).toBe(13);
+  });
+
+  it('Wrekende Geest doet 1 schade per kaart van de tegenstander in de zone', () => {
+    let s = createGame(['Ana', 'Bo'], 42);
+    for (let i = 0; i < 3; i++) s.zones[1].cards.push({ player: 1, card: { uid: `bo-${i}`, defId: 'zilver' }, turn: 0 });
+    s = play(s, 'geest', zone(1));
+    expect(s.zones[1].damage[0]).toBe(3);
+  });
+
+  it('elke kaart met een speciaal effect verwijst naar een bestaand effect', () => {
+    for (const id of [...new Set(SHOP_SUPPLY)]) {
+      for (const e of [...getCard(id).top, ...getCard(id).bottom]) {
+        if (e.kw === 'speciaal') expect(() => getSpecial(e.id)).not.toThrow();
+      }
+    }
   });
 });
