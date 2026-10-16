@@ -107,6 +107,7 @@ button { font: inherit; }
 .gold { background: rgba(255, 213, 79, 0.18); border: 1px solid #c9a227; color: #ffe082; }
 .flags { background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.3); }
 .slow { background: rgba(2, 119, 189, 0.3); border: 1px solid #4fc3f7; }
+.echo { background: rgba(79, 138, 139, 0.35); border: 1px solid #80cbc4; }
 .bonus { background: rgba(120, 60, 160, 0.35); border: 1px dashed #c9a227; color: #ffe082; font-size: 12px !important; }
 
 /* Knop boven de spelerinfo: speel je hele hand af voor het bovenste effect. */
@@ -465,6 +466,14 @@ button { font: inherit; }
   box-shadow: 0 0 18px 6px var(--c), 0 0 40px 10px rgba(255, 200, 80, 0.5);
   pointer-events: none;
   z-index: 144;
+}
+
+/* Een zone die net een nieuw effect kreeg (Landmeter, Weermaker, Portaalmagiër, Aardbeving). */
+.zone-fx.fx-new { animation: fx-new 1s cubic-bezier(0.2, 1.2, 0.4, 1); }
+@keyframes fx-new {
+  0% { transform: scale(0.2) rotate(-200deg); opacity: 0; filter: brightness(3); }
+  60% { transform: scale(1.35) rotate(8deg); opacity: 1; box-shadow: 0 0 30px 8px rgba(255, 220, 140, 0.8); }
+  100% { transform: none; }
 }
 
 @keyframes deal-in {

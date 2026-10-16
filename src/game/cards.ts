@@ -110,6 +110,30 @@ const CARD_LIST: CardDef[] = [
   { id: 'fenix', name: 'Fenix', price: 6, icon: '🐦‍🔥', color: '#e64a19', top: [fx('goud', 2)], bottom: [fx('aanval', 3), special('wedergeboorte')] },
   { id: 'goblin', name: 'Goblin', price: 2, icon: '👺', color: '#558b2f', top: [fx('goud', 1)], bottom: [special('diefstal')] },
   { id: 'geest', name: 'Wrekende Geest', price: 4, icon: '👻', color: '#455a64', top: [fx('trek', 1), fx('goud', 1)], bottom: [special('wraak')] },
+
+  // Kaarten die het effect van een zone veranderen
+  { id: 'landmeter', name: 'Landmeter', price: 3, icon: '🧭', color: '#5d7b3a', top: [fx('goud', 2)], bottom: [special('nieuwterrein'), fx('aanval', 1)] },
+  { id: 'portaal', name: 'Portaalmagiër', price: 4, icon: '🌀', color: '#4527a0', top: [fx('trek', 1), fx('goud', 1)], bottom: [special('wisseling'), fx('aanval', 2)] },
+  { id: 'weermaker', name: 'Weermaker', price: 5, icon: '🌦️', color: '#0288d1', top: [special('allesnieuw'), fx('goud', 1)], bottom: [fx('aanval', 3), special('nieuwterrein')] },
+  { id: 'aardbeving', name: 'Aardbeving', price: 7, icon: '🌋', color: '#8d3b1f', top: [special('allesnieuw'), fx('storm', 1)], bottom: [fx('aanval', 4), special('allesnieuw')] },
+
+  // Meer Vernietig
+  { id: 'zuiveraar', name: 'Zuiveraar', price: 3, icon: '✨', color: '#9e8c3a', top: [fx('goud', 1)], bottom: [fx('vernietig', 0), fx('herstel', 3)] },
+  { id: 'brandstichter', name: 'Brandstichter', price: 4, icon: '🧨', color: '#bf360c', top: [fx('storm', 1)], bottom: [fx('vernietig', 0), fx('aanval', 2), fx('vertraag', 1)] },
+  { id: 'dodenbezweerder', name: 'Dodenbezweerder', price: 5, icon: '💀', color: '#37474f', top: [fx('trek', 1), fx('goud', 1)], bottom: [special('zielenoogst')] },
+
+  // Je volgende kaart in een zone keert meteen terug
+  { id: 'windloper', name: 'Windloper', price: 3, icon: '🌬️', color: '#4f8a8b', top: [fx('goud', 1), special('echo')], bottom: [fx('aanval', 2)] },
+  { id: 'schaduwdanser', name: 'Schaduwdanser', price: 4, icon: '🥷', color: '#3e2a4f', top: [fx('goud', 2)], bottom: [fx('aanval', 2), special('echo')] },
+  { id: 'tijdmagier', name: 'Tijdmagiër', price: 5, icon: '🕰️', color: '#6d5a2b', top: [fx('trek', 1), special('echo')], bottom: [fx('aanval', 3), special('echo')] },
+
+  // Heel dure kaarten
+  { id: 'mammoet', name: 'Oorlogsmammoet', price: 7, icon: '🦣', color: '#6d4c41', top: [fx('goud', 3)], bottom: [fx('aanval', 5), fx('schild', 3)] },
+  { id: 'aartsmagier', name: 'Aartsmagiër', price: 8, icon: '🧙', color: '#311b92', top: [fx('trek', 3), fx('goud', 1)], bottom: [fx('storm', 3), fx('trek', 1)] },
+  { id: 'titaan', name: 'Titaan', price: 9, icon: '⛰️', color: '#546e7a', top: [fx('goud', 4)], bottom: [fx('aanval', 9)] },
+  { id: 'leegte', name: 'Leegtescheur', price: 10, icon: '🕳️', color: '#1a1030', top: [fx('storm', 2)], bottom: [fx('vernietig', 0), fx('aanval', 7), fx('vertraag', 2)] },
+  { id: 'meteoor', name: 'Meteoor', price: 11, icon: '☄️', color: '#d84315', top: [fx('storm', 3), fx('goud', 2)], bottom: [fx('storm', 5)] },
+  { id: 'drakenkoning', name: 'Drakenkoning', price: 12, icon: '🐲', color: '#7f0000', top: [fx('storm', 4)], bottom: [fx('aanval', 10), fx('schild', 4)] },
 ];
 
 /** Engelse kaartnamen. Een kaart zonder vertaling hier houdt haar Nederlandse naam. */
@@ -122,6 +146,11 @@ const NAMES_EN: Record<string, string> = {
   bard: 'Wandering Bard', valkenier: 'Falconer', getijde: 'Tide Mage', bol: 'Crystal Ball', generaal: 'General',
   alchemist: 'Alchemist', huurling: 'Mercenary', ram: 'Battering Ram', fenix: 'Phoenix', goblin: 'Goblin',
   geest: 'Vengeful Spirit',
+  landmeter: 'Surveyor', portaal: 'Portal Mage', weermaker: 'Weather Maker', aardbeving: 'Earthquake',
+  zuiveraar: 'Purifier', brandstichter: 'Arsonist', dodenbezweerder: 'Necromancer',
+  windloper: 'Windrunner', schaduwdanser: 'Shadow Dancer', tijdmagier: 'Chronomancer',
+  mammoet: 'War Mammoth', aartsmagier: 'Archmage', titaan: 'Titan', leegte: 'Void Rift', meteoor: 'Meteor',
+  drakenkoning: 'Dragon King',
 };
 
 // De naam wordt een getter: def.name geeft altijd de naam in de gekozen taal.
@@ -150,4 +179,8 @@ export const SHOP_SUPPLY = expand([
   ['offervuur', 3], ['terugtocht', 3], ['koerier', 3], ['hoornblazer', 3], ['marskramer', 3],
   ['bard', 3], ['valkenier', 3], ['getijde', 2], ['bol', 2], ['generaal', 2],
   ['alchemist', 2], ['geest', 3], ['goblin', 3], ['huurling', 3], ['ram', 3], ['fenix', 2],
+  ['landmeter', 3], ['portaal', 2], ['weermaker', 2], ['aardbeving', 1],
+  ['zuiveraar', 3], ['brandstichter', 2], ['dodenbezweerder', 2],
+  ['windloper', 3], ['schaduwdanser', 2], ['tijdmagier', 2],
+  ['mammoet', 2], ['aartsmagier', 1], ['titaan', 1], ['leegte', 1], ['meteoor', 1], ['drakenkoning', 1],
 ]);

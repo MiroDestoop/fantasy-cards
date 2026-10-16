@@ -256,6 +256,10 @@ function renderInfo(g: GameState, pid: PlayerId): string {
         <span class="gold" title="${tr('Goud om kaarten te kopen in de winkel', 'Gold to buy cards in the shop')}">🪙 ${p.gold}</span>
         <span class="flags" title="${tr('Veroverde zones', 'Conquered zones')}">🚩 ${zonesOwnedBy(g, pid)}/${ZONES_TO_WIN}</span>
         ${p.bonusGold ? `<span class="bonus" title="${tr(`Bonus: krijgt elke beurt ${p.bonusGold} extra goud`, `Bonus: gets ${p.bonusGold} extra gold every turn`)}">+${p.bonusGold} 🪙/${tr('beurt', 'turn')}</span>` : ''}
+        ${p.echo ? `<span class="echo" title="${tr(
+          `Je volgende ${p.echo > 1 ? `${p.echo} kaarten` : 'kaart'} in een zone keert na het effect meteen terug naar je aflegstapel`,
+          `Your next ${p.echo > 1 ? `${p.echo} cards` : 'card'} in a zone returns to your discard pile right after its effect`,
+        )}">🌬️ ${p.echo}</span>` : ''}
         ${p.slow ? `<span class="slow" title="${tr(`Trekt volgende beurt ${cardsWord(p.slow)} minder`, `Draws ${cardsWord(p.slow)} fewer next turn`)}">⏳ −${p.slow}</span>` : ''}
       </div>
     </div>
@@ -447,7 +451,7 @@ function renderZone(g: GameState, i: number, bottom: PlayerId, prev: GameState |
     <div class="zone-mid">
       ${bar(top)}
       <div class="zone-name">${z.icon} ${esc(zoneName(z))}</div>
-      ${fx ? `<div class="zone-fx zfx-${fx.id}" data-zfx="${fx.id}">${fx.icon} ${esc(fx.label)}</div>` : ''}
+      ${fx ? `<div class="zone-fx zfx-${fx.id} ${prev && prev !== g && prev.zones[i].effect !== z.effect ? 'fx-new' : ''}" data-zfx="${fx.id}">${fx.icon} ${esc(fx.label)}</div>` : ''}
       ${bar(bottom)}
     </div>
     <div class="zcards">${row(bottom)}</div>
@@ -1672,6 +1676,23 @@ function captureEffects(action: Action, before: GameState, after: GameState): Fl
       grab(el, kind, zc.player);
     }
   });
+
+  // Een kaart die meteen terugkeert (echo) lag nooit zichtbaar in de zone: ze vliegt vanuit haar vrije plek weg.
+  if (action.type === 'play' && action.target.kind === 'zone') {
+    const pid = before.active;
+    const uid = action.handUid;
+    const card = before.players[pid].hand.find((c) => c.uid === uid);
+    const spot = app.querySelectorAll('.zone-area')[action.target.zone]?.querySelector<HTMLElement>(`.zslot.empty.p${pid}`);
+    if (card && spot && !after.zones[action.target.zone].cards.some((c) => c.card.uid === uid)) {
+      const owner = after.players[pid];
+      const has = (cards: CardInstance[]) => cards.some((c) => c.uid === uid);
+      const kind = has(owner.discard) ? 'return' : has(owner.hand) ? 'to-hand' : 'to-shop';
+      const clone = document.createElement('div');
+      clone.className = 'card';
+      clone.innerHTML = renderFace(getCard(card.defId));
+      flights.push({ clone, from: spot.getBoundingClientRect(), kind, pid, index: flights.length, w: CARD_W });
+    }
+  }
 
   // Een aankoop vervangt één kaart; Ververs vervangt ze allemaal.
   const oldMarket = before.shop.market.map((c) => c.uid);

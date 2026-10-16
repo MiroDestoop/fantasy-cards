@@ -1,12 +1,12 @@
 import { getCard, SHOP_SUPPLY, STARTER_DECK } from './cards';
 import { getSpecial } from './specials';
 import {
-  FIRST_HAND_SIZE, HAND_SIZE, MARKET_SIZE, MAX_HAND, RECALL_PRICE, ZONE_COUNT, ZONES_TO_WIN,
+  FIRST_HAND_SIZE, HAND_SIZE, MARKET_SIZE, MAX_HAND, RECALL_PRICE, ZONE_COUNT, ZONE_HP, ZONES_TO_WIN,
 } from './rules';
 import { cardsWord, tr } from './i18n';
 import { leadsZone, makeZone, zoneCapacity, ZONE_EFFECTS, ZONE_NAMES, zoneEffect, zoneName, type ZoneEffectId } from './zones';
 import type {
-  Action, ActionResult, CardInstance, Effect, GameState, PlayerId, PlayerState, PlayTarget,
+  Action, ActionResult, CardInstance, Effect, GameState, PlayerId, PlayerState, PlayTarget, Zone,
 } from './types';
 
 const MAX_LOG = 60;
@@ -39,6 +39,7 @@ export function createGame(
     recalls: 0,
     bonusGold: options.bonusGold?.[pid] ?? 0,
     slow: 0,
+    echo: 0,
   });
   const s: GameState = {
     players: [makePlayer(names[0], 0), makePlayer(names[1], 1)],
@@ -178,6 +179,9 @@ function playCard(s: GameState, handUid: string, target: PlayTarget): string | n
       p.gold -= fx.playCost;
       log(s, tr(`${fx.icon} ${p.name} betaalt ${fx.playCost} goud tol.`, `${fx.icon} ${p.name} pays ${fx.playCost} gold toll.`));
     }
+    // Een eerdere kaart met 'echo' laat deze kaart na haar effecten meteen terugkeren (haar eigen echo telt pas voor de volgende).
+    const echo = p.echo > 0;
+    if (echo) p.echo--;
     // Eerst wordt de kaart gelegd, dan pas werken haar effecten. Terugroep en Vernietig slaan de kaart zelf over.
     zone.cards.push({ player: pid, card, turn: s.turn });
     for (const e of def.bottom) applyEffect(s, pid, e, target.zone, card.uid);
@@ -194,6 +198,14 @@ function playCard(s: GameState, handUid: string, target: PlayTarget): string | n
     if (onPlay?.selfSlow) {
       p.slow += onPlay.selfSlow;
       log(s, tr(`${fx!.icon} ${p.name} trekt volgende beurt ${cardsWord(onPlay.selfSlow)} minder.`, `${fx!.icon} ${p.name} draws ${cardsWord(onPlay.selfSlow)} fewer next turn.`));
+    }
+    const still = zone.cards.find((c) => c.card.uid === card.uid);
+    if (echo && still) {
+      zone.cards = zone.cards.filter((c) => c !== still);
+      // Een Huurling gaat terug naar de winkel, een Fenix naar je hand, al de rest naar je aflegstapel.
+      if (hasSpecial(card.defId, 'huur')) s.shop.pile.unshift(card);
+      else if (!rebirth(s, p, card)) p.discard.push(card);
+      log(s, tr(`🌬️ ${def.name} keert meteen terug uit ${zoneName(zone)}.`, `🌬️ ${def.name} returns from ${zoneName(zone)} right away.`));
     }
   }
   return null;
@@ -248,6 +260,11 @@ function applyEffect(s: GameState, pid: PlayerId, e: Effect, zoneIdx: number | n
         for (let i = 0; i < count; i++) drawCard(s, p);
       },
       log: (message) => log(s, message),
+      zoneIdx,
+      destroy: () => (zoneIdx === null ? 0 : destroyZoneCards(s, pid, zoneIdx, selfUid)),
+      newEffect: (i) => newZoneEffect(s, i),
+      swapEffects: (a, b) => swapZoneEffects(s, a, b),
+      random: () => random(s),
     });
     return;
   }
@@ -278,15 +295,7 @@ function applyEffect(s: GameState, pid: PlayerId, e: Effect, zoneIdx: number | n
       if (zoneIdx !== null) s.zones[zoneIdx].shield[pid] += e.amount;
       break;
     case 'vernietig':
-      if (zoneIdx !== null) {
-        const taken = takeZoneCards(s, zoneIdx, pid, Infinity, selfUid);
-        // Een Fenix verbrandt niet: ze keert terug in je hand.
-        const banished = taken.filter((c) => !rebirth(s, p, c));
-        if (banished.length) log(s, tr(
-          `${p.name} verbant ${cardsWord(banished.length)} uit ${zoneName(s.zones[zoneIdx])} uit het spel.`,
-          `${p.name} banishes ${cardsWord(banished.length)} in ${zoneName(s.zones[zoneIdx])} from the game.`,
-        ));
-      }
+      if (zoneIdx !== null) destroyZoneCards(s, pid, zoneIdx, selfUid);
       break;
     case 'terugroep':
       if (zoneIdx !== null) {
@@ -300,6 +309,53 @@ function applyEffect(s: GameState, pid: PlayerId, e: Effect, zoneIdx: number | n
       log(s, tr('De winkel krijgt een volledig nieuw aanbod.', 'The shop gets a completely new offer.'));
       break;
   }
+}
+
+/** Vernietig: verbant je andere kaarten in deze zone. Geeft het aantal kaarten dat de zone verliet (ook een herrezen Fenix). */
+function destroyZoneCards(s: GameState, pid: PlayerId, zoneIdx: number, selfUid?: string): number {
+  const p = s.players[pid];
+  const taken = takeZoneCards(s, zoneIdx, pid, Infinity, selfUid);
+  // Een Fenix verbrandt niet: ze keert terug in je hand.
+  const banished = taken.filter((c) => !rebirth(s, p, c));
+  if (banished.length) log(s, tr(
+    `${p.name} verbant ${cardsWord(banished.length)} uit ${zoneName(s.zones[zoneIdx])} uit het spel.`,
+    `${p.name} banishes ${cardsWord(banished.length)} in ${zoneName(s.zones[zoneIdx])} from the game.`,
+  ));
+  return taken.length;
+}
+
+/** Geeft een open zone een nieuw willekeurig effect, dat nu in geen enkele zone speelt. */
+function newZoneEffect(s: GameState, zoneIdx: number): void {
+  const zone = s.zones[zoneIdx];
+  if (zone.owner !== null) return;
+  const used = s.zones.map((z) => z.effect);
+  const options = (Object.keys(ZONE_EFFECTS) as ZoneEffectId[]).filter((id) => !used.includes(id));
+  if (!options.length) return;
+  setZoneEffect(s, zone, options[Math.floor(random(s) * options.length)]);
+}
+
+/** Ruilt de effecten van twee open zones. */
+function swapZoneEffects(s: GameState, a: number, b: number): void {
+  const za = s.zones[a];
+  const zb = s.zones[b];
+  if (za.owner !== null || zb.owner !== null || !za.effect || !zb.effect || za.effect === zb.effect) return;
+  const ea = za.effect;
+  setZoneEffect(s, za, zb.effect);
+  setZoneEffect(s, zb, ea);
+}
+
+/**
+ * Zet het effect van een zone, met de levens die erbij horen. De schade blijft staan, maar een nieuw
+ * effect verovert nooit zelf een zone: de levens blijven minstens 1 boven de hoogste schade.
+ */
+function setZoneEffect(s: GameState, zone: Zone, id: ZoneEffectId): void {
+  const def = ZONE_EFFECTS[id];
+  zone.effect = id;
+  zone.hp = Math.max(def.hp ?? ZONE_HP + (def.hpBonus ?? 0), Math.max(...zone.damage) + 1);
+  log(s, tr(
+    `${zone.icon} ${zoneName(zone)} wordt ${def.icon} ${def.label}: ${def.text}`,
+    `${zone.icon} ${zoneName(zone)} becomes ${def.icon} ${def.label}: ${def.text}`,
+  ));
 }
 
 function dealDamage(s: GameState, zoneIdx: number, pid: PlayerId, amount: number): void {
@@ -392,6 +448,7 @@ function endTurn(s: GameState): void {
   }
   p.discard.push(...p.played, ...p.hand);
   p.played = [];
+  p.echo = 0;
   p.hand = [];
   s.active = other(s.active);
   startTurn(s);

@@ -11,12 +11,22 @@ export interface SpecialContext {
   oppId: PlayerId;
   /** De zone waarin de kaart gespeeld werd, of null als ze afgelegd werd. */
   zone: Zone | null;
+  /** Het nummer van die zone, of null. */
+  zoneIdx: number | null;
   /** Doe schade in deze zone, met schild en verovering zoals bij Aanval. Bij afleggen doet dit niets. */
   damage: (amount: number) => void;
   /** Trek kaarten, met schudden en handlimiet zoals bij Trek. */
   draw: (count: number) => void;
   /** Zet een regel in het logboek opzij. */
   log: (message: string) => void;
+  /** Vernietig zoals het keyword: verban je andere kaarten in deze zone. Geeft het aantal kaarten dat de zone verliet. */
+  destroy: () => number;
+  /** Geef een open zone een nieuw willekeurig effect, dat in geen andere zone speelt. */
+  newEffect: (zoneIdx: number) => void;
+  /** Ruil de effecten van twee open zones. */
+  swapEffects: (a: number, b: number) => void;
+  /** Toeval uit de seed van het spel (0 tot 1). */
+  random: () => number;
 }
 
 export interface SpecialDef {
@@ -59,6 +69,41 @@ export const SPECIALS: Record<string, SpecialDef> = {
   wedergeboorte: {
     get text() { return tr('Vernietigd of teruggeroepen? Dan keert ze terug in je hand.', 'Destroyed or recalled? She returns to your hand.'); },
     run: () => {},
+  },
+  // Kaarten die het effect van een zone veranderen.
+  nieuwterrein: {
+    get text() { return tr('Deze zone krijgt een nieuw effect.', 'This zone gets a new effect.'); },
+    run: ({ zoneIdx, newEffect }) => {
+      if (zoneIdx !== null) newEffect(zoneIdx);
+    },
+  },
+  allesnieuw: {
+    get text() { return tr('Elke open zone krijgt een nieuw effect.', 'Every open zone gets a new effect.'); },
+    run: ({ state, newEffect }) => {
+      state.zones.forEach((_, i) => newEffect(i));
+    },
+  },
+  wisseling: {
+    get text() { return tr('Ruil het effect van deze zone met een andere zone.', "Swap this zone's effect with another zone."); },
+    run: ({ state, zoneIdx, swapEffects, random }) => {
+      if (zoneIdx === null) return;
+      const others = state.zones.flatMap((z, i) => (i !== zoneIdx && z.owner === null ? [i] : []));
+      if (others.length) swapEffects(zoneIdx, others[Math.floor(random() * others.length)]);
+    },
+  },
+  zielenoogst: {
+    get text() { return tr('Vernietig. 2 schade per verbannen kaart.', 'Destroy. 2 damage per banished card.'); },
+    run: ({ destroy, damage }) => {
+      damage(destroy() * 2);
+    },
+  },
+  // Doet zelf niets: playCard kijkt naar me.echo.
+  echo: {
+    get text() { return tr('Je volgende kaart in een zone keert na haar effect terug.', 'Your next card in a zone returns after its effect.'); },
+    run: ({ me, log }) => {
+      me.echo++;
+      log(tr(`🌬️ De volgende kaart die ${me.name} in een zone speelt, keert meteen terug.`, `🌬️ The next card ${me.name} plays in a zone returns right away.`));
+    },
   },
   wraak: {
     get text() { return tr('1 schade per kaart van je tegenstander hier.', "1 damage per opponent's card here."); },

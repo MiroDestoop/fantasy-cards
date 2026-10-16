@@ -584,3 +584,108 @@ describe('Huurling, Belegeringsram en Fenix', () => {
     expect(s.players[0].hand.some((c) => c.uid === uid2)).toBe(true);
   });
 });
+
+describe('zone-effecten veranderen', () => {
+  const withEffects = (effects: ZoneEffectId[]) => {
+    const s = createGame(['Ana', 'Bo'], 3, { plainZones: true });
+    s.zones = effects.map((e, i) => makeZone({ name: `Z${i}`, icon: '' }, e));
+    return s;
+  };
+
+  it('Landmeter geeft de zone een nieuw effect dat nergens anders speelt', () => {
+    let s = withEffects(['vesting', 'mist', 'tolpoort']);
+    s = play(s, 'landmeter', zone(0));
+    const fx = s.zones.map((z) => z.effect);
+    expect(fx[0]).not.toBe('vesting');
+    expect(new Set(fx).size).toBe(3);
+    expect(s.zones[0].hp).toBeGreaterThan(0);
+  });
+
+  it('een nieuw effect verovert nooit zelf een zone', () => {
+    let s = withEffects(['slagveld', 'vesting', 'tolpoort']);
+    s.zones[0].damage = [0, 11];
+    // Zoek een seed waarbij Dichte mist (8 levens) of Bouwval (10) gekozen wordt; de levens blijven boven de schade.
+    for (let seed = 0; seed < 30; seed++) {
+      const t = structuredClone(s);
+      t.seed = seed;
+      const r = play(t, 'landmeter', zone(0));
+      expect(r.zones[0].owner).toBe(null);
+      expect(r.zones[0].hp).toBeGreaterThan(r.zones[0].damage[1]);
+    }
+  });
+
+  it('Portaalmagiër ruilt het effect met een andere open zone', () => {
+    let s = withEffects(['vesting', 'mist', 'tolpoort']);
+    s.zones[2].owner = 1;
+    s = play(s, 'portaal', zone(0));
+    expect(s.zones[0].effect).toBe('mist');
+    expect(s.zones[1].effect).toBe('vesting');
+    expect(s.zones[1].hp).toBe(ZONE_HP + 2);
+    expect(s.zones[2].effect).toBe('tolpoort');
+  });
+
+  it('Aardbeving geeft elke open zone een nieuw effect', () => {
+    let s = withEffects(['vesting', 'mist', 'tolpoort']);
+    s = play(s, 'aardbeving', DISCARD);
+    expect(s.zones.map((z) => z.effect).filter((e) => ['vesting', 'mist', 'tolpoort'].includes(e!)).length).toBeLessThan(3);
+    expect(new Set(s.zones.map((z) => z.effect)).size).toBe(3);
+  });
+});
+
+describe('Dodenbezweerder', () => {
+  it('verbant je andere kaarten en doet 2 schade per kaart', () => {
+    let s = createGame(['Ana', 'Bo'], 5, { plainZones: true });
+    s = play(s, 'golem', zone(0));
+    s = play(s, 'bron', zone(0));
+    s = play(s, 'dodenbezweerder', zone(0));
+    expect(s.zones[0].cards.map((c) => c.card.defId)).toEqual(['dodenbezweerder']);
+    expect(s.zones[0].damage[0]).toBe(4);
+  });
+});
+
+describe('echo: de volgende kaart keert meteen terug', () => {
+  it('Windloper afgelegd: de volgende kaart in een zone werkt en gaat naar de aflegstapel', () => {
+    let s = createGame(['Ana', 'Bo'], 6, { plainZones: true });
+    s = play(s, 'windloper', DISCARD);
+    expect(s.players[0].echo).toBe(1);
+    s = play(s, 'trol', zone(1));
+    expect(s.zones[1].damage[0]).toBe(5);
+    expect(s.zones[1].cards).toHaveLength(0);
+    expect(s.players[0].discard.at(-1)?.defId).toBe('trol');
+    expect(s.players[0].echo).toBe(0);
+    // Alleen de volgende kaart.
+    s = play(s, 'trol', zone(1));
+    expect(s.zones[1].cards).toHaveLength(1);
+  });
+
+  it('Schaduwdanser in een zone blijft zelf liggen', () => {
+    let s = createGame(['Ana', 'Bo'], 6, { plainZones: true });
+    s = play(s, 'schaduwdanser', zone(0));
+    expect(s.zones[0].cards).toHaveLength(1);
+    s = play(s, 'vuurbal', zone(0));
+    expect(s.zones[0].cards).toHaveLength(1);
+  });
+
+  it('vervalt aan het einde van je beurt', () => {
+    let s = createGame(['Ana', 'Bo'], 6, { plainZones: true });
+    s = play(s, 'windloper', DISCARD);
+    s = act(s, { type: 'endTurn' });
+    expect(s.players[0].echo).toBe(0);
+  });
+
+  it('een Huurling die meteen terugkeert, gaat naar de winkel', () => {
+    let s = createGame(['Ana', 'Bo'], 6, { plainZones: true });
+    s = play(s, 'windloper', DISCARD);
+    s = play(s, 'huurling', zone(0));
+    expect(s.shop.pile[0].defId).toBe('huurling');
+    expect(s.players[0].discard.some((c) => c.defId === 'huurling')).toBe(false);
+  });
+});
+
+describe('dure kaarten', () => {
+  it('bestaan van 7 tot 12 goud en liggen in de winkelvoorraad', () => {
+    const prices = ['mammoet', 'aartsmagier', 'titaan', 'leegte', 'meteoor', 'drakenkoning'].map((id) => getCard(id).price);
+    expect(prices).toEqual([7, 8, 9, 10, 11, 12]);
+    for (const id of ['mammoet', 'drakenkoning']) expect(SHOP_SUPPLY).toContain(id);
+  });
+});

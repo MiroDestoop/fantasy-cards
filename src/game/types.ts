@@ -49,6 +49,8 @@ export interface PlayerState {
   bonusGold: number;
   /** Zoveel kaarten minder trekken bij de volgende beurt (door Vertraag). */
   slow: number;
+  /** Zoveel volgende kaarten die je deze beurt in een zone speelt, keren na hun effect meteen terug (special 'echo'). */
+  echo: number;
 }
 
 /** Een kaart in een zone. Ze blijft liggen tot Terugroep of Vernietig, ook nadat de zone veroverd is. */

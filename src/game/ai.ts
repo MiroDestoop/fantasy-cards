@@ -285,9 +285,10 @@ function expand(node: Node, pid: PlayerId, profile: Profile): Node[] {
   return children;
 }
 
-/** Heeft de zet kaarten getrokken of de winkel veranderd? Wat daarna komt, weet een speler nog niet. */
+/** Heeft de zet kaarten getrokken, de winkel of een zone-effect veranderd? Wat daarna komt, weet een speler nog niet. */
 function reveals(before: GameState, after: GameState, pid: PlayerId): boolean {
   if (after.players[pid].deck.length !== before.players[pid].deck.length) return true;
+  if (after.zones.some((z, i) => z.effect !== before.zones[i].effect)) return true;
   const market = (g: GameState) => g.shop.market.map((c) => c.uid).join();
   return market(before) !== market(after);
 }
