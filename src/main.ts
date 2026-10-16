@@ -638,7 +638,9 @@ function dispatch(action: Action): void {
   render();
   shopDeal = false;
   playEffects(flights);
-  playSounds(action, before, game, flights);
+  const impacts = findImpacts(action, before, game);
+  playImpacts(impacts);
+  playSounds(action, before, game, flights, impacts);
   if (vsComputer && action.type === 'endTurn' && game.winner === null) {
     if (computerTurn(game)) scheduleComputer(COMPUTER_THINK_MS);
     else sfx.deal(game.players[game.active].hand.length, 0.3);
@@ -657,7 +659,7 @@ function scheduleComputer(delay: number): void {
 }
 
 /** Kiest de geluiden bij een actie door de toestand voor en na te vergelijken. */
-function playSounds(action: Action, before: GameState, after: GameState, flights: Flight[]): void {
+function playSounds(action: Action, before: GameState, after: GameState, flights: Flight[], impacts: Impacts): void {
   const me = before.active;
   const opp = other(me);
   const sum = (g: GameState, f: (z: GameState['zones'][number]) => number) => g.zones.reduce((t, z) => t + f(z), 0);
@@ -666,7 +668,8 @@ function playSounds(action: Action, before: GameState, after: GameState, flights
   if (action.type === 'buy') sfx.buy();
   const played = action.type === 'play' ? 1 : action.type === 'discardAll' ? before.players[me].hand.length : 0;
   if (played) {
-    if (action.type === 'play' && action.target.kind === 'zone') sfx.place();
+    if (impacts.slam) sfx.slam(impacts.slam.power, SLAM_IMPACT_MS / 1000);
+    else if (action.type === 'play' && action.target.kind === 'zone') sfx.place();
     else for (let i = 0; i < played; i++) sfx.flick(i * 0.07);
     // De volgende geluiden starten na het laatste kaartgeluid.
     const t = (played - 1) * 0.07;
@@ -685,9 +688,157 @@ function playSounds(action: Action, before: GameState, after: GameState, flights
   }
   if (flights.some((f) => f.kind === 'shop-out')) sfx.shuffle(0.05);
 
-  const conquered = after.zones.some((z, i) => z.owner !== null && before.zones[i].owner === null);
-  if (after.winner !== null) sfx.victory(0.4);
-  else if (conquered) sfx.conquer(0.3);
+  const t = impacts.conquerAt / 1000;
+  impacts.conquests.forEach((_, n) => sfx.boom(t + n * 0.35));
+  if (after.winner !== null) sfx.victory(t + 0.3);
+  else if (impacts.conquests.length) sfx.conquer(t + 0.15);
+}
+
+// ---------- Inslagen: dure kaarten in een zone en veroverde zones ----------
+
+/** Vanaf deze prijs slaat een kaart met een klap neer in een zone. */
+const SLAM_PRICE = 6;
+/** Tijd tot de dure kaart de tafel raakt. */
+const SLAM_IMPACT_MS = 300;
+
+interface Impacts {
+  /** Een dure kaart die in een zone gelegd werd; power loopt van 0 (prijs 6) tot 1 (prijs 8 of meer). */
+  slam: { uid: string; zone: number; power: number } | null;
+  /** Zones die door deze actie veroverd werden. */
+  conquests: { zone: number; owner: PlayerId }[];
+  /** Wanneer de verovering losbarst (ms), na een eventuele inslag. */
+  conquerAt: number;
+}
+
+function findImpacts(action: Action, before: GameState, after: GameState): Impacts {
+  let slam: Impacts['slam'] = null;
+  if (action.type === 'play' && action.target.kind === 'zone') {
+    const card = before.players[before.active].hand.find((c) => c.uid === action.handUid);
+    const price = card ? getCard(card.defId).price ?? 0 : 0;
+    if (price >= SLAM_PRICE) slam = { uid: action.handUid, zone: action.target.zone, power: Math.min(1, (price - SLAM_PRICE) / 2) };
+  }
+  const conquests = after.zones.flatMap((z, i) => (z.owner !== null && before.zones[i].owner === null ? [{ zone: i, owner: z.owner }] : []));
+  return { slam, conquests, conquerAt: slam ? SLAM_IMPACT_MS + 250 : 300 };
+}
+
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+function playImpacts(impacts: Impacts): void {
+  const zoneEls = app.querySelectorAll<HTMLElement>('.zone-area');
+
+  if (impacts.slam) {
+    const { uid, zone, power } = impacts.slam;
+    const card = app.querySelector<HTMLElement>(`[data-zcard="${uid}"] .card`);
+    if (card) {
+      // De kaart hangt groot boven de tafel, aarzelt even en slaat dan neer.
+      card.classList.remove('enter-up', 'enter-down');
+      card.classList.add('slamming');
+      const big = 1.9 + power * 0.6;
+      card.animate(
+        [
+          { transform: `translateY(-70px) scale(${big}) rotate(-6deg)`, opacity: 0, filter: 'brightness(2)' },
+          { transform: `translateY(-90px) scale(${big + 0.1}) rotate(-4deg)`, opacity: 1, filter: 'brightness(1.4)', offset: 0.55 },
+          { transform: 'translateY(0) scale(0.92) rotate(0deg)', opacity: 1, filter: 'brightness(1.8)', offset: 0.85, easing: 'ease-out' },
+          { transform: 'translateY(0) scale(1)', opacity: 1, filter: 'none' },
+        ],
+        { duration: SLAM_IMPACT_MS / 0.85, easing: 'cubic-bezier(.6,0,.9,.4)' },
+      ).onfinish = () => card.classList.remove('slamming');
+      const r = card.getBoundingClientRect();
+      const x = r.left + r.width / 2;
+      const y = r.top + r.height / 2;
+      window.setTimeout(() => {
+        shake(8 + power * 10, 350 + power * 200);
+        shockwave(x, y, '#ffd27a', 1 + power);
+        burst(x, y, ['#fff3c4', '#ffcc66', '#ff9800'], 18 + Math.round(power * 16), 110 + power * 80, 0);
+        flashZone(zoneEls[zone], 'rgba(255, 220, 140, 0.55)');
+      }, SLAM_IMPACT_MS);
+    }
+  }
+
+  impacts.conquests.forEach(({ zone, owner }, n) => {
+    const el = zoneEls[zone];
+    if (!el) return;
+    const at = impacts.conquerAt + n * 350;
+    const color = owner === 0 ? '#4fc3f7' : '#ff8a65';
+    // De strook "Veroverd door" valt van groot naar zijn plek.
+    el.querySelector<HTMLElement>('.zone-banner')?.animate(
+      [
+        { transform: 'translateY(-50%) scale(2.4)', opacity: 0 },
+        { transform: 'translateY(-50%) scale(0.94)', opacity: 1, offset: 0.7 },
+        { transform: 'translateY(-50%) scale(1)', opacity: 1 },
+      ],
+      { duration: 420, delay: at - 260, easing: 'cubic-bezier(.5,0,.8,.5)', fill: 'backwards' },
+    );
+    window.setTimeout(() => {
+      const r = el.getBoundingClientRect();
+      const x = r.left + r.width / 2;
+      const y = r.top + r.height / 2;
+      shake(16, 650);
+      shockwave(x, y, color, 3.2);
+      shockwave(x, y, '#ffd27a', 2.2, 120);
+      burst(x, y, [color, '#ffd27a', '#ffffff'], 46, 260, 0);
+      flashZone(el, color);
+    }, at);
+  });
+}
+
+/** Schudt de hele tafel, uitdovend. Niet als de speler minder beweging vraagt. */
+function shake(px: number, ms: number): void {
+  if (reducedMotion.matches) return;
+  const steps = Math.round(ms / 40);
+  const frames: Keyframe[] = [];
+  for (let i = 0; i < steps; i++) {
+    const f = px * (1 - i / steps);
+    frames.push({ transform: `translate(${(Math.random() * 2 - 1) * f}px, ${(Math.random() * 2 - 1) * f}px) rotate(${(Math.random() * 2 - 1) * f * 0.06}deg)` });
+  }
+  frames.push({ transform: 'none' });
+  app.animate(frames, { duration: ms, easing: 'linear' });
+}
+
+/** Een ring die vanuit het inslagpunt uitdijt. */
+function shockwave(x: number, y: number, color: string, size: number, delay = 0): void {
+  const ring = document.createElement('div');
+  ring.className = 'shockwave';
+  ring.style.setProperty('--c', color);
+  document.body.appendChild(ring);
+  ring.animate(
+    [
+      { transform: `translate(${x}px, ${y}px) translate(-50%, -50%) scale(0.1)`, opacity: 1, borderWidth: '14px' },
+      { transform: `translate(${x}px, ${y}px) translate(-50%, -50%) scale(${size * scale * 2})`, opacity: 0, borderWidth: '2px' },
+    ],
+    { duration: 600, delay, easing: 'cubic-bezier(.1,.7,.3,1)', fill: 'both' },
+  ).onfinish = () => ring.remove();
+}
+
+/** Vonken die in alle richtingen wegspatten. */
+function burst(x: number, y: number, colors: string[], count: number, reach: number, delay: number): void {
+  for (let i = 0; i < count; i++) {
+    const spark = document.createElement('div');
+    spark.className = 'spark';
+    spark.style.setProperty('--c', colors[i % colors.length]);
+    document.body.appendChild(spark);
+    const angle = Math.random() * Math.PI * 2;
+    const dist = reach * scale * (0.4 + Math.random() * 0.6);
+    const dx = Math.cos(angle) * dist;
+    const dy = Math.sin(angle) * dist;
+    spark.animate(
+      [
+        { transform: `translate(${x}px, ${y}px) scale(1.4)`, opacity: 1 },
+        { transform: `translate(${x + dx}px, ${y + dy + 30}px) scale(0.2)`, opacity: 0 },
+      ],
+      { duration: 500 + Math.random() * 400, delay, easing: 'cubic-bezier(.1,.8,.3,1)', fill: 'both' },
+    ).onfinish = () => spark.remove();
+  }
+}
+
+/** Een felle gloed over de hele zone. */
+function flashZone(el: HTMLElement | undefined, color: string): void {
+  if (!el) return;
+  const flash = document.createElement('div');
+  flash.className = 'zone-flash';
+  flash.style.setProperty('--c', color);
+  el.appendChild(flash);
+  flash.animate([{ opacity: 0.9 }, { opacity: 0 }], { duration: 700, easing: 'ease-out' }).onfinish = () => flash.remove();
 }
 
 // ---------- Animaties voor Terugroep, Vernietig en Ververs ----------

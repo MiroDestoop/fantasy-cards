@@ -140,6 +140,19 @@ export const sfx = {
   shuffle(d = 0) {
     for (let i = 0; i < 9; i++) noise(d + i * 0.045, 0.05, { filter: 'bandpass', freq: 2200 + (i % 3) * 600, q: 1.5, vol: 0.22 });
   },
+  /** Een dure kaart die neerslaat; power van 0 tot 1. */
+  slam(power: number, d = 0) {
+    noise(Math.max(0, d - 0.25), 0.25, { filter: 'bandpass', freq: 300, freqTo: 1800, q: 1, vol: 0.15 });
+    noise(d, 0.35 + power * 0.2, { filter: 'lowpass', freq: 700, freqTo: 120, vol: 0.7 });
+    tone(d, 80 - power * 20, 0.6 + power * 0.3, { vol: 0.6, slideTo: 30 });
+    noise(d, 0.04, { filter: 'highpass', freq: 2500, vol: 0.35 });
+  },
+  /** De donderslag van een veroverde zone. */
+  boom(d = 0) {
+    noise(d, 0.9, { filter: 'lowpass', freq: 900, freqTo: 80, vol: 0.75 });
+    tone(d, 70, 1.1, { vol: 0.6, slideTo: 28 });
+    tone(d, 140, 0.4, { type: 'triangle', vol: 0.2, slideTo: 50 });
+  },
   conquer(d = 0) {
     [523, 659, 784].forEach((f, i) => tone(d + i * 0.13, f, 0.2, { type: 'triangle', vol: 0.2 }));
     tone(d + 0.39, 1046, 0.7, { type: 'triangle', vol: 0.22 });

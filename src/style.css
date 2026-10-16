@@ -365,6 +365,42 @@ button { font: inherit; }
   z-index: 141;
 }
 
+/* Inslagen: een dure kaart die neerslaat en een zone die veroverd wordt. */
+.card.slamming { position: relative; z-index: 30; }
+.shockwave {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  border: 14px solid var(--c);
+  box-shadow: 0 0 24px var(--c), inset 0 0 24px var(--c);
+  pointer-events: none;
+  z-index: 142;
+}
+.spark {
+  position: fixed;
+  left: -4px;
+  top: -4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--c);
+  box-shadow: 0 0 10px 3px var(--c);
+  pointer-events: none;
+  z-index: 143;
+}
+.zone-flash {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(circle, var(--c), transparent 75%);
+  mix-blend-mode: screen;
+  pointer-events: none;
+  z-index: 3;
+}
+
 /* Na Ververs worden de nieuwe winkelkaarten er één voor één ingelegd. */
 .shop-slot.deal-in .card {
   animation: deal-in 0.45s cubic-bezier(0.2, 1.1, 0.4, 1) backwards;
