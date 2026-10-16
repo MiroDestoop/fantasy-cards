@@ -414,6 +414,11 @@ describe('zones', () => {
     expect(s.zones[0].owner).toBe(0);
   });
 
+  it('Slagveld heeft 16 levens en Dichte mist 8', () => {
+    expect(withEffect('slagveld').zones[0].hp).toBe(16);
+    expect(withEffect('mist').zones[0].hp).toBe(8);
+  });
+
   it('Slagveld geeft elke aanval 1 schade meer, ook Storm', () => {
     let s = play(withEffect('slagveld'), 'zilver', zone(0));
     expect(s.zones[0].damage[0]).toBe(2);
@@ -438,5 +443,26 @@ describe('zones', () => {
     expect(s.players[1].gold).toBe(0);
     s = act(s, { type: 'endTurn' });
     expect(s.players[0].gold).toBe(gold + 1);
+  });
+});
+
+describe('Goblin', () => {
+  it('steelt in een zone al het goud van de tegenstander', () => {
+    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
+    s.players[0].gold = 1;
+    s.players[1].gold = 7;
+    s = play(s, 'goblin', zone(0));
+    expect(s.players[0].gold).toBe(8);
+    expect(s.players[1].gold).toBe(0);
+    expect(s.zones[0].cards.some((c) => c.card.defId === 'goblin')).toBe(true);
+  });
+
+  it('is goedkoop en geeft afgelegd 1 goud', () => {
+    expect(getCard('goblin').price).toBeLessThanOrEqual(2);
+    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
+    s.players[1].gold = 5;
+    s = play(s, 'goblin', DISCARD);
+    expect(s.players[0].gold).toBe(1);
+    expect(s.players[1].gold).toBe(5);
   });
 });

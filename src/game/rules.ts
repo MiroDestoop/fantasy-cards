@@ -3,7 +3,7 @@ export const HAND_SIZE = 5;
 /** De beginspeler trekt in de allereerste beurt minder kaarten, als tegengewicht voor het voordeel van beginnen. */
 export const FIRST_HAND_SIZE = 3;
 /** Gewone levens van een zone: zoveel schade moet je er doen om ze te veroveren (zone-effecten kunnen dat veranderen). */
-export const ZONE_HP = 10;
+export const ZONE_HP = 12;
 /** Aantal veroverde zones om te winnen. */
 export const ZONES_TO_WIN = 2;
 /** Zoveel kaarten mag elke speler in één zone hebben liggen. */

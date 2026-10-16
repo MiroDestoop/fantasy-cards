@@ -33,6 +33,15 @@ export const SPECIALS: Record<string, SpecialDef> = {
       me.gold += Math.min(me.gold, 5);
     },
   },
+  diefstal: {
+    text: 'Steel al het goud van je tegenstander.',
+    run: ({ me, opp, log }) => {
+      const stolen = opp.gold;
+      me.gold += stolen;
+      opp.gold = 0;
+      log(stolen ? `👺 ${me.name} steelt ${stolen} goud van ${opp.name}!` : `👺 ${opp.name} heeft geen goud om te stelen.`);
+    },
+  },
   wraak: {
     text: '1 schade per kaart van je tegenstander hier.',
     run: ({ zone, oppId, damage }) => {
