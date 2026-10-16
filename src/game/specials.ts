@@ -28,9 +28,9 @@ export interface SpecialDef {
 // Gebruik ze op een kaart met special('naam') in cards.ts.
 export const SPECIALS: Record<string, SpecialDef> = {
   dubbelgoud: {
-    text: 'Verdubbel je goud (max. +5).',
+    text: 'Verdubbel je goud (max. +6).',
     run: ({ me }) => {
-      me.gold += Math.min(me.gold, 5);
+      me.gold += Math.min(me.gold, 6);
     },
   },
   diefstal: {

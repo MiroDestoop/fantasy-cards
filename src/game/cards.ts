@@ -71,15 +71,15 @@ const CARD_LIST: CardDef[] = [
   { id: 'storm', name: 'Bliksemstorm', price: 6, icon: '⚡', color: '#3949ab', top: [fx('storm', 2)], bottom: [fx('aanval', 3), fx('trek', 1)] },
   { id: 'vampier', name: 'Vampierbeet', price: 5, icon: '🧛', color: '#6a1b2a', top: [fx('goud', 2)], bottom: [fx('aanval', 3), fx('herstel', 2)] },
   { id: 'uil', name: 'Wijze Uil', price: 3, icon: '🦉', color: '#795548', top: [fx('trek', 2)], bottom: [fx('aanval', 1), fx('trek', 1)] },
-  { id: 'inzicht', name: 'Arcaan Inzicht', price: 4, icon: '📜', color: '#8e24aa', top: [fx('trek', 3)], bottom: [fx('aanval', 2), fx('trek', 1)] },
+  { id: 'inzicht', name: 'Arcaan Inzicht', price: 5, icon: '📜', color: '#8e24aa', top: [fx('trek', 3)], bottom: [fx('aanval', 2), fx('trek', 1)] },
   { id: 'heks', name: 'IJsheks', price: 5, icon: '❄️', color: '#0277bd', top: [fx('vertraag', 1)], bottom: [fx('aanval', 2), fx('vertraag', 1)] },
   { id: 'zandloper', name: 'Zandloper', price: 6, icon: '⏳', color: '#a1887f', top: [fx('vertraag', 2)], bottom: [fx('aanval', 3)] },
   { id: 'golem', name: 'Steengolem', price: 4, icon: '🗿', color: '#757575', top: [fx('goud', 1)], bottom: [fx('schild', 5)] },
   { id: 'bron', name: 'Helende Bron', price: 3, icon: '💧', color: '#00897b', top: [fx('goud', 1)], bottom: [fx('herstel', 4)] },
   { id: 'schat', name: 'Drakenschat', price: 5, icon: '👑', color: '#c9a227', top: [fx('goud', 4)], bottom: [fx('aanval', 2)] },
   { id: 'offervuur', name: 'Offervuur', price: 4, icon: '🕯️', color: '#d84315', top: [fx('goud', 1)], bottom: [fx('vernietig', 0), fx('aanval', 3)] },
-  { id: 'terugtocht', name: 'Terugtocht', price: 3, icon: '🏳️', color: '#607d8b', top: [fx('trek', 1)], bottom: [fx('vernietig', 0), fx('schild', 2)] },
-  { id: 'koerier', name: 'Koerier', price: 3, icon: '🐎', color: '#8d6e63', top: [fx('trek', 1)], bottom: [fx('aanval', 2), fx('terugroep', 1)] },
+  { id: 'terugtocht', name: 'Terugtocht', price: 3, icon: '🏳️', color: '#607d8b', top: [fx('trek', 1), fx('goud', 1)], bottom: [fx('vernietig', 0), fx('schild', 2)] },
+  { id: 'koerier', name: 'Koerier', price: 3, icon: '🐎', color: '#8d6e63', top: [fx('trek', 1), fx('goud', 1)], bottom: [fx('aanval', 2), fx('terugroep', 1)] },
   { id: 'hoornblazer', name: 'Hoornblazer', price: 5, icon: '📯', color: '#bf8f00', top: [fx('goud', 2)], bottom: [fx('aanval', 3), fx('terugroep', 2)] },
   { id: 'marskramer', name: 'Marskramer', price: 2, icon: '🛒', color: '#ad1457', top: [fx('goud', 1), fx('ververs', 0)], bottom: [fx('aanval', 1)] },
   { id: 'bard', name: 'Zwervende Bard', price: 3, icon: '🪕', color: '#7b1fa2', top: [fx('ververs', 0), fx('trek', 1)], bottom: [fx('aanval', 1), fx('terugroep', 2)] },
@@ -89,9 +89,9 @@ const CARD_LIST: CardDef[] = [
   { id: 'generaal', name: 'Generaal', price: 7, icon: '🎖️', color: '#4e342e', top: [fx('goud', 3)], bottom: [fx('aanval', 4), fx('terugroep', 3)] },
 
   // Kaarten met een speciaal effect (zie specials.ts)
-  { id: 'alchemist', name: 'Alchemist', price: 6, icon: '⚗️', color: '#6a1b9a', top: [special('dubbelgoud')], bottom: [fx('aanval', 2)] },
+  { id: 'alchemist', name: 'Alchemist', price: 5, icon: '⚗️', color: '#6a1b9a', top: [special('dubbelgoud')], bottom: [fx('aanval', 2)] },
   { id: 'goblin', name: 'Goblin', price: 2, icon: '👺', color: '#558b2f', top: [fx('goud', 1)], bottom: [special('diefstal')] },
-  { id: 'geest', name: 'Wrekende Geest', price: 4, icon: '👻', color: '#455a64', top: [fx('trek', 1)], bottom: [special('wraak')] },
+  { id: 'geest', name: 'Wrekende Geest', price: 4, icon: '👻', color: '#455a64', top: [fx('trek', 1), fx('goud', 1)], bottom: [special('wraak')] },
 ];
 
 export const CARDS: Record<string, CardDef> = Object.fromEntries(CARD_LIST.map((c) => [c.id, c]));

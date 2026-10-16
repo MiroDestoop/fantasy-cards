@@ -346,14 +346,14 @@ describe('winnen', () => {
 });
 
 describe('speciale effecten', () => {
-  it('Alchemist verdubbelt je goud, met een maximum van +5', () => {
+  it('Alchemist verdubbelt je goud, met een maximum van +6', () => {
     let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
     s.players[0].gold = 3;
     s = play(s, 'alchemist', DISCARD);
     expect(s.players[0].gold).toBe(6);
     s.players[0].gold = 8;
     s = play(s, 'alchemist', DISCARD);
-    expect(s.players[0].gold).toBe(13);
+    expect(s.players[0].gold).toBe(14);
   });
 
   it('Wrekende Geest doet 1 schade per kaart van de tegenstander in de zone', () => {
