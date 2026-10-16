@@ -1,6 +1,6 @@
 import './style.css';
 import { AI_LEVELS, chooseAction, type AiLevel } from './game/ai';
-import { getCard, KEYWORDS } from './game/cards';
+import { getCard, KEYWORDS, STARTER_DECK } from './game/cards';
 import { getSpecial } from './game/specials';
 import {
   applyAction, createGame, other, recallPrice, whyCantBuy, whyCantPlay, zonesOwnedBy,
@@ -664,7 +664,10 @@ function scheduleComputer(delay: number): void {
 }
 
 /** Zo lang blijft een kaart van de computer in het midden van het scherm liggen. */
-const SHOWCASE_HOLD_MS = 1100;
+const SHOWCASE_HOLD_MS = 400;
+/** Startkaarten (Koperen Munt, Rekruut, Zilveren Munt) ken je al: die flitsen maar heel kort voorbij. */
+const STARTER_HOLD_MS = 60;
+const STARTER_APPEAR_MS = 220;
 
 /**
  * Toont een kaart die de computer speelt eerst groot in het midden van het scherm,
@@ -679,6 +682,8 @@ function showcase(g: GameState, action: Extract<Action, { type: 'play' }>, done:
   const target = action.target;
   const toZone = target.kind === 'zone';
   const slam = toZone && (def.price ?? 0) >= SLAM_PRICE;
+  const starter = STARTER_DECK.includes(def.id);
+  const appear = starter ? STARTER_APPEAR_MS : 380;
 
   const dim = document.createElement('div');
   dim.className = 'showcase-dim';
@@ -703,14 +708,15 @@ function showcase(g: GameState, action: Extract<Action, { type: 'play' }>, done:
   const center = `translate(${cx}px, ${cy}px) scale(${big})`;
   label.style.top = `${cy + CARD_H * big + 14 * scale}px`;
   label.style.fontSize = `${20 * scale}px`;
-  dim.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 250, fill: 'both' });
-  label.animate([{ opacity: 0, transform: 'translate(-50%, 10px)' }, { opacity: 1, transform: 'translate(-50%, 0)' }], { duration: 250, delay: 200, fill: 'both' });
+  const fadeIn = starter ? 150 : 250;
+  dim.animate([{ opacity: 0 }, { opacity: 1 }], { duration: fadeIn, fill: 'both' });
+  label.animate([{ opacity: 0, transform: 'translate(-50%, 10px)' }, { opacity: 1, transform: 'translate(-50%, 0)' }], { duration: fadeIn, delay: starter ? 0 : 200, fill: 'both' });
   el.animate([{ transform: from, opacity: 0.6 }, { transform: center, opacity: 1 }], {
-    duration: 380, easing: 'cubic-bezier(.2,1.1,.4,1)', fill: 'both',
+    duration: appear, easing: 'cubic-bezier(.2,1.1,.4,1)', fill: 'both',
   });
 
   window.setTimeout(() => {
-    const fade = { duration: 250, fill: 'both' } as const;
+    const fade = { duration: fadeIn, fill: 'both' } as const;
     dim.animate([{ opacity: 1 }, { opacity: 0 }], fade).onfinish = () => dim.remove();
     label.animate([{ opacity: 1 }, { opacity: 0 }], fade).onfinish = () => label.remove();
 
@@ -730,7 +736,7 @@ function showcase(g: GameState, action: Extract<Action, { type: 'play' }>, done:
         { transform: center, opacity: 1 },
         { transform: end, opacity: slam || !toZone ? 0 : 1 },
       ],
-      { duration: slam ? 220 : 420, easing: 'cubic-bezier(.5,0,.75,0)', fill: 'both' },
+      { duration: slam ? 220 : starter ? 300 : 420, easing: 'cubic-bezier(.5,0,.75,0)', fill: 'both' },
     );
     fly.onfinish = () => {
       // De kaart ligt al op haar plek: geen tweede intrede-animatie in de zone.
@@ -738,7 +744,7 @@ function showcase(g: GameState, action: Extract<Action, { type: 'play' }>, done:
       done();
       el.remove();
     };
-  }, 380 + SHOWCASE_HOLD_MS);
+  }, appear + (starter ? STARTER_HOLD_MS : SHOWCASE_HOLD_MS));
 }
 
 /** Kiest de geluiden bij een actie door de toestand voor en na te vergelijken. */
