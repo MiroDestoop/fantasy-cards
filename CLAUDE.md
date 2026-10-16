@@ -18,7 +18,8 @@ Repository: https://github.com/MiroDestoop/fantasy-cards. `vite.config.ts` gebru
 ## Spelregels (huidige stand)
 
 - **Match:** best-of-3 (`GAMES_TO_WIN_MATCH` = 2 gewonnen spellen). Spel 1: toeval beslist wie begint; spel 2: de andere speler; spel 3: wie spel 2 verloor. Zo begint elke speler minstens één keer. De engine krijgt de beginspeler via `createGame(names, seed, { starter })`; de stand van de match (`match`, `nextStarter`) zit in `main.ts`.
-- **Winnen:** verover 2 van de 3 zones (Wachttoren, Elfenwoud, Kristalgrot). Een zone is van jou als je er als eerste 10 schade doet; daarna is ze gesloten.
+- **Winnen:** verover 2 van de 3 zones. Een zone is van jou als je er als eerste haar levens vol schade doet (gewoon 10, `ZONE_HP`; per zone in `zone.hp`); daarna is ze gesloten.
+- **Zones** (`src/game/zones.ts`): elk spel krijgt 3 willekeurige namen uit `ZONE_NAMES` (Wachttoren, Elfenwoud, Kristalgrot, Drakennest, Spookmoeras, Zonnetempel), elk met een ander willekeurig effect uit `ZONE_EFFECTS` (via de seed, dus gelijk bij online spelers): **Vesting** (+2 levens), **Bouwval** (−2 levens), **Slagveld** (+1 schade per aanval: Aanval, Storm en speciale schade, in `dealDamage`), **Dichte mist** (−1 schade per aanval, minimum 0), **Goudader** (+1 goud aan het begin van je beurt als je er in de open zone meer schade hebt dan je tegenstander, in `startTurn`). Tests gebruiken `createGame(..., { plainZones: true })` voor zones zonder effect.
 - **Stapel:** je begint met 10 startkaarten: 5× Koperen Munt (alleen Goud 1), 3× Rekruut (Goud 1 / Aanval 1 + Terugroep 1), 2× Zilveren Munt (Goud 2 / Aanval 1).
 - **Beurt:** trek 5 kaarten (min Vertraag). Alleen de allereerste beurt van het spel (de beginspeler) trekt er 3 (`FIRST_HAND_SIZE`). Is je stapel leeg, dan wordt je aflegstapel geschud. Afgelegde kaarten liggen tot het einde van je beurt apart (`played`) en gaan pas bij Einde beurt, samen met je resterende hand, naar je aflegstapel. Zo kan Trek een kaart nooit twee keer in dezelfde beurt terugbrengen (vroeger gaf een kleine stapel met Trek een oneindige lus). Handlimiet 8: wat je daarboven trekt, gaat meteen naar je aflegstapel.
 - **Elke kaart heeft twee helften.** Sleep ze naar je **aflegstapel** voor het bovenste effect (`top`), of naar een **zone** voor het onderste effect (`bottom`). Een kaart zonder `bottom` kan je alleen afleggen. De knop "Alles afleggen" speelt je hele hand af voor het bovenste effect.
@@ -52,6 +53,7 @@ Een kaart in een zone wordt **eerst gelegd**, daarna werken haar effecten. Terug
 | `src/game/types.ts` | Alle types: `GameState`, `Action`, `CardDef` (`top`/`bottom`), `Effect` (keyword of `speciaal`), `Keyword` |
 | `src/game/cards.ts` | `KEYWORDS` (label + uitleg), alle kaarten (`CARD_LIST`), `STARTER_DECK`, `SHOP_SUPPLY` |
 | `src/game/specials.ts` | Speciale effecten zonder keyword (`SPECIALS`): een korte tekst en een `run`-functie |
+| `src/game/zones.ts` | Zonenamen (`ZONE_NAMES`), zone-effecten (`ZONE_EFFECTS`), `makeZone`, `zoneEffect` |
 | `src/game/engine.ts` | Spelregels: `createGame`, `applyAction`, `whyCantPlay`, `whyCantBuy`, `whyCantRecall` |
 | `src/game/engine.test.ts` | Tests voor de regels |
 | `src/game/ai.ts` | Computertegenstander in vier niveaus: `chooseAction(state, level, rnd)` geeft één actie voor de speler aan zet |
@@ -60,7 +62,7 @@ Een kaart in een zone wordt **eerst gelegd**, daarna werken haar effecten. Terug
 | `src/style.css` | Alle stijlen |
 | `src/online.ts` | Online spelen via PeerJS (WebRTC): kamer maken (`hostRoom`), meedoen (`joinRoom`), berichten (`Msg`), hartslag |
 | `src/sound.ts` | Geluidseffecten via Web Audio (geen bestanden), aan/uit bewaard in localStorage |
-| `src/zoneArt.ts` | Inline-SVG illustraties per zone (op zonenaam) |
+| `src/zoneArt.ts` | Inline-SVG illustraties per zone (op zonenaam); een nieuwe naam in `ZONE_NAMES` heeft hier ook een tekening nodig |
 
 **Engine**
 - `applyAction(state, action)` is puur: ze werkt op een `structuredClone` en geeft `{ok, state}` of `{ok:false, error}` terug, met een Nederlandse foutmelding die de UI als toast toont.

@@ -4,6 +4,7 @@ import { getSpecial } from './specials';
 import { applyAction, createGame, recallPrice } from './engine';
 import { FIRST_HAND_SIZE, HAND_SIZE, MARKET_SIZE, MAX_HAND, MAX_ZONE_CARDS, RECALL_PRICE, ZONE_HP } from './rules';
 import type { Action, GameState, PlayerId, PlayTarget } from './types';
+import { makeZone, type ZoneEffectId } from './zones';
 
 let counter = 0;
 function give(s: GameState, player: PlayerId, defId: string): string {
@@ -27,7 +28,7 @@ function play(s: GameState, defId: string, target: PlayTarget): GameState {
 
 describe('spelopzet', () => {
   it('geeft elke speler 10 kaarten; de eerste speler trekt er meteen 3', () => {
-    const s = createGame(['Ana', 'Bo'], 1);
+    const s = createGame(['Ana', 'Bo'], 1, { plainZones: true });
     expect(s.players[0].hand).toHaveLength(FIRST_HAND_SIZE);
     expect(s.players[0].deck).toHaveLength(10 - FIRST_HAND_SIZE);
     expect(s.players[1].deck).toHaveLength(10);
@@ -36,7 +37,7 @@ describe('spelopzet', () => {
   });
 
   it('laat de gekozen speler beginnen, met een kortere eerste hand', () => {
-    const s = createGame(['Ana', 'Bo'], 1, { starter: 1 });
+    const s = createGame(['Ana', 'Bo'], 1, { starter: 1, plainZones: true });
     expect(s.active).toBe(1);
     expect(s.players[1].hand).toHaveLength(FIRST_HAND_SIZE);
     expect(s.players[0].hand).toHaveLength(0);
@@ -45,13 +46,13 @@ describe('spelopzet', () => {
   });
 
   it('is reproduceerbaar met dezelfde seed', () => {
-    expect(createGame(['A', 'B'], 7)).toEqual(createGame(['A', 'B'], 7));
+    expect(createGame(['A', 'B'], 7, { plainZones: true })).toEqual(createGame(['A', 'B'], 7, { plainZones: true }));
   });
 });
 
 describe('kaarten spelen', () => {
   it('afleggen geeft het bovenste effect', () => {
-    let s = createGame(['Ana', 'Bo'], 42);
+    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
     s = play(s, 'zilver', DISCARD);
     expect(s.players[0].gold).toBe(2);
     expect(s.players[0].played.at(-1)?.defId).toBe('zilver');
@@ -59,7 +60,7 @@ describe('kaarten spelen', () => {
   });
 
   it('in een zone spelen geeft het onderste effect en legt de kaart daar', () => {
-    let s = createGame(['Ana', 'Bo'], 42);
+    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
     s = play(s, 'rekruut', zone(1));
     expect(s.players[0].gold).toBe(0);
     expect(s.zones[1].damage).toEqual([1, 0]);
@@ -67,14 +68,14 @@ describe('kaarten spelen', () => {
   });
 
   it('zonekaarten blijven liggen, ook over beurten heen', () => {
-    let s = createGame(['Ana', 'Bo'], 42);
+    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
     s = play(s, 'rekruut', zone(0));
     for (let i = 0; i < 4; i++) s = act(s, { type: 'endTurn' });
     expect(s.zones[0].cards).toHaveLength(1);
   });
 
   it(`je mag maximaal ${MAX_ZONE_CARDS} kaarten per zone leggen`, () => {
-    let s = createGame(['Ana', 'Bo'], 42);
+    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
     for (let i = 0; i < MAX_ZONE_CARDS; i++) s = play(s, 'zilver', zone(0));
     const r = applyAction(s, { type: 'play', handUid: give(s, 0, 'zilver'), target: zone(0) });
     expect(r.ok).toBe(false);
@@ -83,7 +84,7 @@ describe('kaarten spelen', () => {
   });
 
   it('Vernietig verbant je andere kaarten in de zone uit het spel', () => {
-    let s = createGame(['Ana', 'Bo'], 42);
+    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
     for (let i = 0; i < MAX_ZONE_CARDS - 1; i++) s = play(s, 'zilver', zone(0));
     s.zones[0].cards.push({ player: 1, card: { uid: 'bo-1', defId: 'rekruut' }, turn: 0 });
     const discardBefore = s.players[0].discard.length;
@@ -94,7 +95,7 @@ describe('kaarten spelen', () => {
   });
 
   it('Terugroep haalt je oudste kaart in de zone terug naar je aflegstapel', () => {
-    let s = createGame(['Ana', 'Bo'], 42);
+    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
     s = play(s, 'zilver', zone(0));
     const oldest = s.zones[0].cards[0].card.uid;
     s = play(s, 'schat', zone(0));
@@ -104,13 +105,13 @@ describe('kaarten spelen', () => {
   });
 
   it('Terugroep laat de gespeelde kaart zelf liggen, ook in een lege zone', () => {
-    let s = createGame(['Ana', 'Bo'], 42);
+    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
     s = play(s, 'rekruut', zone(0));
     expect(s.zones[0].cards.map((c) => c.card.defId)).toEqual(['rekruut']);
   });
 
   it('Terugroep en Vernietig mag je niet als vijfde kaart in een volle zone spelen', () => {
-    let s = createGame(['Ana', 'Bo'], 42);
+    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
     for (let i = 0; i < MAX_ZONE_CARDS; i++) s = play(s, 'zilver', zone(0));
     for (const defId of ['rekruut', 'offervuur']) {
       const r = applyAction(s, { type: 'play', handUid: give(s, 0, defId), target: zone(0) });
@@ -121,7 +122,7 @@ describe('kaarten spelen', () => {
 
 describe('terugtrekken', () => {
   const fullZone = () => {
-    let s = createGame(['Ana', 'Bo'], 42);
+    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
     for (let i = 0; i < MAX_ZONE_CARDS; i++) s = play(s, 'zilver', zone(0));
     return s;
   };
@@ -161,7 +162,7 @@ describe('terugtrekken', () => {
   });
 
   it('Ververs vervangt de hele winkel', () => {
-    let s = createGame(['Ana', 'Bo'], 42);
+    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
     const before = s.shop.market.map((c) => c.uid);
     const pileBefore = s.shop.pile.length;
     s = play(s, 'marskramer', DISCARD);
@@ -172,20 +173,20 @@ describe('terugtrekken', () => {
   });
 
   it('kaarten zonder onderste effect kan je alleen afleggen', () => {
-    const s = createGame(['Ana', 'Bo'], 42);
+    const s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
     expect(applyAction(s, { type: 'play', handUid: give(s, 0, 'koper'), target: zone(0) }).ok).toBe(false);
     expect(applyAction(s, { type: 'play', handUid: give(s, 0, 'koper'), target: DISCARD }).ok).toBe(true);
   });
 
   it('Storm raakt elke open zone', () => {
-    let s = createGame(['Ana', 'Bo'], 42);
+    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
     s.zones[2].owner = 1;
     s = play(s, 'draak', DISCARD);
     expect(s.zones.map((z) => z.damage[0])).toEqual([3, 3, 0]);
   });
 
   it('Schild blokkeert schade van de tegenstander in die zone', () => {
-    let s = createGame(['Ana', 'Bo'], 42);
+    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
     s = play(s, 'golem', zone(0));
     s = act(s, { type: 'endTurn' });
     s = play(s, 'vuurbal', zone(0));
@@ -194,14 +195,14 @@ describe('terugtrekken', () => {
   });
 
   it('Herstel haalt schade van de tegenstander weg', () => {
-    let s = createGame(['Ana', 'Bo'], 42);
+    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
     s.zones[0].damage = [0, 6];
     s = play(s, 'bron', zone(0));
     expect(s.zones[0].damage[1]).toBe(2);
   });
 
   it('Vertraag laat de tegenstander minder trekken', () => {
-    let s = createGame(['Ana', 'Bo'], 42);
+    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
     s = play(s, 'zandloper', DISCARD);
     s = act(s, { type: 'endTurn' });
     expect(s.players[1].hand).toHaveLength(HAND_SIZE - 2);
@@ -209,7 +210,7 @@ describe('terugtrekken', () => {
   });
 
   it('een veroverde zone is gesloten', () => {
-    const s = createGame(['Ana', 'Bo'], 42);
+    const s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
     s.zones[0].owner = 1;
     const r = applyAction(s, { type: 'play', handUid: give(s, 0, 'rekruut'), target: zone(0) });
     expect(r.ok).toBe(false);
@@ -218,7 +219,7 @@ describe('terugtrekken', () => {
 
 describe('beurten en stapel', () => {
   it('legt je hand af aan het einde van je beurt en trekt er 5 nieuwe', () => {
-    let s = createGame(['Ana', 'Bo'], 3);
+    let s = createGame(['Ana', 'Bo'], 3, { plainZones: true });
     s = act(s, { type: 'endTurn' });
     expect(s.players[0].hand).toHaveLength(0);
     expect(s.players[0].discard).toHaveLength(FIRST_HAND_SIZE);
@@ -227,7 +228,7 @@ describe('beurten en stapel', () => {
   });
 
   it('schudt de aflegstapel als de stapel leeg is', () => {
-    let s = createGame(['Ana', 'Bo'], 3);
+    let s = createGame(['Ana', 'Bo'], 3, { plainZones: true });
     for (let i = 0; i < 4; i++) s = act(s, { type: 'endTurn' });
     // Ana zit nu aan haar derde beurt: 10 kaarten zijn al eens getrokken, dus er is geschud.
     const ana = s.players[0];
@@ -236,7 +237,7 @@ describe('beurten en stapel', () => {
   });
 
   it('gespeelde kaarten gaan pas bij Einde beurt naar je aflegstapel', () => {
-    let s = createGame(['Ana', 'Bo'], 3);
+    let s = createGame(['Ana', 'Bo'], 3, { plainZones: true });
     s = play(s, 'zilver', DISCARD);
     expect(s.players[0].played).toHaveLength(1);
     const discardBefore = s.players[0].discard.length;
@@ -247,7 +248,7 @@ describe('beurten en stapel', () => {
 
   it('een kleine stapel met Trek geeft geen oneindige lus meer', () => {
     // Alleen Drakenschat en Arcaan Inzicht: vroeger trok Inzicht ze allebei opnieuw, eindeloos.
-    let s = createGame(['Ana', 'Bo'], 3);
+    let s = createGame(['Ana', 'Bo'], 3, { plainZones: true });
     const ana = s.players[0];
     ana.deck = [];
     ana.discard = [];
@@ -265,7 +266,7 @@ describe('beurten en stapel', () => {
 
 describe('alles afleggen', () => {
   it('speelt elke kaart in je hand af voor het bovenste effect', () => {
-    let s = createGame(['Ana', 'Bo'], 42);
+    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
     s.players[0].hand = [
       { uid: 'a', defId: 'koper' },
       { uid: 'b', defId: 'zilver' },
@@ -279,14 +280,14 @@ describe('alles afleggen', () => {
   });
 
   it('laat kaarten die onderweg getrokken worden in je hand', () => {
-    let s = createGame(['Ana', 'Bo'], 42);
+    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
     s.players[0].hand = [{ uid: 'a', defId: 'inzicht' }];
     s = act(s, { type: 'discardAll' });
     expect(s.players[0].hand).toHaveLength(3);
   });
 
   it('weigert met een lege hand', () => {
-    const s = createGame(['Ana', 'Bo'], 42);
+    const s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
     s.players[0].hand = [];
     expect(applyAction(s, { type: 'discardAll' }).ok).toBe(false);
   });
@@ -294,7 +295,7 @@ describe('alles afleggen', () => {
 
 describe('handlimiet', () => {
   it(`legt kaarten boven de limiet van ${MAX_HAND} meteen af`, () => {
-    let s = createGame(['Ana', 'Bo'], 42);
+    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
     s.players[0].hand.push(...Array.from({ length: HAND_SIZE - FIRST_HAND_SIZE }, (_, i) => ({ uid: `vul-${i}`, defId: 'koper' })));
     s.players[0].deck.push(...Array.from({ length: 6 }, (_, i) => ({ uid: `extra-${i}`, defId: 'koper' })));
     const discardBefore = s.players[0].discard.length;
@@ -311,7 +312,7 @@ describe('handlimiet', () => {
 
 describe('winkel', () => {
   it('kost goud, legt de kaart op je aflegstapel en vult de markt op dezelfde plek aan', () => {
-    let s = createGame(['Ana', 'Bo'], 42);
+    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
     s.players[0].gold = 20;
     const target = s.shop.market[2];
     const price = getCard(target.defId).price!;
@@ -323,14 +324,14 @@ describe('winkel', () => {
   });
 
   it('weigert te kopen zonder genoeg goud', () => {
-    const s = createGame(['Ana', 'Bo'], 42);
+    const s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
     expect(applyAction(s, { type: 'buy', marketUid: s.shop.market[0].uid }).ok).toBe(false);
   });
 });
 
 describe('winnen', () => {
   it(`${ZONE_HP} schade verovert een zone, 2 zones winnen het spel`, () => {
-    let s = createGame(['Ana', 'Bo'], 42);
+    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
     s.zones[0].damage = [ZONE_HP - 1, 0];
     s.zones[0].cards.push({ player: 1, card: { uid: 'bo-1', defId: 'rekruut' }, turn: 0 });
     s = play(s, 'zilver', zone(0));
@@ -346,7 +347,7 @@ describe('winnen', () => {
 
 describe('speciale effecten', () => {
   it('Alchemist verdubbelt je goud, met een maximum van +5', () => {
-    let s = createGame(['Ana', 'Bo'], 42);
+    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
     s.players[0].gold = 3;
     s = play(s, 'alchemist', DISCARD);
     expect(s.players[0].gold).toBe(6);
@@ -356,7 +357,7 @@ describe('speciale effecten', () => {
   });
 
   it('Wrekende Geest doet 1 schade per kaart van de tegenstander in de zone', () => {
-    let s = createGame(['Ana', 'Bo'], 42);
+    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
     for (let i = 0; i < 3; i++) s.zones[1].cards.push({ player: 1, card: { uid: `bo-${i}`, defId: 'zilver' }, turn: 0 });
     s = play(s, 'geest', zone(1));
     expect(s.zones[1].damage[0]).toBe(3);
@@ -381,5 +382,61 @@ describe('bonusgoud', () => {
     s = act(s, { type: 'endTurn' });
     expect(s.players[1].gold).toBe(2);
     expect(s.players[0].gold).toBe(0);
+  });
+});
+
+describe('zones', () => {
+  it('krijgen elk spel willekeurige namen, elk met een ander effect', () => {
+    const seen = new Set<string>();
+    for (let seed = 1; seed <= 20; seed++) {
+      const s = createGame(['Ana', 'Bo'], seed);
+      expect(s.zones).toHaveLength(3);
+      expect(new Set(s.zones.map((z) => z.effect)).size).toBe(3);
+      expect(new Set(s.zones.map((z) => z.name)).size).toBe(3);
+      for (const z of s.zones) seen.add(z.name);
+    }
+    expect(seen.size).toBeGreaterThan(3);
+    expect(createGame(['Ana', 'Bo'], 5).zones).toEqual(createGame(['Ana', 'Bo'], 5).zones);
+  });
+
+  const withEffect = (effect: ZoneEffectId) => {
+    const s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
+    s.zones[0] = { ...makeZone({ name: 'Testzone', icon: '🧪' }, effect), cards: [] };
+    return s;
+  };
+
+  it('Vesting en Bouwval veranderen de levens van een zone', () => {
+    expect(withEffect('vesting').zones[0].hp).toBe(ZONE_HP + 2);
+    let s = withEffect('bouwval');
+    expect(s.zones[0].hp).toBe(ZONE_HP - 2);
+    s.zones[0].damage = [ZONE_HP - 3, 0];
+    s = play(s, 'zilver', zone(0));
+    expect(s.zones[0].owner).toBe(0);
+  });
+
+  it('Slagveld geeft elke aanval 1 schade meer, ook Storm', () => {
+    let s = play(withEffect('slagveld'), 'zilver', zone(0));
+    expect(s.zones[0].damage[0]).toBe(2);
+    s = play(s, 'vuurbal', DISCARD);
+    expect(s.zones[0].damage[0]).toBe(4);
+    expect(s.zones[1].damage[0]).toBe(1);
+  });
+
+  it('Dichte mist geeft elke aanval 1 schade minder', () => {
+    let s = play(withEffect('mist'), 'trol', zone(0));
+    expect(s.zones[0].damage[0]).toBe(4);
+    s = play(s, 'zilver', zone(0));
+    expect(s.zones[0].damage[0]).toBe(4);
+  });
+
+  it('Goudader geeft 1 goud aan het begin van je beurt als je er voorstaat', () => {
+    let s = withEffect('goudader');
+    s.zones[0].damage = [3, 1];
+    s.zones[1].damage = [0, 5];
+    const gold = s.players[0].gold;
+    s = act(s, { type: 'endTurn' });
+    expect(s.players[1].gold).toBe(0);
+    s = act(s, { type: 'endTurn' });
+    expect(s.players[0].gold).toBe(gold + 1);
   });
 });

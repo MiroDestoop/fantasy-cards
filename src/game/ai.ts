@@ -1,6 +1,7 @@
 import { getCard } from './cards';
 import { applyAction, other, recallPrice, whyCantBuy, zoneCardCount } from './engine';
 import { MAX_ZONE_CARDS, ZONE_HP } from './rules';
+import { zoneEffect } from './zones';
 import type { Action, CardDef, CardInstance, GameState, PlayerId, PlayTarget } from './types';
 
 /**
@@ -155,13 +156,13 @@ function buyRating(state: GameState, pid: PlayerId, def: CardDef): number {
   let rating = def.price ?? 0;
   if (attack) rating += 0.5;
   // Bijna een zone veroverd: schade is nu extra veel waard.
-  if (open.some(({ z }) => z.damage[pid] >= ZONE_HP * 0.6)) rating += 0.3 * attack;
+  if (open.some(({ z }) => z.damage[pid] >= z.hp * 0.6)) rating += 0.3 * attack;
   // Zones raken vol: Terugroep en Vernietig maken plaats.
   if (has(['terugroep', 'vernietig']) && open.some(({ i }) => zoneCardCount(state, i, pid) >= MAX_ZONE_CARDS - 1)) {
     rating += 1.5;
   }
   // De tegenstander wint bijna een zone: Herstel en Schild houden haar tegen.
-  if (has(['herstel', 'schild']) && open.some(({ z }) => z.damage[other(pid)] >= ZONE_HP * 0.6)) rating += 1;
+  if (has(['herstel', 'schild']) && open.some(({ z }) => z.damage[other(pid)] >= z.hp * 0.6)) rating += 1;
   return rating;
 }
 
@@ -363,8 +364,12 @@ function evaluate(s: GameState, pid: PlayerId, profile: Profile): number {
     else if (z.owner === opp) score -= 60;
     else {
       // Schade telt zwaarder naarmate de zone bijna veroverd is.
-      const mine = z.damage[pid];
-      const theirs = z.damage[opp];
+      // Omgerekend naar een zone met gewone levens, zodat 6 van 8 even zwaar weegt als 7,5 van 10.
+      const mine = (z.damage[pid] * ZONE_HP) / z.hp;
+      const theirs = (z.damage[opp] * ZONE_HP) / z.hp;
+      // Een goudader levert elke beurt goud op voor wie er voorstaat.
+      const gold = zoneEffect(z)?.goldIfLeading ?? 0;
+      if (gold) score += Math.sign(mine - theirs) * gold * 1.2;
       score += 1.3 * mine + (mine * mine) / ZONE_HP;
       score -= threat * (1.3 * theirs + (theirs * theirs) / ZONE_HP);
       score += z.shield[pid] * (theirs > 0 ? 0.8 * threat : 0.4);

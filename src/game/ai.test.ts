@@ -28,12 +28,12 @@ describe('computertegenstander', () => {
   });
 
   it('speelt eerst haar hele hand voordat ze haar beurt eindigt', () => {
-    const s = createGame(['A', 'B'], 9);
+    const s = createGame(['A', 'B'], 9, { plainZones: true });
     expect(chooseAction(s).type).toBe('play');
   });
 
   it.each(AI_LEVELS.map((l) => l.id))('niveau %s speelt een spel uit met enkel geldige acties', (level) => {
-    expect(playOut(createGame(['A', 'B'], 11), [level, 'normaal'], 3).winner).not.toBeNull();
+    expect(playOut(createGame(['A', 'B'], 11, { plainZones: true }), [level, 'normaal'], 3).winner).not.toBeNull();
   }, 120000);
 
   it('Moeilijk wint duidelijk vaker van Normaal', () => {
@@ -49,7 +49,7 @@ describe('computertegenstander', () => {
   }, 120000);
 
   it('Moeilijk trekt een kaart terug om met een volle zone toch te winnen', () => {
-    const s = createGame(['A', 'B'], 42);
+    const s = createGame(['A', 'B'], 42, { plainZones: true });
     const me = s.players[0];
     me.hand = [{ uid: 'trol', defId: 'trol' }];
     me.gold = 5;
@@ -63,7 +63,7 @@ describe('computertegenstander', () => {
   });
 
   it('kijkt niet in verborgen kaarten: de volgorde van de stapels verandert haar keuze niet', () => {
-    const s = createGame(['A', 'B'], 21);
+    const s = createGame(['A', 'B'], 21, { plainZones: true });
     s.players[0].hand = [{ uid: 'u', defId: 'uil' }, { uid: 'v', defId: 'vuurbal' }, { uid: 'k', defId: 'koper' }];
     const mixed = structuredClone(s);
     mixed.players[0].deck.reverse();

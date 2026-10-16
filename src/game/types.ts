@@ -1,3 +1,5 @@
+import type { ZoneEffectId } from './zones';
+
 export type PlayerId = 0 | 1;
 
 export type Keyword =
@@ -60,6 +62,10 @@ export interface ZoneCard {
 export interface Zone {
   name: string;
   icon: string;
+  /** Het speciale effect van deze zone (null alleen in tests). */
+  effect: ZoneEffectId | null;
+  /** Levens: zoveel schade moet je hier doen om de zone te veroveren. */
+  hp: number;
   /** Schade die elke speler al in deze zone gedaan heeft. */
   damage: [number, number];
   /** Schild van elke speler: blokkeert schade van de tegenstander in deze zone. */

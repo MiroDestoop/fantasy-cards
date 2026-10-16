@@ -11,7 +11,7 @@ export const KEYWORDS: Record<Keyword, { label: string; noAmount?: boolean; expl
   },
   aanval: {
     label: 'Aanval',
-    explain: (n) => `Doe ${n} schade in de zone waar je deze kaart speelt. Wie als eerste ${ZONE_HP} schade doet in een zone, verovert ze.`,
+    explain: (n) => `Doe ${n} schade in de zone waar je deze kaart speelt. Wie als eerste de levens van een zone vol schade doet (meestal ${ZONE_HP}), verovert ze.`,
   },
   storm: {
     label: 'Storm',

@@ -1011,3 +1011,21 @@ button { font: inherit; }
 .room-link b { color: var(--ink) !important; font-weight: normal; }
 .waiting { font-style: italic; animation: denken 1.6s ease-in-out infinite; }
 .net-error { margin: 0; color: #ff8a80; font-size: 16px; }
+
+/* Het speciale effect van een zone, onder haar naam; hover voor de uitleg. */
+.zone-fx {
+  margin-top: -4px;
+  padding: 2px 12px;
+  border-radius: 999px;
+  font-size: 14px;
+  background: rgba(10, 6, 3, 0.75);
+  border: 1px solid var(--edge, rgba(230, 192, 104, 0.5));
+  color: var(--ink);
+  cursor: help;
+  pointer-events: auto;
+}
+.zfx-vesting { --edge: #a1887f; }
+.zfx-bouwval { --edge: #8d6e63; }
+.zfx-slagveld { --edge: #e57373; }
+.zfx-mist { --edge: #b0bec5; }
+.zfx-goudader { --edge: #e6c068; }

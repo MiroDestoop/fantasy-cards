@@ -1,8 +1,9 @@
 import { getCard, SHOP_SUPPLY, STARTER_DECK } from './cards';
 import { getSpecial } from './specials';
 import {
-  FIRST_HAND_SIZE, HAND_SIZE, MARKET_SIZE, MAX_HAND, MAX_ZONE_CARDS, RECALL_PRICE, ZONE_HP, ZONE_SETUP, ZONES_TO_WIN,
+  FIRST_HAND_SIZE, HAND_SIZE, MARKET_SIZE, MAX_HAND, MAX_ZONE_CARDS, RECALL_PRICE, ZONE_COUNT, ZONES_TO_WIN,
 } from './rules';
+import { makeZone, ZONE_EFFECTS, ZONE_NAMES, zoneEffect, type ZoneEffectId } from './zones';
 import type {
   Action, ActionResult, CardInstance, Effect, GameState, PlayerId, PlayerState, PlayTarget,
 } from './types';
@@ -18,6 +19,8 @@ export interface GameOptions {
   bonusGold?: [number, number];
   /** Wie de eerste beurt speelt (standaard speler 0). In een best-of-3 begint elke speler minstens één keer. */
   starter?: PlayerId;
+  /** Zones zonder effect en in vaste volgorde (voor tests). */
+  plainZones?: boolean;
 }
 
 export function createGame(
@@ -38,7 +41,7 @@ export function createGame(
   });
   const s: GameState = {
     players: [makePlayer(names[0], 0), makePlayer(names[1], 1)],
-    zones: ZONE_SETUP.map((z) => ({ ...z, damage: [0, 0], shield: [0, 0], owner: null, cards: [] })),
+    zones: [],
     active: options.starter ?? 0,
     turn: 0,
     winner: null,
@@ -49,6 +52,15 @@ export function createGame(
   for (const p of s.players) shuffle(s, p.deck);
   shuffle(s, s.shop.pile);
   refreshShop(s);
+  if (options.plainZones) {
+    s.zones = ZONE_NAMES.slice(0, ZONE_COUNT).map((n) => makeZone(n, null));
+  } else {
+    // Elk spel: willekeurige namen, elk met een ander willekeurig effect.
+    const names = shuffled(s, ZONE_NAMES).slice(0, ZONE_COUNT);
+    const effects = shuffled(s, Object.keys(ZONE_EFFECTS) as ZoneEffectId[]);
+    s.zones = names.map((n, i) => makeZone(n, effects[i]));
+    for (const z of s.zones) log(s, `${z.icon} ${z.name}: ${ZONE_EFFECTS[z.effect!].icon} ${ZONE_EFFECTS[z.effect!].label}. ${ZONE_EFFECTS[z.effect!].text}`);
+  }
   startTurn(s);
   return s;
 }
@@ -255,12 +267,18 @@ function applyEffect(s: GameState, pid: PlayerId, e: Effect, zoneIdx: number | n
 function dealDamage(s: GameState, zoneIdx: number, pid: PlayerId, amount: number): void {
   const zone = s.zones[zoneIdx];
   if (zone.owner !== null) return;
+  const bonus = zoneEffect(zone)?.damageBonus ?? 0;
+  if (bonus) {
+    amount = Math.max(0, amount + bonus);
+    log(s, `${zoneEffect(zone)!.label} in ${zone.name}: ${bonus > 0 ? '+' : ''}${bonus} schade.`);
+    if (amount === 0) return;
+  }
   const opp = other(pid);
   const blocked = Math.min(zone.shield[opp], amount);
   zone.shield[opp] -= blocked;
   if (blocked) log(s, `Het schild van ${s.players[opp].name} in ${zone.name} blokkeert ${blocked} schade.`);
-  zone.damage[pid] = Math.min(ZONE_HP, zone.damage[pid] + amount - blocked);
-  if (zone.damage[pid] >= ZONE_HP) {
+  zone.damage[pid] = Math.min(zone.hp, zone.damage[pid] + amount - blocked);
+  if (zone.damage[pid] >= zone.hp) {
     zone.owner = pid;
     // De zone sluit; de kaarten die er liggen, blijven er voorgoed liggen.
     log(s, `🚩 ${s.players[pid].name} verovert ${zone.name}!`);
@@ -317,6 +335,13 @@ function startTurn(s: GameState): void {
     p.gold += p.bonusGold;
     log(s, `${p.name} krijgt ${p.bonusGold} bonusgoud.`);
   }
+  for (const z of s.zones) {
+    const gold = zoneEffect(z)?.goldIfLeading ?? 0;
+    if (gold && z.owner === null && z.damage[pid] > z.damage[other(pid)]) {
+      p.gold += gold;
+      log(s, `💰 ${p.name} staat voor in ${z.name} en krijgt ${gold} goud.`);
+    }
+  }
   const count = Math.max(0, (s.turn === 1 ? FIRST_HAND_SIZE : HAND_SIZE) - p.slow);
   p.slow = 0;
   for (let i = 0; i < count; i++) drawCard(s, p);
@@ -356,6 +381,16 @@ function random(s: GameState): number {
   t = Math.imul(t ^ (t >>> 15), t | 1);
   t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+
+/** Een geschudde kopie (met de toevalsgenerator van het spel, dus reproduceerbaar). */
+function shuffled<T>(s: GameState, a: readonly T[]): T[] {
+  const copy = [...a];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(random(s) * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
 }
 
 function shuffle(s: GameState, a: CardInstance[]): void {

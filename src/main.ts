@@ -9,6 +9,7 @@ import { FIRST_HAND_SIZE, GAMES_TO_WIN_MATCH, HAND_SIZE, MAX_ZONE_CARDS, RECALL_
 import type { Action, CardDef, CardInstance, Effect, GameState, Keyword, PlayerId, PlayTarget } from './game/types';
 import { hostRoom, joinRoom, makeCode, PROTOCOL, type Link, type Msg } from './online';
 import { isMuted, sfx, toggleMute } from './sound';
+import { ZONE_EFFECTS, zoneEffect } from './game/zones';
 import { ZONE_ART } from './zoneArt';
 
 const HERO_ICONS = ['🧙‍♂️', '🧝‍♀️'] as const;
@@ -110,7 +111,8 @@ function renderStart(): string {
     <div class="rules">
       <h2>Zo speel je</h2>
       <ul>
-        <li>Verover <b>${ZONES_TO_WIN} van de 3 zones</b> om te winnen. Een zone is van jou als je er als eerste ${ZONE_HP} schade doet.</li>
+        <li>Verover <b>${ZONES_TO_WIN} van de 3 zones</b> om te winnen. Een zone is van jou als je er als eerste haar levens vol schade doet (meestal ${ZONE_HP}).</li>
+        <li>Elk spel krijg je andere zones, elk met een <b>speciaal effect</b>: meer of minder levens, meer of minder schade, of goud voor wie er voorstaat.</li>
         <li>Je speelt een <b>best-of-3</b>: wie eerst ${GAMES_TO_WIN_MATCH} spellen wint, wint de match. Elke speler begint minstens één spel.</li>
         <li>Elke beurt trek je ${HAND_SIZE} kaarten (de beginspeler in de allereerste beurt maar ${FIRST_HAND_SIZE}). Elke kaart heeft twee helften:
           sleep ze naar je <b>aflegstapel</b> voor het bovenste effect, of naar een <b>zone</b> voor het onderste.</li>
@@ -323,6 +325,7 @@ function renderBacks(n: number): string {
 
 function renderZone(g: GameState, i: number, bottom: PlayerId, prev: GameState | null): string {
   const z = g.zones[i];
+  const fx = zoneEffect(z);
   const top = other(bottom);
   // Je eigen kaarten in een open zone kan je tijdens je beurt terugtrekken voor goud.
   const canRecall = z.owner === null && humanCanAct();
@@ -350,9 +353,9 @@ function renderZone(g: GameState, i: number, bottom: PlayerId, prev: GameState |
     const before = prev && prev !== g ? prev.zones[i].damage[pid] : dmg;
     const d = dmg - before;
     return `
-    <div class="bar p${pid}" title="${esc(g.players[pid].name)}: ${dmg} van ${ZONE_HP} schade">
-      <div class="fill ${d ? 'grow' : ''}" style="width:${(dmg / ZONE_HP) * 100}%;--from:${(before / ZONE_HP) * 100}%"></div>
-      <span class="bar-text">${esc(g.players[pid].name)} · ${dmg}/${ZONE_HP}</span>
+    <div class="bar p${pid}" title="${esc(g.players[pid].name)}: ${dmg} van ${z.hp} schade">
+      <div class="fill ${d ? 'grow' : ''}" style="width:${(dmg / z.hp) * 100}%;--from:${(before / z.hp) * 100}%"></div>
+      <span class="bar-text">${esc(g.players[pid].name)} · ${dmg}/${z.hp}</span>
       ${z.shield[pid] ? `<span class="zshield" title="Schild: blokkeert de volgende ${z.shield[pid]} schade van de tegenstander">🛡️ ${z.shield[pid]}</span>` : ''}
       ${d ? `<div class="float ${d > 0 ? 'dmg' : 'heal'}">${d > 0 ? '+' : ''}${d}</div>` : ''}
     </div>`;
@@ -364,6 +367,7 @@ function renderZone(g: GameState, i: number, bottom: PlayerId, prev: GameState |
     <div class="zone-mid">
       ${bar(top)}
       <div class="zone-name">${z.icon} ${esc(z.name)}</div>
+      ${fx ? `<div class="zone-fx zfx-${fx.id}" data-zfx="${fx.id}">${fx.icon} ${esc(fx.label)}</div>` : ''}
       ${bar(bottom)}
     </div>
     <div class="zcards">${row(bottom)}</div>
@@ -698,7 +702,11 @@ app.addEventListener('mouseover', (e) => {
   const pile = target.closest<HTMLElement>('[data-pile]');
   const recall = target.closest<HTMLElement>('[data-recall]');
   const special = target.closest<HTMLElement>('[data-special]');
-  if (recall && game) {
+  const zfx = target.closest<HTMLElement>('[data-zfx]');
+  if (zfx) {
+    const fx = ZONE_EFFECTS[zfx.dataset.zfx as keyof typeof ZONE_EFFECTS];
+    tipEl.innerHTML = `<b>${fx.icon} ${esc(fx.label)}</b><br>${esc(fx.text)}`;
+  } else if (recall && game) {
     tipEl.innerHTML = recallTip(game, recall.dataset.recall!);
   } else if (special) {
     tipEl.innerHTML = `<b>✨ Speciaal effect</b><br>${esc(getSpecial(special.dataset.special!).text)}
