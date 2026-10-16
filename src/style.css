@@ -20,6 +20,11 @@ html, body {
   overflow: hidden;
   background: radial-gradient(circle at 50% 40%, #3b2516, #120a05 70%);
   user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  /* Op een aanraakscherm geen scrollen of zoomen: elke vingerbeweging is voor het spel. */
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 button { font: inherit; }
@@ -891,3 +896,62 @@ button { font: inherit; }
 .tip-note { margin-top: 6px; font-size: 12px; font-style: italic; color: var(--ink-dim); }
 .tip-warn { color: #ff8a80; font-style: normal; }
 .tip-section { margin-top: 10px; padding-top: 6px; border-top: 1px solid rgba(230, 192, 104, 0.3); }
+
+/* ---------- Aanraakscherm ---------- */
+
+/* Lang indrukken: de kaart groot, met de uitleg van haar keywords ernaast. */
+.preview {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4vw;
+  padding: 4vh 4vw;
+  background: rgba(0, 0, 0, 0.75);
+  pointer-events: none;
+  animation: fade 0.12s;
+}
+.preview-holder { position: relative; flex-shrink: 0; }
+.preview-card {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: scale(var(--s));
+  transform-origin: 0 0;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+}
+.preview-text {
+  max-width: 40vw;
+  max-height: 90vh;
+  overflow: hidden;
+  display: grid;
+  gap: 10px;
+  font-size: clamp(12px, 3.6vh, 18px);
+  color: var(--ink);
+}
+.preview-text b { color: var(--gold); }
+
+/* Rechtop gehouden telefoon: vraag om te draaien. */
+#rotate {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+  font-size: 22px;
+  color: var(--ink);
+  background: radial-gradient(circle at 50% 40%, #3b2516, #120a05 70%);
+}
+#rotate small { color: var(--ink-dim); font-size: 16px; }
+.rotate-icon { font-size: 64px; animation: draai 2s ease-in-out infinite; }
+@keyframes draai { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
+@media (orientation: portrait) and (pointer: coarse) {
+  #rotate { display: flex; }
+}

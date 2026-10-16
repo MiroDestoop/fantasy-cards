@@ -376,6 +376,7 @@ app.addEventListener('click', (e) => {
   const [kind, arg, arg2] = (el?.dataset.click ?? '').split(':');
   switch (kind) {
     case 'start':
+      goFullscreen();
       startGame();
       break;
     case 'mode':
@@ -457,8 +458,10 @@ window.addEventListener('pointermove', (e) => {
       el.classList.toggle('no-drop', !!game && !!whyCantPlay(game, drag.uid, parseDrop(el)!));
     }
   }
+  // Met een vinger hangt de kaart boven je vingertop, anders zie je ze niet.
+  const lift = e.pointerType === 'touch' ? CARD_H * scale * 1.1 : (CARD_H * scale) / 2;
   drag.ghost.style.transform =
-    `translate(${e.clientX - (CARD_W * scale) / 2}px, ${e.clientY - (CARD_H * scale) / 2}px) scale(${scale}) rotate(-4deg)`;
+    `translate(${e.clientX - (CARD_W * scale) / 2}px, ${e.clientY - lift}px) scale(${scale}) rotate(-4deg)`;
   const over = dropTargetAt(e.clientX, e.clientY);
   if (over !== drag.hover) {
     drag.hover?.classList.remove('drop-hover');
@@ -496,6 +499,87 @@ function parseDrop(el: HTMLElement | null): PlayTarget | null {
   if (value === 'discard') return { kind: 'discard' };
   if (value?.startsWith('zone:')) return { kind: 'zone', zone: Number(value.slice(5)) };
   return null;
+}
+
+// ---------- Aanraakscherm ----------
+
+/** Lang indrukken toont een kaart groot, met de uitleg van haar keywords. */
+const LONG_PRESS_MS = 450;
+let press: { timer: number; x: number; y: number } | null = null;
+let previewEl: HTMLElement | null = null;
+/** Na een groot getoonde kaart mag het loslaten geen klik worden (bv. een aankoop in de winkel). */
+let swallowClick = false;
+
+app.addEventListener('pointerdown', (e) => {
+  if (e.pointerType !== 'touch') return;
+  const host = (e.target as HTMLElement).closest<HTMLElement>('.slot, .shop-slot, .zslot');
+  const card = host?.querySelector<HTMLElement>(':scope > .card');
+  if (!card) return;
+  const timer = window.setTimeout(() => {
+    press = null;
+    endDrag();
+    showPreview(card);
+  }, LONG_PRESS_MS);
+  press = { timer, x: e.clientX, y: e.clientY };
+});
+window.addEventListener('pointermove', (e) => {
+  if (press && (drag?.ghost || Math.hypot(e.clientX - press.x, e.clientY - press.y) > 10)) cancelPress();
+});
+function releasePress(): void {
+  cancelPress();
+  if (!previewEl) return;
+  previewEl.remove();
+  previewEl = null;
+  swallowClick = true;
+  window.setTimeout(() => (swallowClick = false), 400);
+}
+window.addEventListener('pointerup', releasePress);
+window.addEventListener('pointercancel', releasePress);
+app.addEventListener(
+  'click',
+  (e) => {
+    if (!swallowClick) return;
+    swallowClick = false;
+    e.stopPropagation();
+    e.preventDefault();
+  },
+  true,
+);
+// Geen menu of tekstselectie bij lang indrukken.
+app.addEventListener('contextmenu', (e) => e.preventDefault());
+
+function cancelPress(): void {
+  if (press) clearTimeout(press.timer);
+  press = null;
+}
+
+function showPreview(card: HTMLElement): void {
+  hideTip();
+  const big = card.cloneNode(true) as HTMLElement;
+  big.className = 'card preview-card';
+  const size = Math.min((window.innerHeight * 0.8) / CARD_H, (window.innerWidth * 0.42) / CARD_W);
+  big.style.setProperty('--s', String(size));
+  const lines = [...card.querySelectorAll<HTMLElement>('[data-kw], [data-special]')].map((el) => {
+    if (el.dataset.special) return `<div><b>✨ Speciaal</b><br>${esc(getSpecial(el.dataset.special).text)}</div>`;
+    const key = el.dataset.kw as Keyword;
+    const n = Number(el.dataset.n);
+    return `<div><b>${keywordText(key, n)}</b><br>${KEYWORDS[key].explain(n)}</div>`;
+  });
+  previewEl = document.createElement('div');
+  previewEl.className = 'preview';
+  previewEl.innerHTML = `<div class="preview-holder" style="width:${CARD_W * size}px;height:${CARD_H * size}px"></div>
+    <div class="preview-text">${[...new Set(lines)].join('')}</div>`;
+  previewEl.querySelector('.preview-holder')!.appendChild(big);
+  document.body.appendChild(previewEl);
+}
+
+/** Op een telefoon of tablet: volledig scherm en liggend, waar de browser dat toelaat. */
+function goFullscreen(): void {
+  const el = document.documentElement;
+  if (!matchMedia('(pointer: coarse)').matches || document.fullscreenElement || !el.requestFullscreen) return;
+  el.requestFullscreen()
+    .then(() => (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }).lock?.('landscape'))
+    .catch(() => {});
 }
 
 // ---------- Tooltips: uitleg bij keywords en inhoud van stapels ----------
@@ -666,8 +750,8 @@ function scheduleComputer(delay: number): void {
 /** Zo lang blijft een kaart van de computer in het midden van het scherm liggen. */
 const SHOWCASE_HOLD_MS = 400;
 /** Startkaarten (Koperen Munt, Rekruut, Zilveren Munt) ken je al: die flitsen maar heel kort voorbij. */
-const STARTER_HOLD_MS = 60;
-const STARTER_APPEAR_MS = 220;
+const STARTER_HOLD_MS = 80;
+const STARTER_APPEAR_MS = 120;
 
 /**
  * Toont een kaart die de computer speelt eerst groot in het midden van het scherm,
