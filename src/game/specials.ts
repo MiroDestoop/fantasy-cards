@@ -42,6 +42,21 @@ export const SPECIALS: Record<string, SpecialDef> = {
       log(stolen ? `👺 ${me.name} steelt ${stolen} goud van ${opp.name}!` : `👺 ${opp.name} heeft geen goud om te stelen.`);
     },
   },
+  ram: {
+    text: '+3 schade als je tegenstander hier een Schild heeft.',
+    run: ({ zone, oppId, damage }) => {
+      if (zone && zone.shield[oppId] > 0) damage(3);
+    },
+  },
+  // De twee volgende doen niets op het moment zelf: de engine kijkt ernaar (zie hasSpecial in engine.ts).
+  huur: {
+    text: 'Gaat aan het einde van je beurt terug naar de winkel.',
+    run: () => {},
+  },
+  wedergeboorte: {
+    text: 'Vernietigd of teruggeroepen? Dan keert ze terug in je hand.',
+    run: () => {},
+  },
   wraak: {
     text: '1 schade per kaart van je tegenstander hier.',
     run: ({ zone, oppId, damage }) => {

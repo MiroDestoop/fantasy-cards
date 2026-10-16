@@ -1171,7 +1171,8 @@ function playSounds(action: Action, before: GameState, after: GameState, flights
 
   // Zelfde timing als de animaties in playEffects.
   for (const f of flights) {
-    if (f.kind === 'return') sfx.whoosh(f.index * 0.11);
+    if (f.kind === 'return' || f.kind === 'to-shop') sfx.whoosh(f.index * 0.11);
+    if (f.kind === 'to-hand') sfx.rebirth(f.index * 0.11);
     if (f.kind === 'banish') sfx.burn(f.index * 0.09);
   }
   if (flights.some((f) => f.kind === 'shop-out')) sfx.shuffle(0.05);
@@ -1334,7 +1335,7 @@ function flashZone(el: HTMLElement | undefined, color: string): void {
 interface Flight {
   clone: HTMLElement;
   from: DOMRect;
-  kind: 'return' | 'banish' | 'shop-out';
+  kind: 'return' | 'to-hand' | 'to-shop' | 'banish' | 'shop-out';
   pid: PlayerId;
   index: number;
 }
@@ -1351,9 +1352,12 @@ function captureEffects(before: GameState, after: GameState): Flight[] {
       if (after.zones[zi].cards.some((c) => c.card.uid === zc.card.uid)) continue;
       const el = app.querySelector<HTMLElement>(`[data-zcard="${zc.card.uid}"] .card`);
       if (!el) continue;
-      // Teruggeroepen kaarten liggen nu op de aflegstapel; vernietigde zijn nergens meer.
-      const returned = after.players[zc.player].discard.some((c) => c.uid === zc.card.uid);
-      grab(el, returned ? 'return' : 'banish', zc.player);
+      // Teruggeroepen kaarten liggen nu op de aflegstapel, een Fenix in de hand, een Huurling in de winkel;
+      // vernietigde kaarten zijn nergens meer.
+      const owner = after.players[zc.player];
+      const has = (cards: CardInstance[]) => cards.some((c) => c.uid === zc.card.uid);
+      const kind = has(owner.discard) ? 'return' : has(owner.hand) ? 'to-hand' : has(after.shop.pile) ? 'to-shop' : 'banish';
+      grab(el, kind, zc.player);
     }
   });
 
@@ -1378,9 +1382,17 @@ function playEffects(flights: Flight[]): void {
     const start = `translate(${f.from.left}px, ${f.from.top}px) scale(${s0})`;
     let anim: Animation;
 
-    if (f.kind === 'return') {
-      const pile = app.querySelector(`[data-pile="discard:${f.pid}"]`)!.getBoundingClientRect();
-      const s1 = pile.width / CARD_W;
+    if (f.kind === 'return' || f.kind === 'to-hand' || f.kind === 'to-shop') {
+      const target =
+        f.kind === 'return' ? app.querySelector(`[data-pile="discard:${f.pid}"]`)
+        : f.kind === 'to-shop' ? app.querySelector('.shop-title')
+        : app.querySelector(game && f.pid === bottomSeat(game) ? '.hand.mine' : '.hand.opp');
+      const r = target!.getBoundingClientRect();
+      // Naar de aflegstapel: zo groot als de stapel; naar hand of winkel: een kleine kaart in het midden.
+      const s1 = f.kind === 'return' ? r.width / CARD_W : scale * 0.6;
+      const pile = f.kind === 'return'
+        ? r
+        : { left: r.left + r.width / 2 - (CARD_W * s1) / 2, top: r.top + r.height / 2 - (CARD_H * s1) / 2 };
       const midX = (f.from.left + pile.left) / 2;
       const midY = Math.min(f.from.top, pile.top) - 90 * scale;
       anim = c.animate(

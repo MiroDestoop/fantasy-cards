@@ -275,14 +275,16 @@ function applyEffect(s: GameState, pid: PlayerId, e: Effect, zoneIdx: number | n
       break;
     case 'vernietig':
       if (zoneIdx !== null) {
-        const n = takeZoneCards(s, zoneIdx, pid, Infinity, selfUid).length;
-        if (n) log(s, `${p.name} verbant ${n} kaart(en) uit ${s.zones[zoneIdx].name} uit het spel.`);
+        const taken = takeZoneCards(s, zoneIdx, pid, Infinity, selfUid);
+        // Een Fenix verbrandt niet: ze keert terug in je hand.
+        const banished = taken.filter((c) => !rebirth(s, p, c));
+        if (banished.length) log(s, `${p.name} verbant ${banished.length} kaart(en) uit ${s.zones[zoneIdx].name} uit het spel.`);
       }
       break;
     case 'terugroep':
       if (zoneIdx !== null) {
         const back = takeZoneCards(s, zoneIdx, pid, e.amount, selfUid);
-        p.discard.push(...back);
+        for (const c of back) if (!rebirth(s, p, c)) p.discard.push(c);
         if (back.length) log(s, `${p.name} roept ${back.map((c) => getCard(c.defId).name).join(', ')} terug.`);
       }
       break;
@@ -340,15 +342,41 @@ function recallCard(s: GameState, zoneIdx: number, cardUid: string): string | nu
   const price = recallPrice(s, s.active);
   const zc = zone.cards.find((c) => c.card.uid === cardUid)!;
   zone.cards = zone.cards.filter((c) => c !== zc);
-  p.discard.push(zc.card);
+  if (!rebirth(s, p, zc.card)) p.discard.push(zc.card);
   p.gold -= price;
   p.recalls++;
   log(s, `${p.name} trekt ${getCard(zc.card.defId).name} terug uit ${zone.name} voor ${price} goud.`);
   return null;
 }
 
+/** Heeft deze kaart dit speciale effect op haar onderste helft? */
+function hasSpecial(defId: string, id: string): boolean {
+  return getCard(defId).bottom.some((e) => e.kw === 'speciaal' && e.id === id);
+}
+
+/** Een Fenix die een zone verlaat, keert terug in je hand (als er plaats is). Geeft true als dat gebeurde. */
+function rebirth(s: GameState, p: PlayerState, card: CardInstance): boolean {
+  if (!hasSpecial(card.defId, 'wedergeboorte')) return false;
+  if (p.hand.length >= MAX_HAND) {
+    p.discard.push(card);
+    log(s, `🔥 ${getCard(card.defId).name} herrijst, maar je hand is vol: ze gaat naar je aflegstapel.`);
+  } else {
+    p.hand.push(card);
+    log(s, `🔥 ${getCard(card.defId).name} herrijst uit haar as en keert terug in de hand van ${p.name}.`);
+  }
+  return true;
+}
+
 function endTurn(s: GameState): void {
   const p = s.players[s.active];
+  // Huurlingen vertrekken aan het einde van je beurt, ook uit een veroverde zone: ze gaan onderaan de winkelvoorraad.
+  for (const z of s.zones) {
+    const hired = z.cards.filter((c) => c.player === s.active && hasSpecial(c.card.defId, 'huur'));
+    if (!hired.length) continue;
+    z.cards = z.cards.filter((c) => !hired.includes(c));
+    s.shop.pile.unshift(...hired.map((c) => c.card));
+    log(s, `🗡️ ${hired.length > 1 ? `${hired.length} huurlingen vertrekken` : 'De huurling vertrekt'} uit ${z.name} en gaat terug naar de winkel.`);
+  }
   p.discard.push(...p.played, ...p.hand);
   p.played = [];
   p.hand = [];

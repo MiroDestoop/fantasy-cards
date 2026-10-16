@@ -530,3 +530,57 @@ describe('Goblin', () => {
     expect(s.players[1].gold).toBe(5);
   });
 });
+
+describe('Huurling, Belegeringsram en Fenix', () => {
+  const fresh = () => createGame(['Ana', 'Bo'], 42, { plainZones: true });
+
+  it('Huurling doet 4 schade en gaat aan het einde van je beurt terug naar de winkelvoorraad', () => {
+    let s = play(fresh(), 'huurling', zone(0));
+    expect(s.zones[0].damage[0]).toBe(4);
+    const uid = s.zones[0].cards.find((c) => c.card.defId === 'huurling')!.card.uid;
+    s = act(s, { type: 'endTurn' });
+    expect(s.zones[0].cards.some((c) => c.card.uid === uid)).toBe(false);
+    expect(s.shop.pile[0].uid).toBe(uid);
+    const ana = s.players[0];
+    expect([...ana.deck, ...ana.discard, ...ana.hand].some((c) => c.uid === uid)).toBe(false);
+  });
+
+  it('Huurling vertrekt pas aan het einde van de beurt van wie ze speelde', () => {
+    let s = play(fresh(), 'huurling', zone(0));
+    s = act(s, { type: 'endTurn' });
+    s = play(s, 'huurling', zone(1));
+    expect(s.zones[1].cards).toHaveLength(1);
+  });
+
+  it('Belegeringsram doet 2 schade, en 3 meer als de tegenstander hier een Schild heeft', () => {
+    let s = play(fresh(), 'ram', zone(0));
+    expect(s.zones[0].damage[0]).toBe(2);
+    s = fresh();
+    s.zones[0].shield[1] = 2;
+    s = play(s, 'ram', zone(0));
+    // 3 + 2 = 5 schade, waarvan het schild er 2 tegenhoudt.
+    expect(s.zones[0].damage[0]).toBe(3);
+    expect(s.zones[0].shield[1]).toBe(0);
+  });
+
+  it('Fenix keert terug in je hand als ze teruggeroepen wordt', () => {
+    let s = play(fresh(), 'fenix', zone(0));
+    expect(s.zones[0].damage[0]).toBe(3);
+    const uid = s.zones[0].cards[0].card.uid;
+    s = play(s, 'rekruut', zone(0));
+    expect(s.players[0].hand.some((c) => c.uid === uid)).toBe(true);
+    expect(s.players[0].discard.some((c) => c.uid === uid)).toBe(false);
+  });
+
+  it('Fenix keert terug in je hand als ze vernietigd wordt, ook bij terugtrekken', () => {
+    let s = play(fresh(), 'fenix', zone(0));
+    const uid = s.zones[0].cards[0].card.uid;
+    s = play(s, 'offervuur', zone(0));
+    expect(s.players[0].hand.some((c) => c.uid === uid)).toBe(true);
+    s = play(s, 'fenix', zone(1));
+    s.players[0].gold = 10;
+    const uid2 = s.zones[1].cards[0].card.uid;
+    s = act(s, { type: 'recall', zone: 1, cardUid: uid2 });
+    expect(s.players[0].hand.some((c) => c.uid === uid2)).toBe(true);
+  });
+});

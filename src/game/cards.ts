@@ -90,6 +90,9 @@ const CARD_LIST: CardDef[] = [
 
   // Kaarten met een speciaal effect (zie specials.ts)
   { id: 'alchemist', name: 'Alchemist', price: 5, icon: '⚗️', color: '#6a1b9a', top: [special('dubbelgoud')], bottom: [fx('aanval', 2)] },
+  { id: 'huurling', name: 'Huurling', price: 4, icon: '🗡️', color: '#5d4037', top: [fx('goud', 1)], bottom: [fx('aanval', 4), special('huur')] },
+  { id: 'ram', name: 'Belegeringsram', price: 4, icon: '🐏', color: '#6d4c41', top: [fx('goud', 1)], bottom: [special('ram'), fx('aanval', 2)] },
+  { id: 'fenix', name: 'Fenix', price: 6, icon: '🐦‍🔥', color: '#e64a19', top: [fx('goud', 2)], bottom: [fx('aanval', 3), special('wedergeboorte')] },
   { id: 'goblin', name: 'Goblin', price: 2, icon: '👺', color: '#558b2f', top: [fx('goud', 1)], bottom: [special('diefstal')] },
   { id: 'geest', name: 'Wrekende Geest', price: 4, icon: '👻', color: '#455a64', top: [fx('trek', 1), fx('goud', 1)], bottom: [special('wraak')] },
 ];
@@ -113,5 +116,5 @@ export const SHOP_SUPPLY = expand([
   ['inzicht', 3], ['heks', 3], ['zandloper', 2], ['golem', 3], ['bron', 3], ['schat', 3],
   ['offervuur', 3], ['terugtocht', 3], ['koerier', 3], ['hoornblazer', 3], ['marskramer', 3],
   ['bard', 3], ['valkenier', 3], ['getijde', 2], ['bol', 2], ['generaal', 2],
-  ['alchemist', 2], ['geest', 3], ['goblin', 3],
+  ['alchemist', 2], ['geest', 3], ['goblin', 3], ['huurling', 3], ['ram', 3], ['fenix', 2],
 ]);
