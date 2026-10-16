@@ -276,7 +276,9 @@ button { font: inherit; }
 }
 .art {
   height: 54px;
-  flex-shrink: 0;
+  /* Een kaart met veel effecten krijgt een lagere illustratie, zodat alles op de kaart past. */
+  flex-shrink: 1;
+  min-height: 36px;
   border-radius: 8px;
   display: grid;
   place-items: center;
@@ -284,6 +286,25 @@ button { font: inherit; }
   border: 2px solid rgba(0, 0, 0, 0.35);
   background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--art) 60%, white), var(--art) 55%, color-mix(in srgb, var(--art) 45%, black));
 }
+/* Het ras rechtsboven in de illustratie. */
+.art { position: relative; }
+.race {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  border-radius: 50%;
+  background: rgba(20, 12, 4, 0.55);
+  pointer-events: auto;
+  cursor: help;
+}
+/* Een effect met een rasvoorwaarde: gestippelde rand en het rasicoon ervoor. */
+.kw.cond { outline: 1.5px dashed rgba(255, 255, 255, 0.85); outline-offset: -2px; }
+.out-race { text-align: center; font-size: 15px; color: var(--ink-dim); cursor: help; }
 .card-name { font-size: 13.5px; font-weight: bold; text-align: center; line-height: 1.1; }
 
 .sect {
@@ -327,6 +348,7 @@ button { font: inherit; }
 .kw-ververs { --edge: #ad1457; }
 .kw-herschep { --edge: #2e7d32; }
 .kw-echo { --edge: #4f8a8b; }
+.kw-schenk { --edge: #6a4c93; }
 /* Een speciaal effect is een korte zin in plaats van een keyword. */
 .kw-speciaal {
   --edge: #4a2c6e;

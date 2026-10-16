@@ -1,12 +1,12 @@
 import './style.css';
 import { AI_LEVELS, chooseAction, type AiLevel } from './game/ai';
-import { CARDS, getCard, KEYWORDS, STARTER_DECK } from './game/cards';
+import { CARDS, getCard, KEYWORDS, RACES, STARTER_DECK } from './game/cards';
 import { getSpecial } from './game/specials';
 import {
   applyAction, createGame, drawOverflow, other, recallPrice, shopPrice, whyCantBuy, whyCantPlay, zonesOwnedBy,
 } from './game/engine';
 import { FIRST_HAND_SIZE, GAMES_TO_WIN_MATCH, HAND_SIZE, MAX_HAND, MAX_ZONE_CARDS, RECALL_PRICE, ZONE_HP, ZONES_TO_WIN } from './game/rules';
-import type { Action, CardDef, CardInstance, Effect, GameState, Keyword, PlayerId, PlayTarget } from './game/types';
+import type { Action, CardDef, CardInstance, Effect, GameState, Keyword, PlayerId, PlayTarget, Race } from './game/types';
 import { hostRoom, joinRoom, makeCode, PROTOCOL, type Link, type Msg } from './online';
 import { isMuted, sfx, toggleMute } from './sound';
 import { cardsWord, getLang, setLang, tr, type Lang } from './game/i18n';
@@ -347,11 +347,33 @@ function keywordText(kw: Keyword, n: number): string {
 
 function renderKeywords(effects: Effect[]): string {
   return effects
-    .map((e) =>
-      e.kw === 'speciaal'
-        ? `<span class="kw kw-speciaal" data-special="${e.id}">${esc(getSpecial(e.id).text)}</span>`
-        : `<span class="kw kw-${e.kw}" data-kw="${e.kw}" data-n="${e.amount}">${keywordText(e.kw, e.amount)}</span>`)
+    .map((e) => {
+      // Een rasvoorwaarde staat als icoon voor het effect.
+      const need = e.need ? ` data-need="${e.need}"` : '';
+      const cls = e.need ? ' cond' : '';
+      const pre = e.need ? `${RACES[e.need].icon}` : '';
+      return e.kw === 'speciaal'
+        ? `<span class="kw kw-speciaal${cls}" data-special="${e.id}"${need}>${pre}${esc(getSpecial(e.id).text)}</span>`
+        : `<span class="kw kw-${e.kw}${cls}" data-kw="${e.kw}" data-n="${e.amount}"${need}>${pre}${keywordText(e.kw, e.amount)}</span>`;
+    })
     .join(' ');
+}
+
+/** De uitleg van een rasvoorwaarde, onder de uitleg van het effect. */
+function needText(race: string | undefined): string {
+  if (!race) return '';
+  const r = RACES[race as Race];
+  return `<div class="tip-note">${r.icon} ${tr(
+    `Alleen als er al een ${r.label} van jou in deze zone ligt.`,
+    `Only if one of your ${r.plural} is already in this zone.`,
+  )}</div>`;
+}
+
+function raceTip(race: Race): string {
+  const r = RACES[race];
+  const out = game?.outRace === race;
+  return `<b>${r.icon} ${r.label}</b><br>${tr(`Deze kaart is een ${r.label}.`, `This card is a ${r.label}.`)}
+    ${out ? `<div class="tip-note">🚫 ${tr(`De ${r.plural} doen dit spel niet mee.`, `The ${r.plural} sit out this game.`)}</div>` : ''}`;
 }
 
 function renderFace(def: CardDef): string {
@@ -359,7 +381,7 @@ function renderFace(def: CardDef): string {
   // is die plaats nodig voor de effecten; de kleur van elke helft toont welke welke is.
   const labels = STARTER_DECK.includes(def.id);
   return `
-    <div class="art" style="--art:${def.color}">${def.icon}</div>
+    <div class="art" style="--art:${def.color}">${def.icon}${def.race ? `<span class="race" data-race="${def.race}">${RACES[def.race].icon}</span>` : ''}</div>
     <div class="card-name">${esc(def.name)}</div>
     <div class="sect sect-top ${labels ? '' : 'no-label'}">
       ${labels ? `<div class="sect-label">⤓ ${tr('Afleggen', 'Discard')}</div>` : ''}
@@ -533,6 +555,7 @@ function renderSidePanel(g: GameState): string {
       `Drag a card to your <b>discard pile</b> (top effect) or into a <b>zone</b> (bottom effect).
       Hover over a pile to see what is in it. Hover over your card in a zone to withdraw it (↩).`,
     )}</div>
+    ${g.outRace ? `<div class="out-race" data-race="${g.outRace}">🚫 ${RACES[g.outRace].icon} ${tr(`Zonder ${RACES[g.outRace].plural}`, `No ${RACES[g.outRace].plural}`)}</div>` : ''}
     <div class="log">${g.log.slice(-16).reverse().map((l) => `<div>${esc(l)}</div>`).join('')}</div>
     <div class="side-buttons">
       <button class="sound-toggle" data-click="sound">${isMuted() ? `🔇 ${tr('Geluid uit', 'Sound off')}` : `🔊 ${tr('Geluid aan', 'Sound on')}`}</button>
@@ -874,10 +897,10 @@ function showPreview(card: HTMLElement): void {
   const size = Math.min((window.innerHeight * 0.8) / CARD_H, (window.innerWidth * 0.42) / CARD_W);
   big.style.setProperty('--s', String(size));
   const lines = [...card.querySelectorAll<HTMLElement>('[data-kw], [data-special]')].map((el) => {
-    if (el.dataset.special) return `<div><b>✨ Speciaal</b><br>${esc(getSpecial(el.dataset.special).text)}</div>`;
+    if (el.dataset.special) return `<div><b>✨ Speciaal</b><br>${esc(getSpecial(el.dataset.special).text)}${needText(el.dataset.need)}</div>`;
     const key = el.dataset.kw as Keyword;
     const n = Number(el.dataset.n);
-    return `<div><b>${keywordText(key, n)}</b><br>${KEYWORDS[key].explain(n)}</div>`;
+    return `<div><b>${keywordText(key, n)}</b><br>${KEYWORDS[key].explain(n)}${needText(el.dataset.need)}</div>`;
   });
   previewEl = document.createElement('div');
   previewEl.className = 'preview';
@@ -906,18 +929,21 @@ app.addEventListener('mouseover', (e) => {
   const recall = target.closest<HTMLElement>('[data-recall]');
   const special = target.closest<HTMLElement>('[data-special]');
   const zfx = target.closest<HTMLElement>('[data-zfx]');
-  if (zfx) {
+  const race = target.closest<HTMLElement>('[data-race]');
+  if (race) {
+    tipEl.innerHTML = raceTip(race.dataset.race as Race);
+  } else if (zfx) {
     const fx = ZONE_EFFECTS[zfx.dataset.zfx as keyof typeof ZONE_EFFECTS];
     tipEl.innerHTML = `<b>${fx.icon} ${esc(fx.label)}</b><br>${esc(fx.text)}`;
   } else if (recall && game) {
     tipEl.innerHTML = recallTip(game, recall.dataset.recall!);
   } else if (special) {
-    tipEl.innerHTML = `<b>✨ ${tr('Speciaal effect', 'Special effect')}</b><br>${esc(getSpecial(special.dataset.special!).text)}
+    tipEl.innerHTML = `<b>✨ ${tr('Speciaal effect', 'Special effect')}</b><br>${esc(getSpecial(special.dataset.special!).text)}${needText(special.dataset.need)}
       <div class="tip-note">${tr('Dit effect heeft geen keyword: het hoort alleen bij deze kaart.', 'This effect has no keyword: it belongs to this card only.')}</div>`;
   } else if (kw) {
     const key = kw.dataset.kw as Keyword;
     const n = Number(kw.dataset.n);
-    tipEl.innerHTML = `<b>${keywordText(key, n)}</b><br>${KEYWORDS[key].explain(n)}`;
+    tipEl.innerHTML = `<b>${keywordText(key, n)}</b><br>${KEYWORDS[key].explain(n)}${needText(kw.dataset.need)}`;
   } else if (pile && game) {
     const [kind, pid] = pile.dataset.pile!.split(':');
     const p = game.players[Number(pid)];

@@ -111,15 +111,24 @@ function bestPlay(state: GameState, pid: PlayerId, hand: CardInstance[], profile
   return best;
 }
 
-/** Koopt de duurste betaalbare kaart; goedkope kaarten (onder 3 goud) laat ze liggen. */
+/**
+ * Liggen er in de winkel alleen kaarten onder deze prijs, dan mogen ook die gekocht worden.
+ * Anders raakt de winkel vol goedkope kaarten die niemand koopt, en ververst ze nooit meer.
+ */
+function priceFloor(state: GameState, floor: number): number {
+  return state.shop.market.some((c) => (getCard(c.defId).price ?? 0) >= floor) ? floor : 0;
+}
+
+/** Koopt de duurste betaalbare kaart; goedkope kaarten (onder 3 goud) laat ze liggen, tenzij er niets anders ligt. */
 function bestBuy(state: GameState): CardInstance | null {
   let best: CardInstance | null = null;
   let bestRating = 0;
+  const floor = priceFloor(state, 3);
   for (const card of state.shop.market) {
     if (whyCantBuy(state, card.uid)) continue;
     const def = getCard(card.defId);
     const price = def.price ?? 0;
-    if (price < 3) continue;
+    if (price < floor) continue;
     // Bij gelijke prijs liever een kaart die schade doet.
     const rating = price + (def.bottom.some((e) => e.kw === 'aanval') ? 0.5 : 0);
     if (rating > bestRating) {
@@ -137,7 +146,7 @@ function smartBuy(state: GameState): CardInstance | null {
   const pid = state.active;
   const gold = state.players[pid].gold;
   // Laat in het spel helpen goedkope kaarten niet meer: ze komen te laat in je hand.
-  const minPrice = state.turn >= 20 ? 5 : 3;
+  const minPrice = priceFloor(state, state.turn >= 20 ? 5 : 3);
   const rated = state.shop.market
     .map((card) => ({ card, def: getCard(card.defId) }))
     .filter(({ def }) => (def.price ?? 0) >= minPrice)
@@ -160,7 +169,7 @@ function buyRating(state: GameState, pid: PlayerId, def: CardDef): number {
   // Bijna een zone veroverd: schade is nu extra veel waard.
   if (open.some(({ z }) => z.damage[pid] >= z.hp * 0.6)) rating += 0.3 * attack;
   // Zones raken vol: Terugroep en Vernietig maken plaats.
-  if (has(['terugroep', 'vernietig']) && open.some(({ i }) => zoneCardCount(state, i, pid) >= zoneCapacity(state.zones[i]) - 1)) {
+  if (has(['terugroep', 'vernietig', 'schenk']) && open.some(({ i }) => zoneCardCount(state, i, pid) >= zoneCapacity(state.zones[i]) - 1)) {
     rating += 1.5;
   }
   // De tegenstander wint bijna een zone: Herstel en Schild houden haar tegen.
@@ -383,7 +392,8 @@ function evaluate(s: GameState, pid: PlayerId, profile: Profile): number {
   }
 
   // Goud is veel waard tot je er een sterke kaart mee kunt kopen, daarna minder.
-  score += 1.1 * Math.min(me.gold, 8) + 0.3 * Math.max(0, me.gold - 8);
+  // Is de winkel leeg, dan is goud niets meer waard: anders blijft ze afleggen voor goud in plaats van aan te vallen.
+  if (s.shop.market.length) score += 1.1 * Math.min(me.gold, 8) + 0.3 * Math.max(0, me.gold - 8);
   // Extra kaarten in je hand (door Trek) speel je deze beurt nog.
   score += 1.2 * me.hand.length;
   score += 1.5 * s.players[opp].slow;

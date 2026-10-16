@@ -3,13 +3,20 @@ import type { ZoneEffectId } from './zones';
 export type PlayerId = 0 | 1;
 
 export type Keyword =
-  | 'goud' | 'aanval' | 'storm' | 'herstel' | 'schild' | 'trek' | 'vertraag' | 'vernietig' | 'terugroep' | 'ververs' | 'herschep' | 'echo';
+  | 'goud' | 'aanval' | 'storm' | 'herstel' | 'schild' | 'trek' | 'vertraag' | 'vernietig' | 'terugroep' | 'ververs' | 'herschep' | 'echo'
+  | 'schenk';
+
+/** De vijf rassen van de winkelkaarten. Elk spel doet er één niet mee. */
+export type Race = 'mens' | 'elf' | 'dwerg' | 'ork' | 'ondood';
 
 /**
  * Eén effect op een kaart: een keyword met zijn waarde, zoals Aanval(2),
  * of een speciaal effect uit `SPECIALS` in specials.ts.
  */
-export type Effect = { kw: Keyword; amount: number } | { kw: 'speciaal'; id: string };
+export type Effect = ({ kw: Keyword; amount: number } | { kw: 'speciaal'; id: string }) & {
+  /** Voorwaarde: het effect werkt alleen als er al een kaart van dit ras van jou in deze zone ligt. */
+  need?: Race;
+};
 
 export interface CardDef {
   id: string;
@@ -17,6 +24,8 @@ export interface CardDef {
   /** Goudprijs in de winkel; alleen voor kaarten die je kunt kopen. */
   price?: number;
   icon: string;
+  /** Het ras; elke winkelkaart heeft er een, startkaarten niet. */
+  race?: Race;
   /** Achtergrondkleur van de kaartillustratie. */
   color: string;
   /** Effect als je de kaart naar je aflegstapel sleept. */
@@ -92,6 +101,8 @@ export interface GameState {
   winner: PlayerId | null;
   shop: Shop;
   log: string[];
+  /** Het ras dat dit spel niet meedoet: zijn kaarten liggen niet in de winkel. */
+  outRace: Race | null;
   /** Toestand van de toevalsgenerator, zodat een spel volledig reproduceerbaar is. */
   seed: number;
 }

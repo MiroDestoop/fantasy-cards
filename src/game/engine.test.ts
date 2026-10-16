@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { getCard, SHOP_SUPPLY } from './cards';
+import { getCard, RACE_IDS, SHOP_SUPPLY } from './cards';
 import { getSpecial } from './specials';
-import { applyAction, createGame, recallPrice, shopPrice, drawOverflow } from './engine';
+import { applyAction, createGame, drawOverflow, needMet, recallPrice, shopPrice } from './engine';
 import { FIRST_HAND_SIZE, HAND_SIZE, MARKET_SIZE, MAX_HAND, MAX_ZONE_CARDS, RECALL_PRICE, ZONE_HP } from './rules';
 import type { Action, GameState, PlayerId, PlayTarget } from './types';
 import { makeZone, type ZoneEffectId } from './zones';
@@ -198,7 +198,7 @@ describe('terugtrekken', () => {
     let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
     s.zones[0].damage = [0, 6];
     s = play(s, 'bron', zone(0));
-    expect(s.zones[0].damage[1]).toBe(2);
+    expect(s.zones[0].damage[1]).toBe(3);
   });
 
   it('Vertraag laat de tegenstander minder trekken', () => {
@@ -256,7 +256,7 @@ describe('beurten en stapel', () => {
     s = act(s, { type: 'play', handUid: 'schat', target: DISCARD });
     s = act(s, { type: 'play', handUid: 'inzicht', target: DISCARD });
     expect(s.players[0].hand).toHaveLength(0);
-    expect(s.players[0].gold).toBe(4);
+    expect(s.players[0].gold).toBe(5);
     // Volgende beurt zijn ze er gewoon weer.
     s = act(s, { type: 'endTurn' });
     s = act(s, { type: 'endTurn' });
@@ -283,7 +283,7 @@ describe('alles afleggen', () => {
     let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
     s.players[0].hand = [{ uid: 'a', defId: 'inzicht' }];
     s = act(s, { type: 'discardAll' });
-    expect(s.players[0].hand).toHaveLength(3);
+    expect(s.players[0].hand).toHaveLength(2);
   });
 
   it('weigert met een lege hand', () => {
@@ -299,13 +299,14 @@ describe('handlimiet', () => {
     s.players[0].hand.push(...Array.from({ length: HAND_SIZE - FIRST_HAND_SIZE }, (_, i) => ({ uid: `vul-${i}`, defId: 'koper' })));
     s.players[0].deck.push(...Array.from({ length: 6 }, (_, i) => ({ uid: `extra-${i}`, defId: 'koper' })));
     const discardBefore = s.players[0].discard.length;
-    // Eerste Arcaan Inzicht: hand 5 → 8. Tweede: hand blijft 8, alle 3 getrokken kaarten passen niet meer.
-    s = play(s, 'inzicht', DISCARD);
+    // Eerste Aartsmagiër (Trek 4): hand 5 → 8, de vierde kaart past niet meer. Tweede: geen enkele past nog.
+    s = play(s, 'aartsmagier', DISCARD);
     expect(s.players[0].hand).toHaveLength(MAX_HAND);
-    s = play(s, 'inzicht', DISCARD);
+    expect(s.players[0].discard).toHaveLength(discardBefore + 1);
+    s = play(s, 'aartsmagier', DISCARD);
     expect(s.players[0].hand).toHaveLength(MAX_HAND);
-    // De 3 getrokken kaarten die niet meer pasten; de 2 Inzicht-kaarten liggen bij de gespeelde kaarten.
-    expect(s.players[0].discard).toHaveLength(discardBefore + 3);
+    // 1 + 4 getrokken kaarten die niet meer pasten; de 2 Aartsmagiërs liggen bij de gespeelde kaarten.
+    expect(s.players[0].discard).toHaveLength(discardBefore + 5);
     expect(s.players[0].played).toHaveLength(2);
   });
 });
@@ -346,14 +347,14 @@ describe('winnen', () => {
 });
 
 describe('speciale effecten', () => {
-  it('Alchemist verdubbelt je goud, met een maximum van +6', () => {
+  it('Alchemist verdubbelt je goud, met een maximum van +10', () => {
     let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
     s.players[0].gold = 3;
     s = play(s, 'alchemist', DISCARD);
     expect(s.players[0].gold).toBe(6);
-    s.players[0].gold = 8;
+    s.players[0].gold = 12;
     s = play(s, 'alchemist', DISCARD);
-    expect(s.players[0].gold).toBe(14);
+    expect(s.players[0].gold).toBe(22);
   });
 
   it('Wrekende Geest doet 1 schade per kaart van de tegenstander in de zone', () => {
@@ -430,9 +431,9 @@ describe('zones', () => {
 
   it('Dichte mist geeft elke aanval 1 schade minder', () => {
     let s = play(withEffect('mist'), 'trol', zone(0));
-    expect(s.zones[0].damage[0]).toBe(4);
+    expect(s.zones[0].damage[0]).toBe(3);
     s = play(s, 'zilver', zone(0));
-    expect(s.zones[0].damage[0]).toBe(4);
+    expect(s.zones[0].damage[0]).toBe(3);
   });
 
   it('Schatkamer geeft 1 goud per kaart die je er speelt', () => {
@@ -552,14 +553,14 @@ describe('Huurling, Belegeringsram en Fenix', () => {
     expect(s.zones[1].cards).toHaveLength(1);
   });
 
-  it('Belegeringsram doet 2 schade, en 3 meer als de tegenstander hier een Schild heeft', () => {
+  it('Belegeringsram doet 2 schade, en 5 meer als de tegenstander hier een Schild heeft', () => {
     let s = play(fresh(), 'ram', zone(0));
     expect(s.zones[0].damage[0]).toBe(2);
     s = fresh();
     s.zones[0].shield[1] = 2;
     s = play(s, 'ram', zone(0));
-    // 3 + 2 = 5 schade, waarvan het schild er 2 tegenhoudt.
-    expect(s.zones[0].damage[0]).toBe(3);
+    // 5 + 2 = 7 schade, waarvan het schild er 2 tegenhoudt.
+    expect(s.zones[0].damage[0]).toBe(5);
     expect(s.zones[0].shield[1]).toBe(0);
   });
 
@@ -643,12 +644,91 @@ describe('Dodenbezweerder', () => {
   });
 });
 
+describe('rassen', () => {
+  it('geeft elke winkelkaart een ras, met van elk ras goedkope en dure kaarten', () => {
+    const shop = [...new Set(SHOP_SUPPLY)].map(getCard);
+    expect(shop.every((d) => d.race)).toBe(true);
+    for (const race of RACE_IDS) {
+      const prices = shop.filter((d) => d.race === race).map((d) => d.price!);
+      expect(prices.length).toBeGreaterThanOrEqual(8);
+      expect(Math.min(...prices)).toBeLessThanOrEqual(4);
+      expect(Math.max(...prices)).toBeGreaterThanOrEqual(7);
+    }
+  });
+
+  it('laat elk spel één ras weg uit de winkel', () => {
+    const outs = new Set<string>();
+    for (let seed = 1; seed <= 40; seed++) {
+      const s = createGame(['Ana', 'Bo'], seed);
+      expect(s.outRace).not.toBeNull();
+      outs.add(s.outRace!);
+      const cards = [...s.shop.pile, ...s.shop.market].map((c) => getCard(c.defId));
+      expect(cards.some((d) => d.race === s.outRace)).toBe(false);
+      expect(new Set(cards.map((d) => d.race)).size).toBe(RACE_IDS.length - 1);
+    }
+    expect(outs.size).toBe(RACE_IDS.length);
+  });
+
+  it('een effect met een rasvoorwaarde werkt alleen als dat ras al van jou in de zone ligt', () => {
+    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true, allRaces: true });
+    // Zonder ork: Trollenmoker doet alleen haar gewone Aanval 4.
+    s = play(s, 'trol', zone(0));
+    expect(s.zones[0].damage[0]).toBe(4);
+    // Nu ligt er een ork (de eerste Trollenmoker): de tweede krijgt +2.
+    s = play(s, 'trol', zone(0));
+    expect(s.zones[0].damage[0]).toBe(4 + 6);
+    // Een ork van de tegenstander telt niet.
+    s.zones[1].cards.push({ player: 1, card: { uid: 'bo-trol', defId: 'trol' }, turn: 0 });
+    s = play(s, 'trol', zone(1));
+    expect(s.zones[1].damage[0]).toBe(4);
+    // Afgelegd werkt de voorwaarde nooit.
+    expect(needMet(s, 0, null, { kw: 'aanval', amount: 1, need: 'ork' })).toBe(false);
+  });
+
+  it('drawOverflow telt een Trek met voorwaarde alleen mee als de voorwaarde klopt', () => {
+    const s = createGame(['Ana', 'Bo'], 6, { plainZones: true });
+    const p = s.players[0];
+    p.hand = Array.from({ length: MAX_HAND }, (_, i) => ({ uid: `h${i}`, defId: 'koper' }));
+    p.hand.push({ uid: 'uil', defId: 'uil' });
+    p.deck = Array.from({ length: 10 }, (_, i) => ({ uid: `d${i}`, defId: 'koper' }));
+    expect(drawOverflow(s, 'uil', zone(0))).toBe(1);
+    s.zones[0].cards.push({ player: 0, card: { uid: 'elf', defId: 'bron' }, turn: 0 });
+    expect(drawOverflow(s, 'uil', zone(0))).toBe(2);
+  });
+});
+
+describe('Schenk', () => {
+  it('stuurt je oudste andere kaarten in de zone naar de aflegstapel van je tegenstander', () => {
+    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true, allRaces: true });
+    s.zones[0].cards.push(
+      { player: 0, card: { uid: 'oud1', defId: 'rekruut' }, turn: 0 },
+      { player: 1, card: { uid: 'bo1', defId: 'zilver' }, turn: 0 },
+      { player: 0, card: { uid: 'oud2', defId: 'zilver' }, turn: 0 },
+      { player: 0, card: { uid: 'oud3', defId: 'koper' }, turn: 0 },
+    );
+    const before = s.players[1].discard.length;
+    s = play(s, 'pestdrager', zone(0));
+    expect(s.players[1].discard.slice(before).map((c) => c.uid)).toEqual(['oud1', 'oud2']);
+    expect(s.zones[0].cards.map((c) => c.card.uid)).toEqual(['bo1', 'oud3', s.zones[0].cards[2].card.uid]);
+    expect(getCard(s.zones[0].cards[2].card.defId).id).toBe('pestdrager');
+    expect(s.zones[0].damage[0]).toBe(2);
+  });
+
+  it('een Fenix laat zich niet weggeven: ze keert terug in je hand', () => {
+    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true, allRaces: true });
+    s.zones[0].cards.push({ player: 0, card: { uid: 'fen', defId: 'fenix' }, turn: 0 });
+    s = play(s, 'pestdrager', zone(0));
+    expect(s.players[0].hand.some((c) => c.uid === 'fen')).toBe(true);
+    expect(s.players[1].discard.some((c) => c.uid === 'fen')).toBe(false);
+  });
+});
+
 describe('Ravenkoningin', () => {
   it('doet 2 schade per lege plek van de tegenstander in deze zone', () => {
     let s = createGame(['Ana', 'Bo'], 6, { plainZones: true });
     s.zones[0].cards.push({ player: 1, card: { uid: 'x1', defId: 'zilver' }, turn: 1 });
     s = play(s, 'ravenkoningin', zone(0));
-    expect(s.zones[0].damage[0]).toBe(2 * (MAX_ZONE_CARDS - 1) + 2);
+    expect(s.zones[0].damage[0]).toBe(2 * (MAX_ZONE_CARDS - 1));
   });
 });
 
@@ -670,7 +750,7 @@ describe('echo: de volgende kaart keert meteen terug', () => {
     s = play(s, 'windloper', DISCARD);
     expect(s.players[0].echo).toBe(1);
     s = play(s, 'trol', zone(1));
-    expect(s.zones[1].damage[0]).toBe(5);
+    expect(s.zones[1].damage[0]).toBe(4);
     expect(s.zones[1].cards).toHaveLength(0);
     expect(s.players[0].discard.at(-1)?.defId).toBe('trol');
     expect(s.players[0].echo).toBe(0);

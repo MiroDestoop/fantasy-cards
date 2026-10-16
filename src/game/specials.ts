@@ -36,7 +36,7 @@ export const SPECIALS: Record<string, SpecialDef> = {
   dubbelgoud: {
     get text() { return tr('Verdubbel je goud (max. +6).', 'Double your gold (max. +6).'); },
     run: ({ me }) => {
-      me.gold += Math.min(me.gold, 6);
+      me.gold += Math.min(me.gold, 10);
     },
   },
   diefstal: {
@@ -51,9 +51,9 @@ export const SPECIALS: Record<string, SpecialDef> = {
     },
   },
   ram: {
-    get text() { return tr('+3 schade als je tegenstander hier een Schild heeft.', '+3 damage if your opponent has a Shield here.'); },
+    get text() { return tr('+5 schade als je tegenstander hier een Schild heeft.', '+5 damage if your opponent has a Shield here.'); },
     run: ({ zone, oppId, damage }) => {
-      if (zone && zone.shield[oppId] > 0) damage(3);
+      if (zone && zone.shield[oppId] > 0) damage(5);
     },
   },
   // De twee volgende doen niets op het moment zelf: de engine kijkt ernaar (zie hasSpecial in engine.ts).

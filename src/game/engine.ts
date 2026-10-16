@@ -1,4 +1,4 @@
-import { getCard, SHOP_SUPPLY, STARTER_DECK } from './cards';
+import { getCard, RACE_IDS, RACES, SHOP_SUPPLY, STARTER_DECK } from './cards';
 import { getSpecial } from './specials';
 import {
   FIRST_HAND_SIZE, HAND_SIZE, MARKET_SIZE, MAX_HAND, RECALL_PRICE, ZONE_COUNT, ZONE_HP, ZONES_TO_WIN,
@@ -6,7 +6,7 @@ import {
 import { cardsWord, tr } from './i18n';
 import { leadsZone, makeZone, zoneCapacity, ZONE_EFFECTS, ZONE_NAMES, zoneEffect, zoneName, type ZoneEffectId } from './zones';
 import type {
-  Action, ActionResult, CardInstance, Effect, GameState, PlayerId, PlayerState, PlayTarget, Zone,
+  Action, ActionResult, CardInstance, Effect, GameState, PlayerId, PlayerState, PlayTarget, Race, Zone,
 } from './types';
 
 const MAX_LOG = 60;
@@ -22,6 +22,8 @@ export interface GameOptions {
   starter?: PlayerId;
   /** Zones zonder effect en in vaste volgorde (voor tests). */
   plainZones?: boolean;
+  /** Alle rassen doen mee (voor tests). */
+  allRaces?: boolean;
 }
 
 export function createGame(
@@ -50,7 +52,15 @@ export function createGame(
     shop: { pile: SHOP_SUPPLY.map((defId, i) => ({ uid: `s-${i}`, defId })), market: [] },
     log: [],
     seed,
+    outRace: null,
   };
+  // Elk spel doet één ras niet mee: zijn kaarten verdwijnen uit de voorraad.
+  if (!options.allRaces) {
+    const out = RACE_IDS[Math.floor(random(s) * RACE_IDS.length)];
+    s.outRace = out;
+    s.shop.pile = s.shop.pile.filter((c) => getCard(c.defId).race !== out);
+    log(s, tr(`🚫 ${RACES[out].icon} De ${RACES[out].plural} doen dit spel niet mee.`, `🚫 ${RACES[out].icon} The ${RACES[out].plural} sit out this game.`));
+  }
   for (const p of s.players) shuffle(s, p.deck);
   shuffle(s, s.shop.pile);
   refreshShop(s);
@@ -127,10 +137,21 @@ export function drawOverflow(state: GameState, handUid: string, target: PlayTarg
   if (!card) return 0;
   const def = getCard(card.defId);
   const half = target.kind === 'discard' ? def.top : def.bottom;
-  let draws = half.reduce((t, e) => t + (e.kw === 'trek' ? e.amount : 0), 0);
+  const zoneIdx = target.kind === 'zone' ? target.zone : null;
+  let draws = half.reduce((t, e) => t + (e.kw === 'trek' && needMet(state, state.active, zoneIdx, e) ? e.amount : 0), 0);
   if (target.kind === 'zone') draws += zoneEffect(state.zones[target.zone])?.onPlay?.draw ?? 0;
   draws = Math.min(draws, p.deck.length + p.discard.length);
   return Math.max(0, p.hand.length - 1 + draws - MAX_HAND);
+}
+
+/** Ligt er in deze zone al een kaart van dit ras van deze speler (de gespeelde kaart zelf niet meegeteld)? */
+export function raceHere(state: GameState, pid: PlayerId, zoneIdx: number, race: Race, skipUid?: string): boolean {
+  return state.zones[zoneIdx].cards.some((c) => c.player === pid && c.card.uid !== skipUid && getCard(c.card.defId).race === race);
+}
+
+/** Werkt dit effect hier? Een effect met een rasvoorwaarde werkt alleen in een zone waar dat ras al van jou ligt. */
+export function needMet(state: GameState, pid: PlayerId, zoneIdx: number | null, e: Effect, skipUid?: string): boolean {
+  return !e.need || (zoneIdx !== null && raceHere(state, pid, zoneIdx, e.need, skipUid));
 }
 
 /** Wat het nu kost om een kaart uit een zone terug te trekken. */
@@ -261,6 +282,7 @@ function refreshShop(s: GameState): void {
 function applyEffect(s: GameState, pid: PlayerId, e: Effect, zoneIdx: number | null, selfUid?: string): void {
   const p = s.players[pid];
   const opp = other(pid);
+  if (!needMet(s, pid, zoneIdx, e, selfUid)) return;
   if (e.kw === 'speciaal') {
     getSpecial(e.id).run({
       state: s,
@@ -315,6 +337,14 @@ function applyEffect(s: GameState, pid: PlayerId, e: Effect, zoneIdx: number | n
         const back = takeZoneCards(s, zoneIdx, pid, e.amount, selfUid);
         for (const c of back) if (!rebirth(s, p, c)) p.discard.push(c);
         if (back.length) log(s, tr(`${p.name} roept ${back.map((c) => getCard(c.defId).name).join(', ')} terug.`, `${p.name} recalls ${back.map((c) => getCard(c.defId).name).join(', ')}.`));
+      }
+      break;
+    case 'schenk':
+      if (zoneIdx !== null) {
+        const gift = takeZoneCards(s, zoneIdx, pid, e.amount, selfUid);
+        // Een Fenix laat zich niet weggeven: ze keert terug in je eigen hand.
+        for (const c of gift) if (!rebirth(s, p, c)) s.players[opp].discard.push(c);
+        if (gift.length) log(s, tr(`🎁 ${p.name} schenkt ${gift.map((c) => getCard(c.defId).name).join(', ')} aan ${s.players[opp].name}.`, `🎁 ${p.name} gives ${gift.map((c) => getCard(c.defId).name).join(', ')} to ${s.players[opp].name}.`));
       }
       break;
     case 'herschep':
