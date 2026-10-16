@@ -1029,3 +1029,7 @@ button { font: inherit; }
 .zfx-slagveld { --edge: #e57373; }
 .zfx-mist { --edge: #b0bec5; }
 .zfx-goudader { --edge: #e6c068; }
+.zfx-schatkamer { --edge: #ffd54f; }
+.zfx-tolpoort { --edge: #ff8a65; }
+.zfx-zwaretocht { --edge: #90a4ae; }
+.zfx-bibliotheek { --edge: #9575cd; }

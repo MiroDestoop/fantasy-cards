@@ -392,10 +392,11 @@ describe('zones', () => {
       const s = createGame(['Ana', 'Bo'], seed);
       expect(s.zones).toHaveLength(3);
       expect(new Set(s.zones.map((z) => z.effect)).size).toBe(3);
+      for (const z of s.zones) seen.add(z.effect!);
       expect(new Set(s.zones.map((z) => z.name)).size).toBe(3);
       for (const z of s.zones) seen.add(z.name);
     }
-    expect(seen.size).toBeGreaterThan(3);
+    expect(seen.size).toBeGreaterThan(10);
     expect(createGame(['Ana', 'Bo'], 5).zones).toEqual(createGame(['Ana', 'Bo'], 5).zones);
   });
 
@@ -432,6 +433,39 @@ describe('zones', () => {
     expect(s.zones[0].damage[0]).toBe(4);
     s = play(s, 'zilver', zone(0));
     expect(s.zones[0].damage[0]).toBe(4);
+  });
+
+  it('Schatkamer geeft 1 goud per kaart die je er speelt', () => {
+    const s = play(withEffect('schatkamer'), 'rekruut', zone(0));
+    expect(s.players[0].gold).toBe(1);
+  });
+
+  it('Tolpoort kost 1 goud per kaart, en zonder goud kan het niet', () => {
+    const s = withEffect('tolpoort');
+    s.players[0].gold = 0;
+    expect(applyAction(s, { type: 'play', handUid: give(s, 0, 'zilver'), target: zone(0) }).ok).toBe(false);
+    s.players[0].gold = 2;
+    const after = play(s, 'zilver', zone(0));
+    expect(after.players[0].gold).toBe(1);
+    expect(after.zones[0].damage[0]).toBe(1);
+  });
+
+  it('Bibliotheek laat je 1 kaart trekken', () => {
+    const s = withEffect('bibliotheek');
+    const hand = s.players[0].hand.length;
+    // play() geeft eerst een Zilveren Munt in je hand; die gaat naar de zone en er komt 1 kaart bij.
+    const after = play(s, 'zilver', zone(0));
+    expect(after.players[0].hand).toHaveLength(hand + 1);
+    expect(after.players[0].deck).toHaveLength(s.players[0].deck.length - 1);
+  });
+
+  it('Zware tocht geeft Vertraag 1 op jezelf', () => {
+    let s = play(withEffect('zwaretocht'), 'zilver', zone(0));
+    s = play(s, 'zilver', zone(0));
+    expect(s.players[0].slow).toBe(2);
+    s = act(s, { type: 'endTurn' });
+    s = act(s, { type: 'endTurn' });
+    expect(s.players[0].hand).toHaveLength(HAND_SIZE - 2);
   });
 
   it('Goudader geeft 1 goud aan het begin van je beurt als je er voorstaat', () => {

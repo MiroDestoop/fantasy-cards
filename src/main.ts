@@ -112,7 +112,7 @@ function renderStart(): string {
       <h2>Zo speel je</h2>
       <ul>
         <li>Verover <b>${ZONES_TO_WIN} van de 3 zones</b> om te winnen. Een zone is van jou als je er als eerste haar levens vol schade doet (meestal ${ZONE_HP}).</li>
-        <li>Elk spel krijg je andere zones, elk met een <b>speciaal effect</b>: meer of minder levens, meer of minder schade, of goud voor wie er voorstaat.</li>
+        <li>Elk spel krijg je andere zones, elk met een <b>speciaal effect</b>: meer of minder levens, meer of minder schade, goud of een extra kaart, of juist tol betalen. Hover over het effect onder de zonenaam voor de uitleg.</li>
         <li>Je speelt een <b>best-of-3</b>: wie eerst ${GAMES_TO_WIN_MATCH} spellen wint, wint de match. Elke speler begint minstens één spel.</li>
         <li>Elke beurt trek je ${HAND_SIZE} kaarten (de beginspeler in de allereerste beurt maar ${FIRST_HAND_SIZE}). Elke kaart heeft twee helften:
           sleep ze naar je <b>aflegstapel</b> voor het bovenste effect, of naar een <b>zone</b> voor het onderste.</li>

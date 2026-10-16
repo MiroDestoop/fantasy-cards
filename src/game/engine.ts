@@ -101,6 +101,8 @@ export function whyCantPlay(state: GameState, handUid: string, target: PlayTarge
     if (!zone) return 'Die zone bestaat niet.';
     if (def.bottom.length === 0) return `${def.name} kan je alleen afleggen.`;
     if (zone.owner !== null) return `${zone.name} is al veroverd.`;
+    const cost = zoneEffect(zone)?.playCost ?? 0;
+    if (cost > state.players[state.active].gold) return `${zoneEffect(zone)!.label}: een kaart in ${zone.name} spelen kost ${cost} goud.`;
     // Ook een kaart met Terugroep of Vernietig moet eerst gelegd kunnen worden; pas daarna werkt haar effect.
     if (zoneCardCount(state, target.zone, state.active) >= MAX_ZONE_CARDS) {
       return `Je hebt al ${MAX_ZONE_CARDS} kaarten in ${zone.name}. Trek er eerst een terug om plaats te maken.`;
@@ -159,9 +161,28 @@ function playCard(s: GameState, handUid: string, target: PlayTarget): string | n
   } else {
     const zone = s.zones[target.zone];
     log(s, `${p.name} speelt ${def.name} in ${zone.name}.`);
+    const fx = zoneEffect(zone);
+    if (fx?.playCost) {
+      p.gold -= fx.playCost;
+      log(s, `${fx.icon} ${p.name} betaalt ${fx.playCost} goud tol.`);
+    }
     // Eerst wordt de kaart gelegd, dan pas werken haar effecten. Terugroep en Vernietig slaan de kaart zelf over.
     zone.cards.push({ player: pid, card, turn: s.turn });
     for (const e of def.bottom) applyEffect(s, pid, e, target.zone, card.uid);
+    // Daarna het effect van de zone zelf.
+    const onPlay = fx?.onPlay;
+    if (onPlay?.gold) {
+      p.gold += onPlay.gold;
+      log(s, `${fx!.icon} ${p.name} krijgt ${onPlay.gold} goud in ${zone.name}.`);
+    }
+    if (onPlay?.draw) {
+      for (let i = 0; i < onPlay.draw; i++) drawCard(s, p);
+      log(s, `${fx!.icon} ${p.name} trekt ${onPlay.draw} kaart in ${zone.name}.`);
+    }
+    if (onPlay?.selfSlow) {
+      p.slow += onPlay.selfSlow;
+      log(s, `${fx!.icon} ${p.name} trekt volgende beurt ${onPlay.selfSlow} kaart minder.`);
+    }
   }
   return null;
 }
