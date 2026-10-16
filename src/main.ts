@@ -300,16 +300,19 @@ function renderKeywords(effects: Effect[]): string {
 }
 
 function renderFace(def: CardDef): string {
+  // Alleen de startkaarten tonen "Afleggen" en "In een zone": zo leer je het spel. Op de andere kaarten
+  // is die plaats nodig voor de effecten; de kleur van elke helft toont welke welke is.
+  const labels = STARTER_DECK.includes(def.id);
   return `
     <div class="art" style="--art:${def.color}">${def.icon}</div>
     <div class="card-name">${esc(def.name)}</div>
-    <div class="sect sect-top">
-      <div class="sect-label">⤓ Afleggen</div>
+    <div class="sect sect-top ${labels ? '' : 'no-label'}">
+      ${labels ? '<div class="sect-label">⤓ Afleggen</div>' : ''}
       <div class="kws">${renderKeywords(def.top)}</div>
     </div>
     ${def.bottom.length
-      ? `<div class="sect sect-bottom">
-          <div class="sect-label">⚔ In een zone</div>
+      ? `<div class="sect sect-bottom ${labels ? '' : 'no-label'}">
+          ${labels ? '<div class="sect-label">⚔ In een zone</div>' : ''}
           <div class="kws">${renderKeywords(def.bottom)}</div>
         </div>`
       : '<div class="sect sect-none"><div class="sect-label">Alleen afleggen</div></div>'}`;

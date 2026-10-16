@@ -638,12 +638,8 @@ button { font: inherit; }
   width: 173px;
   height: 242px;
 }
-/* In de winkel geen "Afleggen" / "In een zone" boven de helften: zo is er meer plaats voor de keywords.
-   De kleur van elke helft (goud boven, rood onder) toont nog altijd welke welke is. */
-.shop-slot .sect-top .sect-label,
-.shop-slot .sect-bottom .sect-label { display: none; }
-.shop-slot .sect { justify-content: center; }
-.shop-slot .kw { font-size: 15px; padding: 2px 7px; }
+/* Een helft zonder label (alle kaarten behalve de startkaarten): de keywords staan in het midden. */
+.sect.no-label { justify-content: center; }
 .shop-slot .card {
   position: absolute;
   left: 0;
