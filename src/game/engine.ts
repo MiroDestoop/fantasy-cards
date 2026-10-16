@@ -262,9 +262,6 @@ function applyEffect(s: GameState, pid: PlayerId, e: Effect, zoneIdx: number | n
       log: (message) => log(s, message),
       zoneIdx,
       destroy: () => (zoneIdx === null ? 0 : destroyZoneCards(s, pid, zoneIdx, selfUid)),
-      newEffect: (i) => newZoneEffect(s, i),
-      swapEffects: (a, b) => swapZoneEffects(s, a, b),
-      random: () => random(s),
     });
     return;
   }
@@ -304,6 +301,9 @@ function applyEffect(s: GameState, pid: PlayerId, e: Effect, zoneIdx: number | n
         if (back.length) log(s, tr(`${p.name} roept ${back.map((c) => getCard(c.defId).name).join(', ')} terug.`, `${p.name} recalls ${back.map((c) => getCard(c.defId).name).join(', ')}.`));
       }
       break;
+    case 'herschep':
+      if (zoneIdx !== null) newZoneEffect(s, zoneIdx);
+      break;
     case 'ververs':
       refreshShop(s);
       log(s, tr('De winkel krijgt een volledig nieuw aanbod.', 'The shop gets a completely new offer.'));
@@ -332,16 +332,6 @@ function newZoneEffect(s: GameState, zoneIdx: number): void {
   const options = (Object.keys(ZONE_EFFECTS) as ZoneEffectId[]).filter((id) => !used.includes(id));
   if (!options.length) return;
   setZoneEffect(s, zone, options[Math.floor(random(s) * options.length)]);
-}
-
-/** Ruilt de effecten van twee open zones. */
-function swapZoneEffects(s: GameState, a: number, b: number): void {
-  const za = s.zones[a];
-  const zb = s.zones[b];
-  if (za.owner !== null || zb.owner !== null || !za.effect || !zb.effect || za.effect === zb.effect) return;
-  const ea = za.effect;
-  setZoneEffect(s, za, zb.effect);
-  setZoneEffect(s, zb, ea);
 }
 
 /**

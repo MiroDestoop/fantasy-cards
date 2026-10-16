@@ -614,21 +614,21 @@ describe('zone-effecten veranderen', () => {
     }
   });
 
-  it('Portaalmagiër ruilt het effect met een andere open zone', () => {
-    let s = withEffects(['vesting', 'mist', 'tolpoort']);
-    s.zones[2].owner = 1;
-    s = play(s, 'portaal', zone(0));
-    expect(s.zones[0].effect).toBe('mist');
-    expect(s.zones[1].effect).toBe('vesting');
-    expect(s.zones[1].hp).toBe(ZONE_HP + 2);
-    expect(s.zones[2].effect).toBe('tolpoort');
+  it('Herschep verandert altijd maar één zone', () => {
+    for (const id of ['landmeter', 'portaal', 'weermaker']) {
+      let s = withEffects(['vesting', 'mist', 'tolpoort']);
+      s.players[0].gold = 0;
+      s = play(s, id, zone(1));
+      expect(s.zones[0].effect).toBe('vesting');
+      expect(s.zones[1].effect).not.toBe('mist');
+      expect(s.zones[2].effect).toBe('tolpoort');
+    }
   });
 
-  it('Aardbeving geeft elke open zone een nieuw effect', () => {
+  it('afgelegd verandert een Herschep-kaart geen enkele zone', () => {
     let s = withEffects(['vesting', 'mist', 'tolpoort']);
-    s = play(s, 'aardbeving', DISCARD);
-    expect(s.zones.map((z) => z.effect).filter((e) => ['vesting', 'mist', 'tolpoort'].includes(e!)).length).toBeLessThan(3);
-    expect(new Set(s.zones.map((z) => z.effect)).size).toBe(3);
+    for (const id of ['landmeter', 'portaal', 'weermaker']) s = play(s, id, DISCARD);
+    expect(s.zones.map((z) => z.effect)).toEqual(['vesting', 'mist', 'tolpoort']);
   });
 });
 
