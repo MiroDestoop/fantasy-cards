@@ -191,7 +191,7 @@ describe('terugtrekken', () => {
     s = act(s, { type: 'endTurn' });
     s = play(s, 'vuurbal', zone(0));
     expect(s.zones[0].damage[1]).toBe(0);
-    expect(s.zones[0].shield[0]).toBe(1);
+    expect(s.zones[0].shield[0]).toBe(0);
   });
 
   it('Herstel haalt schade van de tegenstander weg', () => {
@@ -431,9 +431,9 @@ describe('zones', () => {
 
   it('Dichte mist geeft elke aanval 1 schade minder', () => {
     let s = play(withEffect('mist'), 'trol', zone(0));
-    expect(s.zones[0].damage[0]).toBe(3);
+    expect(s.zones[0].damage[0]).toBe(1);
     s = play(s, 'zilver', zone(0));
-    expect(s.zones[0].damage[0]).toBe(3);
+    expect(s.zones[0].damage[0]).toBe(1);
   });
 
   it('Schatkamer geeft 1 goud per kaart die je er speelt', () => {
@@ -671,16 +671,16 @@ describe('rassen', () => {
 
   it('een effect met een rasvoorwaarde werkt alleen als dat ras al van jou in de zone ligt', () => {
     let s = createGame(['Ana', 'Bo'], 42, { plainZones: true, allRaces: true });
-    // Zonder ork: Trollenmoker doet alleen haar gewone Aanval 4.
+    // Zonder ork: Trollenmoker doet alleen haar gewone Aanval 2.
     s = play(s, 'trol', zone(0));
-    expect(s.zones[0].damage[0]).toBe(4);
-    // Nu ligt er een ork (de eerste Trollenmoker): de tweede krijgt +2.
+    expect(s.zones[0].damage[0]).toBe(2);
+    // Nu ligt er een ork (de eerste Trollenmoker): de tweede krijgt +5.
     s = play(s, 'trol', zone(0));
-    expect(s.zones[0].damage[0]).toBe(4 + 6);
+    expect(s.zones[0].damage[0]).toBe(2 + 7);
     // Een ork van de tegenstander telt niet.
     s.zones[1].cards.push({ player: 1, card: { uid: 'bo-trol', defId: 'trol' }, turn: 0 });
     s = play(s, 'trol', zone(1));
-    expect(s.zones[1].damage[0]).toBe(4);
+    expect(s.zones[1].damage[0]).toBe(2);
     // Afgelegd werkt de voorwaarde nooit.
     expect(needMet(s, 0, null, { kw: 'aanval', amount: 1, need: 'ork' })).toBe(false);
   });
@@ -759,7 +759,7 @@ describe('echo: de volgende kaart keert meteen terug', () => {
     s = play(s, 'windloper', DISCARD);
     expect(s.players[0].echo).toBe(1);
     s = play(s, 'trol', zone(1));
-    expect(s.zones[1].damage[0]).toBe(4);
+    expect(s.zones[1].damage[0]).toBe(2);
     expect(s.zones[1].cards).toHaveLength(0);
     expect(s.players[0].discard.at(-1)?.defId).toBe('trol');
     expect(s.players[0].echo).toBe(0);

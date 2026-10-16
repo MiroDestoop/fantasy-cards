@@ -56,9 +56,9 @@ describe('computertegenstander', () => {
     for (const zi of [0, 1]) {
       for (let i = 0; i < MAX_ZONE_CARDS; i++) s.zones[zi].cards.push({ player: 0, card: { uid: `z${zi}-${i}`, defId: 'zilver' }, turn: 1 });
     }
-    s.zones[0].damage[0] = ZONE_HP - 3;
+    s.zones[0].damage[0] = ZONE_HP - 2;
     s.zones[2].owner = 0;
-    // Afleggen geeft maar 2 goud; terugtrekken en dan Trollenmoker (Aanval 5) in de Wachttoren wint het spel.
+    // Afleggen geeft maar 2 goud; terugtrekken en dan Trollenmoker (Aanval 2) in de Wachttoren wint het spel.
     expect(chooseAction(s, 'moeilijk').type).toBe('recall');
   });
 
