@@ -1,7 +1,7 @@
 import { getCard, SHOP_SUPPLY, STARTER_DECK } from './cards';
 import { getSpecial } from './specials';
 import {
-  HAND_SIZE, MARKET_SIZE, MAX_HAND, MAX_ZONE_CARDS, RECALL_PRICE, ZONE_HP, ZONE_SETUP, ZONES_TO_WIN,
+  FIRST_HAND_SIZE, HAND_SIZE, MARKET_SIZE, MAX_HAND, MAX_ZONE_CARDS, RECALL_PRICE, ZONE_HP, ZONE_SETUP, ZONES_TO_WIN,
 } from './rules';
 import type {
   Action, ActionResult, CardInstance, Effect, GameState, PlayerId, PlayerState, PlayTarget,
@@ -315,7 +315,7 @@ function startTurn(s: GameState): void {
     p.gold += p.bonusGold;
     log(s, `${p.name} krijgt ${p.bonusGold} bonusgoud.`);
   }
-  const count = Math.max(0, HAND_SIZE - p.slow);
+  const count = Math.max(0, (s.turn === 1 ? FIRST_HAND_SIZE : HAND_SIZE) - p.slow);
   p.slow = 0;
   for (let i = 0; i < count; i++) drawCard(s, p);
 }

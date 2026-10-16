@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { getCard, SHOP_SUPPLY } from './cards';
 import { getSpecial } from './specials';
 import { applyAction, createGame, recallPrice } from './engine';
-import { HAND_SIZE, MARKET_SIZE, MAX_HAND, MAX_ZONE_CARDS, RECALL_PRICE, ZONE_HP } from './rules';
+import { FIRST_HAND_SIZE, HAND_SIZE, MARKET_SIZE, MAX_HAND, MAX_ZONE_CARDS, RECALL_PRICE, ZONE_HP } from './rules';
 import type { Action, GameState, PlayerId, PlayTarget } from './types';
 
 let counter = 0;
@@ -26,10 +26,10 @@ function play(s: GameState, defId: string, target: PlayTarget): GameState {
 }
 
 describe('spelopzet', () => {
-  it('geeft elke speler 10 kaarten; de eerste speler trekt er meteen 5', () => {
+  it('geeft elke speler 10 kaarten; de eerste speler trekt er meteen 3', () => {
     const s = createGame(['Ana', 'Bo'], 1);
-    expect(s.players[0].hand).toHaveLength(HAND_SIZE);
-    expect(s.players[0].deck).toHaveLength(10 - HAND_SIZE);
+    expect(s.players[0].hand).toHaveLength(FIRST_HAND_SIZE);
+    expect(s.players[0].deck).toHaveLength(10 - FIRST_HAND_SIZE);
     expect(s.players[1].deck).toHaveLength(10);
     expect(s.zones).toHaveLength(3);
     expect(s.shop.market).toHaveLength(MARKET_SIZE);
@@ -212,7 +212,8 @@ describe('beurten en stapel', () => {
     let s = createGame(['Ana', 'Bo'], 3);
     s = act(s, { type: 'endTurn' });
     expect(s.players[0].hand).toHaveLength(0);
-    expect(s.players[0].discard).toHaveLength(HAND_SIZE);
+    expect(s.players[0].discard).toHaveLength(FIRST_HAND_SIZE);
+    // Alleen de allereerste beurt is korter: de tweede speler trekt er gewoon 5.
     expect(s.players[1].hand).toHaveLength(HAND_SIZE);
   });
 
@@ -232,7 +233,7 @@ describe('beurten en stapel', () => {
     const discardBefore = s.players[0].discard.length;
     s = act(s, { type: 'endTurn' });
     expect(s.players[0].played).toHaveLength(0);
-    expect(s.players[0].discard).toHaveLength(discardBefore + 1 + HAND_SIZE);
+    expect(s.players[0].discard).toHaveLength(discardBefore + 1 + FIRST_HAND_SIZE);
   });
 
   it('een kleine stapel met Trek geeft geen oneindige lus meer', () => {
@@ -285,6 +286,7 @@ describe('alles afleggen', () => {
 describe('handlimiet', () => {
   it(`legt kaarten boven de limiet van ${MAX_HAND} meteen af`, () => {
     let s = createGame(['Ana', 'Bo'], 42);
+    s.players[0].hand.push(...Array.from({ length: HAND_SIZE - FIRST_HAND_SIZE }, (_, i) => ({ uid: `vul-${i}`, defId: 'koper' })));
     s.players[0].deck.push(...Array.from({ length: 6 }, (_, i) => ({ uid: `extra-${i}`, defId: 'koper' })));
     const discardBefore = s.players[0].discard.length;
     // Eerste Arcaan Inzicht: hand 5 → 8. Tweede: hand blijft 8, alle 3 getrokken kaarten passen niet meer.

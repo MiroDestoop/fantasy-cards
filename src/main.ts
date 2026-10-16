@@ -653,9 +653,92 @@ function scheduleComputer(delay: number): void {
   window.setTimeout(() => {
     if (id !== gameId || !game || !computerTurn(game) || game.winner !== null) return;
     const action = chooseAction(game, computerLevel);
-    dispatch(action);
-    if (action.type !== 'endTurn' && game && computerTurn(game) && game.winner === null) scheduleComputer(COMPUTER_STEP_MS);
+    const next = () => {
+      if (id !== gameId || !game) return;
+      dispatch(action);
+      if (action.type !== 'endTurn' && game && computerTurn(game) && game.winner === null) scheduleComputer(COMPUTER_STEP_MS);
+    };
+    if (action.type === 'play') showcase(game, action, next);
+    else next();
   }, delay);
+}
+
+/** Zo lang blijft een kaart van de computer in het midden van het scherm liggen. */
+const SHOWCASE_HOLD_MS = 1100;
+
+/**
+ * Toont een kaart die de computer speelt eerst groot in het midden van het scherm,
+ * met de helft die ze gebruikt in het licht, en laat ze dan naar haar plek vliegen.
+ * Pas als de kaart aankomt, wordt de zet echt uitgevoerd (done).
+ */
+function showcase(g: GameState, action: Extract<Action, { type: 'play' }>, done: () => void): void {
+  const pid = g.active;
+  const card = g.players[pid].hand.find((c) => c.uid === action.handUid);
+  if (!card) return done();
+  const def = getCard(card.defId);
+  const target = action.target;
+  const toZone = target.kind === 'zone';
+  const slam = toZone && (def.price ?? 0) >= SLAM_PRICE;
+
+  const dim = document.createElement('div');
+  dim.className = 'showcase-dim';
+  const label = document.createElement('div');
+  label.className = 'showcase-label';
+  label.innerHTML = toZone
+    ? `${esc(g.players[pid].name)} speelt in <b>${g.zones[target.zone].icon} ${esc(g.zones[target.zone].name)}</b>`
+    : `${esc(g.players[pid].name)} legt af`;
+  const el = document.createElement('div');
+  el.className = `card fx-card showcase ${toZone ? 'use-bottom' : 'use-top'}`;
+  el.innerHTML = renderFace(def);
+  document.body.append(dim, el, label);
+
+  // Van de hand van de computer naar het midden, groot.
+  const big = 1.8 * scale;
+  const cx = window.innerWidth / 2 - (CARD_W * big) / 2;
+  const cy = window.innerHeight / 2 - (CARD_H * big) / 2;
+  const hand = app.querySelector('.hand.opp')?.getBoundingClientRect();
+  const from = hand
+    ? `translate(${hand.left + hand.width / 2 - (CARD_W * scale) / 2}px, ${hand.top}px) scale(${scale * 0.8}) rotate(8deg)`
+    : `translate(${cx}px, ${cy - 200}px) scale(${big})`;
+  const center = `translate(${cx}px, ${cy}px) scale(${big})`;
+  label.style.top = `${cy + CARD_H * big + 14 * scale}px`;
+  label.style.fontSize = `${20 * scale}px`;
+  dim.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 250, fill: 'both' });
+  label.animate([{ opacity: 0, transform: 'translate(-50%, 10px)' }, { opacity: 1, transform: 'translate(-50%, 0)' }], { duration: 250, delay: 200, fill: 'both' });
+  el.animate([{ transform: from, opacity: 0.6 }, { transform: center, opacity: 1 }], {
+    duration: 380, easing: 'cubic-bezier(.2,1.1,.4,1)', fill: 'both',
+  });
+
+  window.setTimeout(() => {
+    const fade = { duration: 250, fill: 'both' } as const;
+    dim.animate([{ opacity: 1 }, { opacity: 0 }], fade).onfinish = () => dim.remove();
+    label.animate([{ opacity: 1 }, { opacity: 0 }], fade).onfinish = () => label.remove();
+
+    let end: string;
+    if (slam) {
+      // Een dure kaart verdwijnt omhoog; daarna slaat ze neer met de gewone inslag.
+      end = `translate(${cx}px, ${cy - 120}px) scale(${big * 1.15})`;
+    } else {
+      const spot = toZone
+        ? app.querySelectorAll('.zone-area')[target.zone]?.querySelector(`.zslot.empty.p${pid}`)
+        : app.querySelector(`[data-pile="discard:${pid}"]`);
+      const r = spot?.getBoundingClientRect();
+      end = r ? `translate(${r.left}px, ${r.top}px) scale(${r.width / CARD_W})` : center;
+    }
+    const fly = el.animate(
+      [
+        { transform: center, opacity: 1 },
+        { transform: end, opacity: slam || !toZone ? 0 : 1 },
+      ],
+      { duration: slam ? 220 : 420, easing: 'cubic-bezier(.5,0,.75,0)', fill: 'both' },
+    );
+    fly.onfinish = () => {
+      // De kaart ligt al op haar plek: geen tweede intrede-animatie in de zone.
+      if (toZone && !slam) seenZoneCards.add(`${card.uid}@${g.turn}`);
+      done();
+      el.remove();
+    };
+  }, 380 + SHOWCASE_HOLD_MS);
 }
 
 /** Kiest de geluiden bij een actie door de toestand voor en na te vergelijken. */

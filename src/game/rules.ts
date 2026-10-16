@@ -1,5 +1,7 @@
 /** Kaarten die je aan het begin van elke beurt trekt. */
 export const HAND_SIZE = 5;
+/** De beginspeler trekt in de allereerste beurt minder kaarten, als tegengewicht voor het voordeel van beginnen. */
+export const FIRST_HAND_SIZE = 3;
 /** Schade die je in een zone moet doen om ze te veroveren. */
 export const ZONE_HP = 10;
 /** Aantal veroverde zones om te winnen. */
