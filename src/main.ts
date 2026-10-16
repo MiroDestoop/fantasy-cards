@@ -48,6 +48,10 @@ let handoff: PlayerId | null = null;
 /** Voor animaties: wat stond er bij de vorige weergave op tafel? */
 let prevRendered: GameState | null = null;
 const seenZoneCards = new Set<string>();
+/** Handkaarten die al getekend waren: nieuwe kaarten vliegen van de stapel naar je hand. */
+let seenHandCards = new Set<string>();
+/** Hoeveel kaarten de tegenstander bovenaan vorige keer in de hand had (om nieuwe ruggen te laten aanvliegen). */
+let lastOppHand: { pid: PlayerId; n: number } | null = null;
 let scale = 1;
 
 /** Een match is best-of-3. Spel 1: toeval beslist wie begint; spel 2: de andere speler; spel 3: wie spel 2 verloor. */
@@ -85,6 +89,7 @@ if (codeFromLink) onlineTab = true;
 function render(): void {
   hideTip();
   app.innerHTML = game ? renderGame(game) : renderStart();
+  if (game) playDraws(game);
 }
 
 function renderStart(): string {
@@ -220,7 +225,7 @@ function renderGame(g: GameState): string {
     ${renderShop(g)}
     <div class="seat top">
       ${renderInfo(g, top)}
-      <div class="hand opp">${renderBacks(g.players[top].hand.length)}</div>
+      <div class="hand opp">${renderBacks(g.players[top].hand.length, oppDrawnFrom(top, g.players[top].hand.length))}</div>
       ${renderPiles(g, top, false)}
     </div>
     <div class="zones">${g.zones.map((_, i) => renderZone(g, i, bottom, prev)).join('')}</div>
@@ -236,6 +241,7 @@ function renderGame(g: GameState): string {
   ${g.winner !== null ? renderWinner(g) : ''}`;
 
   for (const z of g.zones) for (const c of z.cards) seenZoneCards.add(`${c.card.uid}@${c.turn}`);
+  if (!hidden) seenHandCards = new Set(g.players[bottom].hand.map((c) => c.uid));
   return html;
 }
 
@@ -309,7 +315,8 @@ function renderHand(g: GameState, pid: PlayerId): string {
     .map((card, i) => {
       const off = i - (n - 1) / 2;
       // De slot blijft stil liggen en vangt de muis op; alleen de kaart erin beweegt bij hover.
-      return `<div class="slot" data-drag="${card.uid}"
+      const drawn = !seenHandCards.has(card.uid);
+      return `<div class="slot ${drawn ? 'drawn' : ''}" data-drag="${card.uid}"
         style="--rot:${off * 3.5}deg;--drop:${off * off * 2.2}px;--overlap:${overlap}px">
         <div class="card">${renderFace(getCard(card.defId))}</div>
       </div>`;
@@ -353,8 +360,41 @@ function renderMini(def: CardDef): string {
   return `<div class="mini" style="--art:${def.color}" title="${esc(def.name)}">${def.icon}</div>`;
 }
 
-function renderBacks(n: number): string {
-  return `<div class="backs">${'<div class="back"></div>'.repeat(n)}</div>`;
+/** drawnFrom: vanaf deze kaart zijn de ruggen nieuw getrokken en vliegen ze van de stapel aan. */
+function renderBacks(n: number, drawnFrom = n): string {
+  let html = '';
+  for (let i = 0; i < n; i++) html += `<div class="back ${i >= drawnFrom ? 'drawn' : ''}"></div>`;
+  return `<div class="backs">${html}</div>`;
+}
+
+function oppDrawnFrom(pid: PlayerId, n: number): number {
+  const last = lastOppHand;
+  lastOppHand = { pid, n };
+  return last && last.pid === pid && n > last.n ? last.n : n;
+}
+
+/** Nieuw getrokken kaarten vliegen één voor één van de stapel naar hun plaats in de hand en draaien open. */
+function playDraws(g: GameState): void {
+  const bottom = bottomSeat(g);
+  const seats: [string, PlayerId, number][] = [['.hand.mine .slot.drawn', bottom, 1], ['.hand.opp .back.drawn', other(bottom), -1]];
+  for (const [sel, pid, dir] of seats) {
+    const deck = app.querySelector(`[data-pile="deck:${pid}"]`)?.getBoundingClientRect();
+    if (!deck) continue;
+    app.querySelectorAll<HTMLElement>(sel).forEach((el, i) => {
+      const r = el.getBoundingClientRect();
+      // De tegenstander zit ondersteboven (rotate 180deg): daar keert de verschuiving om.
+      const dx = ((deck.left + deck.width / 2 - (r.left + r.width / 2)) / scale) * dir;
+      const dy = ((deck.top + deck.height / 2 - (r.top + r.height / 2)) / scale) * dir;
+      el.animate(
+        [
+          { translate: `${dx}px ${dy}px`, scale: '0.45', rotate: 'y 90deg', opacity: 0.3 },
+          { translate: `${dx * 0.35}px ${dy * 0.35 - 60}px`, scale: '0.9', rotate: 'y 0deg', opacity: 1, offset: 0.55 },
+          { translate: '0 0', scale: '1', rotate: 'y 0deg', opacity: 1 },
+        ],
+        { duration: 480, delay: i * 90, easing: 'cubic-bezier(.3,.7,.4,1)', fill: 'backwards' },
+      );
+    });
+  }
 }
 
 function renderZone(g: GameState, i: number, bottom: PlayerId, prev: GameState | null): string {
@@ -427,7 +467,7 @@ function renderShop(g: GameState): string {
     .map((card, i) => {
       const def = getCard(card.defId);
       const affordable = canShop && !whyCantBuy(g, card.uid);
-      return `<div class="shop-slot ${affordable ? 'affordable' : ''} ${shopDeal ? 'deal-in' : ''}" style="--i:${i}" data-click="buy:${card.uid}">
+      return `<div class="shop-slot ${affordable ? 'affordable' : ''} ${shopDeal ? 'deal-in' : shopRefill.has(card.uid) ? 'refill' : ''}" style="--i:${i}" data-click="buy:${card.uid}">
         <div class="card">${renderFace(def)}</div>
         ${(() => {
           // Een Handelspost waar de speler aan zet voorstaat, maakt de kaart goedkoper.
@@ -965,6 +1005,8 @@ function beginGame(seed: number | undefined, starter: PlayerId, gameNo: number):
   gameId++;
   prevRendered = null;
   seenZoneCards.clear();
+  seenHandCards = new Set();
+  lastOppHand = null;
   remoteQueue = [];
   remoteBusy = false;
   if (net) net.waitingNext = false;
@@ -1119,6 +1161,7 @@ function pumpRemote(): void {
   };
   // Net als bij de computer: een kaart van de tegenstander wordt eerst in het midden getoond.
   if (m.action.type === 'play') showcase(game, m.action, run);
+  else if (m.action.type === 'buy') showcaseBuy(game, m.action, run);
   else run();
 }
 
@@ -1140,10 +1183,11 @@ function dispatch(action: Action, remote = false): void {
     match.lastWinner = game.winner;
   }
   // Wat er gaat verdwijnen, moet vastgelegd worden voordat de tafel opnieuw getekend wordt.
-  const flights = captureEffects(before, game);
+  const flights = captureEffects(action, before, game);
   if (action.type === 'endTurn' && game.winner === null && !vsComputer && !net) handoff = game.active;
   render();
   shopDeal = false;
+  shopRefill.clear();
   playEffects(flights);
   const impacts = findImpacts(action, before, game);
   playImpacts(impacts);
@@ -1166,6 +1210,7 @@ function scheduleComputer(delay: number): void {
       if (action.type !== 'endTurn' && game && computerTurn(game) && game.winner === null) scheduleComputer(COMPUTER_STEP_MS);
     };
     if (action.type === 'play') showcase(game, action, next);
+    else if (action.type === 'buy') showcaseBuy(game, action, next);
     else next();
   }, delay);
 }
@@ -1254,6 +1299,71 @@ function showcase(g: GameState, action: Extract<Action, { type: 'play' }>, done:
   }, appear + (starter ? STARTER_HOLD_MS : SHOWCASE_HOLD_MS));
 }
 
+/** Zo lang blijft een kaart die de tegenstander koopt in het midden liggen: dat wil je zien. */
+const BUY_HOLD_MS = 900;
+/** De tegenstander kocht net via showcaseBuy: die kaart vloog al naar de aflegstapel. */
+let buyShown = false;
+
+/**
+ * Toont een kaart die de tegenstander koopt: ze komt uit de winkel naar het midden, groot, met de prijs,
+ * en vliegt dan naar de aflegstapel van de koper. Pas dan wordt de aankoop uitgevoerd (done).
+ */
+function showcaseBuy(g: GameState, action: Extract<Action, { type: 'buy' }>, done: () => void): void {
+  const pid = g.active;
+  const card = g.shop.market.find((c) => c.uid === action.marketUid);
+  const slot = app.querySelector<HTMLElement>(`[data-click="buy:${action.marketUid}"] .card`);
+  if (!card || !slot || whyCantBuy(g, card.uid)) return done();
+  const def = getCard(card.defId);
+  const price = shopPrice(g, pid, card.defId);
+
+  const dim = document.createElement('div');
+  dim.className = 'showcase-dim';
+  const label = document.createElement('div');
+  label.className = 'showcase-label';
+  label.innerHTML = `${esc(g.players[pid].name)} ${tr('koopt', 'buys')} <b>${esc(def.name)}</b> ${tr('voor', 'for')} <b>${price} 🪙</b>`;
+  const el = document.createElement('div');
+  el.className = 'card fx-card showcase bought';
+  el.innerHTML = renderFace(def);
+  slot.style.visibility = 'hidden';
+  document.body.append(dim, el, label);
+
+  const r = slot.getBoundingClientRect();
+  const big = 1.8 * scale;
+  const cx = window.innerWidth / 2 - (CARD_W * big) / 2;
+  const cy = window.innerHeight / 2 - (CARD_H * big) / 2;
+  const from = `translate(${r.left}px, ${r.top}px) scale(${r.width / CARD_W})`;
+  const center = `translate(${cx}px, ${cy}px) scale(${big})`;
+  label.style.top = `${cy + CARD_H * big + 14 * scale}px`;
+  label.style.fontSize = `${20 * scale}px`;
+  dim.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 250, fill: 'both' });
+  label.animate([{ opacity: 0, transform: 'translate(-50%, 10px)' }, { opacity: 1, transform: 'translate(-50%, 0)' }], { duration: 250, delay: 200, fill: 'both' });
+  el.animate(
+    [
+      { transform: from, opacity: 1 },
+      { transform: `translate(${(r.left + cx) / 2}px, ${Math.min(r.top, cy) - 40 * scale}px) scale(${big * 0.7}) rotate(-6deg)`, offset: 0.5 },
+      { transform: center, opacity: 1 },
+    ],
+    { duration: 450, easing: 'cubic-bezier(.2,1,.4,1)', fill: 'both' },
+  );
+  sfx.buy();
+
+  window.setTimeout(() => {
+    const fade = { duration: 250, fill: 'both' } as const;
+    dim.animate([{ opacity: 1 }, { opacity: 0 }], fade).onfinish = () => dim.remove();
+    label.animate([{ opacity: 1 }, { opacity: 0 }], fade).onfinish = () => label.remove();
+    const pile = app.querySelector(`[data-pile="discard:${pid}"]`)?.getBoundingClientRect();
+    const end = pile ? `translate(${pile.left}px, ${pile.top}px) scale(${pile.width / CARD_W}) rotate(0deg)` : center;
+    el.animate([{ transform: center }, { transform: end, opacity: 0.9 }], {
+      duration: 420, easing: 'cubic-bezier(.5,0,.75,0)', fill: 'both',
+    }).onfinish = () => {
+      buyShown = true;
+      done();
+      buyShown = false;
+      el.remove();
+    };
+  }, 450 + BUY_HOLD_MS);
+}
+
 /** Kiest de geluiden bij een actie door de toestand voor en na te vergelijken. */
 function playSounds(action: Action, before: GameState, after: GameState, flights: Flight[], impacts: Impacts): void {
   const me = before.active;
@@ -1261,7 +1371,7 @@ function playSounds(action: Action, before: GameState, after: GameState, flights
   const sum = (g: GameState, f: (z: GameState['zones'][number]) => number) => g.zones.reduce((t, z) => t + f(z), 0);
 
   if (action.type === 'endTurn') sfx.endTurn();
-  if (action.type === 'buy') sfx.buy();
+  if (action.type === 'buy' && !buyShown) sfx.buy();
   const played = action.type === 'play' ? 1 : action.type === 'discardAll' ? before.players[me].hand.length : 0;
   if (played) {
     if (impacts.slam) sfx.slam(impacts.slam.power, SLAM_IMPACT_MS / 1000);
@@ -1270,7 +1380,7 @@ function playSounds(action: Action, before: GameState, after: GameState, flights
     // De volgende geluiden starten na het laatste kaartgeluid.
     const t = (played - 1) * 0.07;
     if (after.players[me].gold > before.players[me].gold) sfx.coin(t + 0.08);
-    if (sum(after, (z) => z.damage[me]) > sum(before, (z) => z.damage[me])) sfx.hit(t + 0.1);
+    if (sum(after, (z) => z.damage[me]) > sum(before, (z) => z.damage[me])) sfx.hit(Math.max(t + 0.1, impacts.hitAt / 1000));
     if (sum(after, (z) => z.damage[opp]) < sum(before, (z) => z.damage[opp])) sfx.heal(t + 0.15);
     if (sum(after, (z) => z.shield[me]) > sum(before, (z) => z.shield[me])) sfx.shield(t + 0.15);
     const drawn = after.players[me].hand.length - (before.players[me].hand.length - played);
@@ -1305,7 +1415,16 @@ interface Impacts {
   conquests: { zone: number; owner: PlayerId }[];
   /** Wanneer de verovering losbarst (ms), na een eventuele inslag. */
   conquerAt: number;
+  /** Schade en herstel per zone: een aanval vliegt als vuurbal naar de balk. */
+  hits: { zone: number; pid: PlayerId; amount: number }[];
+  /** Waar de aanval vandaan komt: de gespeelde kaart in de zone, anders het portret van de speler. */
+  source: string | null;
+  /** Wanneer de eerste aanval de balk raakt (ms). */
+  hitAt: number;
 }
+
+/** Zo lang vliegt een aanval naar de balk. */
+const HIT_FLIGHT_MS = 380;
 
 function findImpacts(action: Action, before: GameState, after: GameState): Impacts {
   let slam: Impacts['slam'] = null;
@@ -1315,7 +1434,19 @@ function findImpacts(action: Action, before: GameState, after: GameState): Impac
     if (price >= SLAM_PRICE) slam = { uid: action.handUid, zone: action.target.zone, power: Math.min(1, (price - SLAM_PRICE) / 2) };
   }
   const conquests = after.zones.flatMap((z, i) => (z.owner !== null && before.zones[i].owner === null ? [{ zone: i, owner: z.owner }] : []));
-  return { slam, conquests, conquerAt: slam ? SLAM_IMPACT_MS + 250 : 300 };
+  const hits: Impacts['hits'] = [];
+  after.zones.forEach((z, i) => {
+    for (const pid of [0, 1] as PlayerId[]) {
+      const amount = z.damage[pid] - before.zones[i].damage[pid];
+      if (amount) hits.push({ zone: i, pid, amount });
+    }
+  });
+  const source = action.type === 'play' && action.target.kind === 'zone' ? action.handUid : null;
+  // De aanval vertrekt als de kaart ligt (na de inslag van een dure kaart).
+  const launch = slam ? SLAM_IMPACT_MS + 80 : source ? 220 : 120;
+  const hitAt = launch + HIT_FLIGHT_MS;
+  const conquerAt = Math.max(slam ? SLAM_IMPACT_MS + 250 : 300, hits.some((h) => h.amount > 0) ? hitAt + 200 : 0);
+  return { slam, conquests, conquerAt, hits, source, hitAt };
 }
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -1352,6 +1483,8 @@ function playImpacts(impacts: Impacts): void {
     }
   }
 
+  playHits(impacts);
+
   impacts.conquests.forEach(({ zone, owner }, n) => {
     const el = zoneEls[zone];
     if (!el) return;
@@ -1377,6 +1510,73 @@ function playImpacts(impacts: Impacts): void {
       flashZone(el, color);
     }, at);
   });
+}
+
+/**
+ * Schade vliegt als een vuurbal van de kaart naar het einde van de balk, en pas bij de inslag groeit
+ * de balk en verschijnt het getal. Herstel (minder schade) laat groene vonkjes uit de balk opstijgen.
+ */
+function playHits(impacts: Impacts): void {
+  const zoneEls = app.querySelectorAll<HTMLElement>('.zone-area');
+  const launchAt = impacts.hitAt - HIT_FLIGHT_MS;
+  let n = 0;
+  for (const { zone, pid, amount } of impacts.hits) {
+    const bar = zoneEls[zone]?.querySelector<HTMLElement>(`.bar.p${pid}`);
+    const fill = bar?.querySelector<HTMLElement>('.fill');
+    if (!bar || !fill) continue;
+    const float = bar.querySelector<HTMLElement>('.float');
+    const r = bar.getBoundingClientRect();
+    const g = game!;
+    const pct = Math.min(1, g.zones[zone].damage[pid] / g.zones[zone].hp);
+    const x = r.left + r.width * pct;
+    const y = r.top + r.height / 2;
+
+    if (amount < 0) {
+      burst(x, y, ['#b9f6ca', '#69f0ae', '#ffffff'], 10, 50, launchAt);
+      continue;
+    }
+    const at = impacts.hitAt + n * 90;
+    // De balk en het getal wachten op de inslag.
+    fill.style.animationDelay = `${at}ms`;
+    if (float) float.style.animationDelay = `${at}ms`;
+
+    const src = (impacts.source && app.querySelector(`[data-zcard="${impacts.source}"] .card`))
+      || app.querySelector(`.info.p${pid} .portrait`);
+    const sr = src?.getBoundingClientRect();
+    if (sr && !reducedMotion.matches) {
+      const sx = sr.left + sr.width / 2;
+      const sy = sr.top + sr.height / 2;
+      const color = pid === 0 ? '#4fc3f7' : '#ff8a65';
+      const bolt = document.createElement('div');
+      bolt.className = 'bolt';
+      bolt.style.setProperty('--c', color);
+      bolt.style.setProperty('--size', `${(14 + Math.min(amount, 6) * 3) * scale}px`);
+      document.body.appendChild(bolt);
+      // Een boog omhoog, zodat de vuurbal niet recht door de kaarten schiet.
+      const mx = (sx + x) / 2;
+      const my = Math.min(sy, y) - 70 * scale;
+      bolt.animate(
+        [
+          { transform: `translate(${sx}px, ${sy}px) scale(0.3)`, opacity: 0 },
+          { transform: `translate(${mx}px, ${my}px) scale(1.1)`, opacity: 1, offset: 0.5 },
+          { transform: `translate(${x}px, ${y}px) scale(0.9)`, opacity: 1 },
+        ],
+        { duration: HIT_FLIGHT_MS, delay: at - HIT_FLIGHT_MS, easing: 'cubic-bezier(.4,0,.8,.6)', fill: 'both' },
+      ).onfinish = () => bolt.remove();
+    }
+    window.setTimeout(() => {
+      burst(x, y, ['#fff3c4', '#ffeb3b', '#ff7043'], 8 + Math.min(amount, 6) * 3, 40 + amount * 10, 0);
+      bar.animate(
+        [
+          { transform: 'translateX(0)' }, { transform: 'translateX(-5px)' }, { transform: 'translateX(4px)' },
+          { transform: 'translateX(-2px)' }, { transform: 'translateX(0)' },
+        ],
+        { duration: 260 },
+      );
+      fill.animate([{ filter: 'brightness(2.2)' }, { filter: 'none' }], { duration: 400, easing: 'ease-out' });
+    }, at);
+    n++;
+  }
 }
 
 /** Schudt de hele tafel, uitdovend. Niet als de speler minder beweging vraagt. */
@@ -1443,17 +1643,21 @@ function flashZone(el: HTMLElement | undefined, color: string): void {
 interface Flight {
   clone: HTMLElement;
   from: DOMRect;
-  kind: 'return' | 'to-hand' | 'to-shop' | 'banish' | 'shop-out';
+  kind: 'return' | 'to-hand' | 'to-shop' | 'banish' | 'shop-out' | 'bought' | 'discard';
   pid: PlayerId;
   index: number;
+  /** Breedte van het element zonder schaal (een kaartrug is smaller dan een kaart). */
+  w: number;
 }
 /** Laat de nieuwe winkelkaarten bij de volgende weergave één voor één binnenkomen. */
 let shopDeal = false;
+/** Winkelkaarten die na een aankoop een vrije plek aanvullen: ze komen uit de voorraad aangevlogen. */
+const shopRefill = new Set<string>();
 
-function captureEffects(before: GameState, after: GameState): Flight[] {
+function captureEffects(action: Action, before: GameState, after: GameState): Flight[] {
   const flights: Flight[] = [];
   const grab = (el: HTMLElement, kind: Flight['kind'], pid: PlayerId) =>
-    flights.push({ clone: el.cloneNode(true) as HTMLElement, from: el.getBoundingClientRect(), kind, pid, index: flights.length });
+    flights.push({ clone: el.cloneNode(true) as HTMLElement, from: el.getBoundingClientRect(), kind, pid, index: flights.length, w: el.offsetWidth });
 
   before.zones.forEach((zone, zi) => {
     for (const zc of zone.cards) {
@@ -1476,6 +1680,30 @@ function captureEffects(before: GameState, after: GameState): Flight[] {
     const start = flights.length;
     app.querySelectorAll<HTMLElement>('.shop-slot .card').forEach((el) => grab(el, 'shop-out', after.active));
     flights.slice(start).forEach((f, i) => (f.index = i));
+  } else {
+    for (const c of after.shop.market) if (!oldMarket.includes(c.uid)) shopRefill.add(c.uid);
+  }
+
+  // Een gekochte kaart vliegt uit de winkel naar de aflegstapel (bij de tegenstander deed showcaseBuy dat al).
+  if (action.type === 'buy' && !buyShown) {
+    const el = app.querySelector<HTMLElement>(`[data-click="buy:${action.marketUid}"] .card`);
+    if (el) grab(el, 'bought', before.active);
+  }
+
+  // Wat je bij Einde beurt of met Alles afleggen uit je hand gooit, vliegt naar je aflegstapel.
+  if (action.type === 'endTurn' || action.type === 'discardAll') {
+    const pid = before.active;
+    const left = before.players[pid].hand.filter((c) => !after.players[pid].hand.some((h) => h.uid === c.uid));
+    const start = flights.length;
+    if (pid === bottomSeat(before) && handoff === null) {
+      for (const c of left) {
+        const el = app.querySelector<HTMLElement>(`[data-drag="${c.uid}"] .card`);
+        if (el) grab(el, 'discard', pid);
+      }
+    } else if (left.length) {
+      for (const el of [...app.querySelectorAll<HTMLElement>('.hand.opp .back')].slice(-left.length)) grab(el, 'discard', pid);
+    }
+    flights.slice(start).forEach((f, i) => (f.index = i));
   }
   return flights;
 }
@@ -1486,19 +1714,31 @@ function playEffects(flights: Flight[]): void {
     c.classList.remove('enter-up', 'enter-down');
     c.classList.add('fx-card');
     document.body.appendChild(c);
-    const s0 = f.from.width / CARD_W;
+    const s0 = f.from.width / (f.w || CARD_W);
     const start = `translate(${f.from.left}px, ${f.from.top}px) scale(${s0})`;
     let anim: Animation;
 
-    if (f.kind === 'return' || f.kind === 'to-hand' || f.kind === 'to-shop') {
+    if (f.kind === 'discard') {
+      // Snel en laag over de tafel naar de aflegstapel.
+      const r = app.querySelector(`[data-pile="discard:${f.pid}"]`)!.getBoundingClientRect();
+      const s1 = r.width / (f.w || CARD_W);
+      anim = c.animate(
+        [
+          { transform: start, opacity: 1 },
+          { transform: `translate(${r.left}px, ${r.top}px) scale(${s1}) rotate(${8 - f.index * 4}deg)`, opacity: 0.85 },
+        ],
+        { duration: 380, delay: f.index * 60, easing: 'cubic-bezier(.5,0,.6,1)', fill: 'both' },
+      );
+    } else if (f.kind === 'return' || f.kind === 'to-hand' || f.kind === 'to-shop' || f.kind === 'bought') {
       const target =
-        f.kind === 'return' ? app.querySelector(`[data-pile="discard:${f.pid}"]`)
+        f.kind === 'return' || f.kind === 'bought' ? app.querySelector(`[data-pile="discard:${f.pid}"]`)
         : f.kind === 'to-shop' ? app.querySelector('.shop-title')
         : app.querySelector(game && f.pid === bottomSeat(game) ? '.hand.mine' : '.hand.opp');
       const r = target!.getBoundingClientRect();
       // Naar de aflegstapel: zo groot als de stapel; naar hand of winkel: een kleine kaart in het midden.
-      const s1 = f.kind === 'return' ? r.width / CARD_W : scale * 0.6;
-      const pile = f.kind === 'return'
+      const toPile = f.kind === 'return' || f.kind === 'bought';
+      const s1 = toPile ? r.width / CARD_W : scale * 0.6;
+      const pile = toPile
         ? r
         : { left: r.left + r.width / 2 - (CARD_W * s1) / 2, top: r.top + r.height / 2 - (CARD_H * s1) / 2 };
       const midX = (f.from.left + pile.left) / 2;
