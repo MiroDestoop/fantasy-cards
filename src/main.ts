@@ -1,6 +1,6 @@
 import './style.css';
 import { AI_LEVELS, chooseAction, type AiLevel } from './game/ai';
-import { getCard, KEYWORDS, STARTER_DECK } from './game/cards';
+import { CARDS, getCard, KEYWORDS, STARTER_DECK } from './game/cards';
 import { getSpecial } from './game/specials';
 import {
   applyAction, createGame, drawOverflow, other, recallPrice, shopPrice, whyCantBuy, whyCantPlay, zonesOwnedBy,
@@ -38,6 +38,11 @@ setLang(loadLang());
 let names: [string, string] = [defaultName(0), defaultName(1)];
 /** Speel je tegen de computer in plaats van tegen een tweede speler aan dezelfde tafel? */
 let vsComputer = false;
+/** Testspel: een gewoon spel tegen de computer, maar met de knop 🧪 neem je eender welke kaart in je hand. */
+let testGame = false;
+/** Het venster met alle kaarten staat open. */
+let testPicker = false;
+let testCount = 0;
 /** Het niveau van de computer; onthouden voor de volgende keer. */
 let computerLevel: AiLevel = loadLevel();
 let game: GameState | null = null;
@@ -103,7 +108,11 @@ function renderStart(): string {
     <div class="mode">
       <button class="${!vsComputer && !onlineTab ? 'on' : ''}" data-click="mode:pvp">👥 ${tr('Twee spelers', 'Two players')}</button>
       <button class="${onlineTab ? 'on' : ''}" data-click="mode:online">🌐 Online</button>
-      <button class="${vsComputer ? 'on' : ''}" data-click="mode:ai">${COMPUTER_ICON} ${tr('Tegen de computer', 'Against the computer')}</button>
+      <button class="${vsComputer && !testGame ? 'on' : ''}" data-click="mode:ai">${COMPUTER_ICON} ${tr('Tegen de computer', 'Against the computer')}</button>
+      <button class="${testGame ? 'on' : ''}" data-click="mode:test" title="${tr(
+        'Een gewoon spel tegen de computer, maar met een knop om eender welke kaart in je hand te nemen',
+        'A normal game against the computer, but with a button to take any card into your hand',
+      )}">🧪 ${tr('Testspel', 'Test game')}</button>
     </div>
     ${onlineTab ? renderOnlineStart() : `${vsComputer
       ? `<div class="mode levels">${AI_LEVELS.map((l) =>
@@ -241,6 +250,7 @@ function renderGame(g: GameState): string {
   </div>
   ${handoff !== null && g.winner === null ? renderHandoff(g, handoff) : ''}
   ${pendingPlay && g.winner === null ? renderConfirmDraw(pendingPlay.lost) : ''}
+  ${testPicker && humanCanAct() ? renderTestPicker() : ''}
   ${g.winner !== null ? renderWinner(g) : ''}`;
 
   for (const z of g.zones) for (const c of z.cards) seenZoneCards.add(`${c.card.uid}@${c.turn}`);
@@ -515,6 +525,8 @@ function renderSidePanel(g: GameState): string {
         : `🌐 ${tr(`<b>${esc(p.name)}</b> is aan zet…`, `<b>${esc(p.name)}</b> is playing…`)}`
       : tr(`<b>${esc(p.name)}</b> is aan zet`, `<b>${esc(p.name)}</b> to play`)}</div>
     <button class="end-turn" data-click="end-turn" ${locked ? 'disabled' : ''}>${tr('Einde<br>beurt', 'End<br>turn')}</button>
+    ${testGame ? `<button class="test-open" data-click="test-open" ${locked ? 'disabled' : ''}
+      title="${tr('Neem eender welke kaart in je hand', 'Take any card into your hand')}">🧪 Test</button>` : ''}
     <div class="hint">${tr(
       `Sleep een kaart naar je <b>aflegstapel</b> (bovenste effect) of naar een <b>zone</b> (onderste effect).
       Hover over een stapel om te zien wat erin zit. Hover over je kaart in een zone om ze terug te trekken (↩).`,
@@ -555,6 +567,24 @@ function renderConfirmDraw(lost: number): string {
         <button class="btn" data-click="confirm-play">${tr('Toch spelen', 'Play anyway')}</button>
         <button class="btn secondary-plain" data-click="cancel-play">${tr('Annuleren', 'Cancel')}</button>
       </div>
+    </div>
+  </div>`;
+}
+
+/** Testspel: alle kaarten op een rij; een klik legt een kopie in je hand. */
+function renderTestPicker(): string {
+  return `
+  <div class="overlay test-overlay">
+    <div class="panel test-panel">
+      <h2>🧪 ${tr('Neem een kaart', 'Take a card')}</h2>
+      <p>${tr('Klik op een kaart om ze in je hand te nemen. Je kunt er meerdere nemen.', 'Click a card to take it into your hand. You can take several.')}</p>
+      <div class="test-grid">${Object.values(CARDS).sort((a, b) => (a.price ?? 0) - (b.price ?? 0)).map((def) => `
+        <div class="test-card" data-click="test-card:${def.id}">
+          <div class="card">${renderFace(def)}</div>
+          <div class="test-price">${def.price ? `${def.price} 🪙` : tr('start', 'starter')}</div>
+        </div>`).join('')}
+      </div>
+      <button class="btn" data-click="test-close">${tr('Klaar', 'Done')}</button>
     </div>
   </div>`;
 }
@@ -601,7 +631,8 @@ app.addEventListener('click', (e) => {
     case 'mode':
       readNames();
       if (net) leaveOnline('');
-      vsComputer = arg === 'ai';
+      vsComputer = arg === 'ai' || arg === 'test';
+      testGame = arg === 'test';
       onlineTab = arg === 'online';
       netError = '';
       render();
@@ -656,6 +687,28 @@ app.addEventListener('click', (e) => {
       else render();
       break;
     }
+    case 'test-open':
+      if (testGame && humanCanAct()) {
+        testPicker = true;
+        render();
+      }
+      break;
+    case 'test-close':
+      testPicker = false;
+      render();
+      break;
+    case 'test-card':
+      if (testGame && game && humanCanAct()) {
+        // Buiten de engine om: alleen in een testspel, nooit online.
+        const g = structuredClone(game);
+        const p = g.players[g.active];
+        p.hand.push({ uid: `test-${++testCount}`, defId: arg });
+        g.log.push(tr(`🧪 ${p.name} neemt ${getCard(arg).name} in de hand (test).`, `🧪 ${p.name} takes ${getCard(arg).name} into hand (test).`));
+        game = g;
+        render();
+        sfx.coin();
+      }
+      break;
     case 'cancel-play':
       pendingPlay = null;
       render();
@@ -1211,6 +1264,7 @@ function pumpRemote(): void {
 /** remote: de actie komt van de online tegenstander en moet niet teruggestuurd worden. */
 function dispatch(action: Action, remote = false): void {
   if (!game) return;
+  testPicker = false;
   pendingPlay = null;
   const r = applyAction(game, action);
   if (!r.ok) {
