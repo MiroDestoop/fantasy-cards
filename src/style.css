@@ -733,6 +733,21 @@ button { font: inherit; }
   cursor: pointer;
 }
 .sound-toggle:hover { background: rgba(230, 192, 104, 0.15); }
+.side-buttons { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+
+/* Taalkeuze: rechtsboven op het startscherm, en klein onderaan het zijpaneel. */
+.lang-toggle {
+  padding: 6px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(230, 192, 104, 0.4);
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--ink);
+  font-size: 15px;
+  cursor: pointer;
+}
+.lang-toggle:hover { background: rgba(230, 192, 104, 0.15); }
+.start .lang-toggle { position: absolute; top: 24px; right: 28px; }
+.lang-toggle.small { padding: 6px 12px; font-size: 14px; }
 
 /* ---------- Effecten ---------- */
 

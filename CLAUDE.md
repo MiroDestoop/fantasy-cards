@@ -1,7 +1,7 @@
 # Munt of Zwaard
 
 Een fantasy-deckbuilder voor twee spelers aan hetzelfde scherm (hotseat), online tegen elkaar, of tegen de computer, op desktop, in 2D met bovenaanzicht van een speltafel.
-TypeScript + Vite, zonder framework. Alle tekst in het spel én in de code (namen, commentaar, commits) is **Nederlands**.
+TypeScript + Vite, zonder framework. De code (namen, commentaar, commits) is **Nederlands**. Het spel zelf kan in het **Nederlands of Engels** (knop op het startscherm en in het zijpaneel, zie `src/game/i18n.ts`).
 
 ## Starten
 
@@ -49,6 +49,7 @@ Een kaart in een zone wordt **eerst gelegd**, daarna werken haar effecten. Terug
 
 | Bestand | Rol |
 |---|---|
+| `src/game/i18n.ts` | Taal (`nl`/`en`): `tr(nl, en)`, `setLang`, `cardsWord`. Elke tekst die de speler ziet, schrijf je als `tr('Nederlands', 'English')` |
 | `src/game/rules.ts` | Constanten: handgrootte, levens per zone, zones om te winnen, max kaarten per zone, handlimiet, zones |
 | `src/game/types.ts` | Alle types: `GameState`, `Action`, `CardDef` (`top`/`bottom`), `Effect` (keyword of `speciaal`), `Keyword` |
 | `src/game/cards.ts` | `KEYWORDS` (label + uitleg), alle kaarten (`CARD_LIST`), `STARTER_DECK`, `SHOP_SUPPLY` |
@@ -67,6 +68,11 @@ Een kaart in een zone wordt **eerst gelegd**, daarna werken haar effecten. Terug
 **Engine**
 - `applyAction(state, action)` is puur: ze werkt op een `structuredClone` en geeft `{ok, state}` of `{ok:false, error}` terug, met een Nederlandse foutmelding die de UI als toast toont.
 - Toeval gebeurt via een seed in de state (mulberry32), zodat spellen reproduceerbaar zijn. Tests gebruiken vaste seeds.
+
+**Talen**
+- Elke zichtbare tekst staat als `tr('Nederlands', 'English')` in de code. Kaartnamen (`NAMES_EN` in `cards.ts`), keyword-labels, specials-teksten, zone-effecten en computerniveaus zijn getters, dus `def.name`, `KEYWORDS[kw].label`, `fx.label` en `getSpecial(id).text` geven altijd de gekozen taal. Zonenamen staan in de toestand in het Nederlands (ook de sleutel voor `ZONE_ART`); toon ze met `zoneName(z)`.
+- De taal wordt onthouden in localStorage (`fantasy-cards-taal`); zonder keuze volgt ze de browser. Het logboek wordt geschreven in de taal van het moment; online schrijft elke speler zijn eigen logboek, dus de taal mag per speler verschillen.
+- Een nieuwe kaart: geef ze ook een Engelse naam in `NAMES_EN`.
 
 **UI**
 - Elke wijziging tekent de hele tafel opnieuw via `innerHTML`.

@@ -9,7 +9,8 @@ import { FIRST_HAND_SIZE, GAMES_TO_WIN_MATCH, HAND_SIZE, MAX_ZONE_CARDS, RECALL_
 import type { Action, CardDef, CardInstance, Effect, GameState, Keyword, PlayerId, PlayTarget } from './game/types';
 import { hostRoom, joinRoom, makeCode, PROTOCOL, type Link, type Msg } from './online';
 import { isMuted, sfx, toggleMute } from './sound';
-import { zoneCapacity, ZONE_EFFECTS, zoneEffect } from './game/zones';
+import { cardsWord, getLang, setLang, tr, type Lang } from './game/i18n';
+import { zoneCapacity, ZONE_EFFECTS, zoneEffect, zoneName } from './game/zones';
 import { ZONE_ART } from './zoneArt';
 
 const HERO_ICONS = ['🧙‍♂️', '🧝‍♀️'] as const;
@@ -20,6 +21,7 @@ const COMPUTER: PlayerId = 1;
 const COMPUTER_THINK_MS = 1000;
 const COMPUTER_STEP_MS = 750;
 const LEVEL_KEY = 'fantasy-cards-niveau';
+const LANG_KEY = 'fantasy-cards-taal';
 const STAGE_W = 1600;
 const STAGE_H = 900;
 const CARD_W = 150;
@@ -32,7 +34,8 @@ const app = document.querySelector<HTMLDivElement>('#app')!;
 const toastEl = document.querySelector<HTMLDivElement>('#toast')!;
 const tipEl = document.querySelector<HTMLDivElement>('#tip')!;
 
-let names: [string, string] = ['Speler 1', 'Speler 2'];
+setLang(loadLang());
+let names: [string, string] = [defaultName(0), defaultName(1)];
 /** Speel je tegen de computer in plaats van tegen een tweede speler aan dezelfde tafel? */
 let vsComputer = false;
 /** Het niveau van de computer; onthouden voor de volgende keer. */
@@ -87,31 +90,35 @@ function render(): void {
 function renderStart(): string {
   return `
   <div class="start">
-    <h1>Munt of Zwaard</h1>
-    <p class="subtitle">Een fantasy-kaartduel aan één tafel, online, of tegen de computer</p>
+    ${renderLangButton()}
+    <h1>${tr('Munt of Zwaard', 'Coin or Sword')}</h1>
+    <p class="subtitle">${tr('Een fantasy-kaartduel aan één tafel, online, of tegen de computer', 'A fantasy card duel at one table, online, or against the computer')}</p>
     <div class="mode">
-      <button class="${!vsComputer && !onlineTab ? 'on' : ''}" data-click="mode:pvp">👥 Twee spelers</button>
+      <button class="${!vsComputer && !onlineTab ? 'on' : ''}" data-click="mode:pvp">👥 ${tr('Twee spelers', 'Two players')}</button>
       <button class="${onlineTab ? 'on' : ''}" data-click="mode:online">🌐 Online</button>
-      <button class="${vsComputer ? 'on' : ''}" data-click="mode:ai">${COMPUTER_ICON} Tegen de computer</button>
+      <button class="${vsComputer ? 'on' : ''}" data-click="mode:ai">${COMPUTER_ICON} ${tr('Tegen de computer', 'Against the computer')}</button>
     </div>
     ${onlineTab ? renderOnlineStart() : `${vsComputer
       ? `<div class="mode levels">${AI_LEVELS.map((l) =>
           `<button class="${l.id === computerLevel ? 'on' : ''}" data-click="level:${l.id}">${l.icon} ${l.label}</button>`).join('')}</div>
         ${levelInfo().bonusGold
-          ? `<p class="level-note">${levelInfo().icon} ${levelInfo().label} speelt zoals Extreem, maar krijgt elke beurt ${levelInfo().bonusGold} extra goud.</p>`
+          ? `<p class="level-note">${levelInfo().icon} ${tr(
+            `${levelInfo().label} speelt zoals Extreem, maar krijgt elke beurt ${levelInfo().bonusGold} extra goud.`,
+            `${levelInfo().label} plays like Extreme, but gets ${levelInfo().bonusGold} extra gold every turn.`,
+          )}</p>`
           : ''}`
       : ''}
     <div class="names">
-      <label>${vsComputer ? 'Jouw naam' : 'Speler 1'} <input id="name0" maxlength="16" value="${esc(names[0])}"></label>
+      <label>${vsComputer ? tr('Jouw naam', 'Your name') : tr('Speler 1', 'Player 1')} <input id="name0" maxlength="16" value="${esc(names[0])}"></label>
       ${vsComputer
-        ? `<label>Tegenstander <div class="computer-name">${levelInfo().icon} ${esc(computerName())}</div></label>`
-        : `<label>Speler 2 <input id="name1" maxlength="16" value="${esc(names[1])}"></label>`}
+        ? `<label>${tr('Tegenstander', 'Opponent')} <div class="computer-name">${levelInfo().icon} ${esc(computerName())}</div></label>`
+        : `<label>${tr('Speler 2', 'Player 2')} <input id="name1" maxlength="16" value="${esc(names[1])}"></label>`}
     </div>
-    <button class="btn" data-click="start">Aan tafel!</button>`}
+    <button class="btn" data-click="start">${tr('Aan tafel!', 'To the table!')}</button>`}
     <div class="rules">
-      <h2>Zo speel je</h2>
-      <ul>
-        <li>Verover <b>${ZONES_TO_WIN} van de 3 zones</b> om te winnen. Een zone is van jou als je er als eerste haar levens vol schade doet (meestal ${ZONE_HP}).</li>
+      <h2>${tr('Zo speel je', 'How to play')}</h2>
+      <ul>${tr(
+        `<li>Verover <b>${ZONES_TO_WIN} van de 3 zones</b> om te winnen. Een zone is van jou als je er als eerste haar levens vol schade doet (meestal ${ZONE_HP}).</li>
         <li>Elk spel krijg je andere zones, elk met een <b>speciaal effect</b>: meer of minder levens, meer of minder schade, goud of een extra kaart, korting in de winkel, minder plaats, of juist tol betalen. Hover over het effect onder de zonenaam voor de uitleg.</li>
         <li>Je speelt een <b>best-of-3</b>: wie eerst ${GAMES_TO_WIN_MATCH} spellen wint, wint de match. Elke speler begint minstens één spel.</li>
         <li>Elke beurt trek je ${HAND_SIZE} kaarten (de beginspeler in de allereerste beurt maar ${FIRST_HAND_SIZE}). Elke kaart heeft twee helften:
@@ -120,42 +127,60 @@ function renderStart(): string {
           Met <b>Terugroep</b> haal je ze terug naar je aflegstapel, met <b>Vernietig</b> verban je ze uit het spel.
           Of klik op <b>↩</b> bij een eigen kaart om ze terug te trekken voor ${RECALL_PRICE} goud; elke keer wordt dat 1 goud duurder.</li>
         <li>Met goud koop je sterkere kaarten in de winkel. Is je stapel leeg, dan wordt je aflegstapel geschud.</li>
-        <li>Hover over een keyword zoals <b>Aanval(2)</b> om te zien wat het doet.</li>
+        <li>Hover over een keyword zoals <b>Aanval(2)</b> om te zien wat het doet.</li>`,
+        `<li>Conquer <b>${ZONES_TO_WIN} of the 3 zones</b> to win. A zone is yours when you are the first to fill its health with damage (usually ${ZONE_HP}).</li>
+        <li>Every game has different zones, each with a <b>special effect</b>: more or less health, more or less damage, gold or an extra card, a shop discount, less room, or paying a toll. Hover over the effect below the zone name for details.</li>
+        <li>You play a <b>best of 3</b>: whoever wins ${GAMES_TO_WIN_MATCH} games first wins the match. Each player starts at least one game.</li>
+        <li>Every turn you draw ${HAND_SIZE} cards (the starting player only ${FIRST_HAND_SIZE} on the very first turn). Every card has two halves:
+          drag it to your <b>discard pile</b> for the top effect, or into a <b>zone</b> for the bottom effect.</li>
+        <li>Cards in a zone stay there, at most ${MAX_ZONE_CARDS} per player per zone.
+          <b>Recall</b> returns them to your discard pile, <b>Destroy</b> banishes them from the game.
+          Or click <b>↩</b> on one of your cards to withdraw it for ${RECALL_PRICE} gold; each time that costs 1 gold more.</li>
+        <li>With gold you buy stronger cards in the shop. When your deck is empty, your discard pile is shuffled.</li>
+        <li>Hover over a keyword such as <b>Attack(2)</b> to see what it does.</li>`,
+      )}
       </ul>
     </div>
   </div>`;
+}
+
+/** De taalknop: toont de andere taal, zodat je ziet waarnaar je wisselt. */
+function renderLangButton(extra = ''): string {
+  return `<button class="lang-toggle ${extra}" data-click="lang" title="${tr('Switch to English', 'Schakel naar Nederlands')}">
+    ${getLang() === 'nl' ? '🇬🇧 English' : '🇳🇱 Nederlands'}
+  </button>`;
 }
 
 function renderOnlineStart(): string {
   const error = netError ? `<p class="net-error">${esc(netError)}</p>` : '';
   if (!net) {
     return `
-    <div class="names"><label>Jouw naam <input id="name0" maxlength="16" value="${esc(names[0])}"></label></div>
+    <div class="names"><label>${tr('Jouw naam', 'Your name')} <input id="name0" maxlength="16" value="${esc(names[0])}"></label></div>
     ${error}
     <div class="online-choice">
       <div class="online-box">
-        <b>Een kamer maken</b>
-        <p>Je krijgt een code die je aan je tegenstander geeft.</p>
-        <button class="btn" data-click="host">🏠 Maak een kamer</button>
+        <b>${tr('Een kamer maken', 'Create a room')}</b>
+        <p>${tr('Je krijgt een code die je aan je tegenstander geeft.', 'You get a code to give to your opponent.')}</p>
+        <button class="btn" data-click="host">🏠 ${tr('Maak een kamer', 'Create a room')}</button>
       </div>
       <div class="online-box">
-        <b>Meedoen</b>
-        <p>Typ de code die je kreeg.</p>
+        <b>${tr('Meedoen', 'Join')}</b>
+        <p>${tr('Typ de code die je kreeg.', 'Type the code you received.')}</p>
         <input id="code" class="code-input" maxlength="4" placeholder="ABCD" value="${esc(codeFromLink)}" autocomplete="off">
-        <button class="btn" data-click="join">🚪 Doe mee</button>
+        <button class="btn" data-click="join">🚪 ${tr('Doe mee', 'Join')}</button>
       </div>
     </div>`;
   }
   const link = `${location.origin}${location.pathname}?kamer=${net.code}`;
   const body =
-    net.status === 'opening' ? '<p>Kamer maken…</p>'
+    net.status === 'opening' ? `<p>${tr('Kamer maken…', 'Creating room…')}</p>`
     : net.status === 'waiting'
-      ? `<p>Geef deze code aan je tegenstander:</p>
+      ? `<p>${tr('Geef deze code aan je tegenstander:', 'Give this code to your opponent:')}</p>
         <div class="room-code">${net.code}</div>
-        <p class="room-link">of stuur de link <b>${esc(link)}</b></p>
-        <p class="waiting">Wachten op een tegenstander…</p>`
-      : `<p class="waiting">Verbinden met kamer <b>${esc(net.code)}</b>…</p>`;
-  return `<div class="online-box wide">${body}<button class="btn small" data-click="cancel-online">Annuleren</button></div>`;
+        <p class="room-link">${tr('of stuur de link', 'or send the link')} <b>${esc(link)}</b></p>
+        <p class="waiting">${tr('Wachten op een tegenstander…', 'Waiting for an opponent…')}</p>`
+      : `<p class="waiting">${tr('Verbinden met kamer', 'Connecting to room')} <b>${esc(net.code)}</b>…</p>`;
+  return `<div class="online-box wide">${body}<button class="btn small" data-click="cancel-online">${tr('Annuleren', 'Cancel')}</button></div>`;
 }
 
 /** Onderaan zit de speler die aan zet is; tegen de computer of online zit jij altijd onderaan. */
@@ -222,10 +247,10 @@ function renderInfo(g: GameState, pid: PlayerId): string {
     <div>
       <div class="player-name">${esc(p.name)}</div>
       <div class="badges">
-        <span class="gold" title="Goud om kaarten te kopen in de winkel">🪙 ${p.gold}</span>
-        <span class="flags" title="Veroverde zones">🚩 ${zonesOwnedBy(g, pid)}/${ZONES_TO_WIN}</span>
-        ${p.bonusGold ? `<span class="bonus" title="Bonus: krijgt elke beurt ${p.bonusGold} extra goud">+${p.bonusGold} 🪙/beurt</span>` : ''}
-        ${p.slow ? `<span class="slow" title="Trekt volgende beurt ${p.slow} kaart(en) minder">⏳ −${p.slow}</span>` : ''}
+        <span class="gold" title="${tr('Goud om kaarten te kopen in de winkel', 'Gold to buy cards in the shop')}">🪙 ${p.gold}</span>
+        <span class="flags" title="${tr('Veroverde zones', 'Conquered zones')}">🚩 ${zonesOwnedBy(g, pid)}/${ZONES_TO_WIN}</span>
+        ${p.bonusGold ? `<span class="bonus" title="${tr(`Bonus: krijgt elke beurt ${p.bonusGold} extra goud`, `Bonus: gets ${p.bonusGold} extra gold every turn`)}">+${p.bonusGold} 🪙/${tr('beurt', 'turn')}</span>` : ''}
+        ${p.slow ? `<span class="slow" title="${tr(`Trekt volgende beurt ${cardsWord(p.slow)} minder`, `Draws ${cardsWord(p.slow)} fewer next turn`)}">⏳ −${p.slow}</span>` : ''}
       </div>
     </div>
   </div>`;
@@ -239,8 +264,11 @@ function renderDiscardAllButton(g: GameState): string {
     0,
   );
   return `<button class="discard-all" data-click="discard-all"
-    title="Speel alle ${hand.length} kaarten in je hand af op je aflegstapel en krijg hun bovenste effect">
-    ⤓ Alles afleggen${gold ? ` <span>+${gold} 🪙</span>` : ''}
+    title="${tr(
+      `Speel alle ${hand.length} kaarten in je hand af op je aflegstapel en krijg hun bovenste effect`,
+      `Discard all ${hand.length} cards in your hand and get their top effect`,
+    )}">
+    ⤓ ${tr('Alles afleggen', 'Discard all')}${gold ? ` <span>+${gold} 🪙</span>` : ''}
   </button>`;
 }
 
@@ -250,20 +278,23 @@ function renderPiles(g: GameState, pid: PlayerId, mine: boolean): string {
   const topDiscard = p.played.at(-1) ?? p.discard.at(-1);
   const stackDepth = Math.min(3, Math.ceil(p.deck.length / 4));
   const played = p.played.length
-    ? `<div class="pile-played" title="${p.played.length} deze beurt gespeeld: ze gaan bij Einde beurt naar de aflegstapel">+${p.played.length}</div>`
+    ? `<div class="pile-played" title="${tr(
+      `${p.played.length} deze beurt gespeeld: ze gaan bij Einde beurt naar de aflegstapel`,
+      `${p.played.length} played this turn: they go to the discard pile at End turn`,
+    )}">+${p.played.length}</div>`
     : '';
   return `
   <div class="piles">
     <div class="pile deck" data-pile="deck:${pid}">
       ${p.deck.length ? `<div class="stack">${'<div class="back"></div>'.repeat(stackDepth)}</div>` : '<div class="empty-slot"></div>'}
       <div class="pile-count">${p.deck.length}</div>
-      <div class="pile-label">Stapel</div>
+      <div class="pile-label">${tr('Stapel', 'Deck')}</div>
     </div>
     <div class="pile discard" ${mine ? 'data-drop="discard"' : ''} data-pile="discard:${pid}">
       ${topDiscard ? renderMini(getCard(topDiscard.defId)) : '<div class="empty-slot"></div>'}
       <div class="pile-count">${p.discard.length}</div>
       ${played}
-      <div class="pile-label">Aflegstapel</div>
+      <div class="pile-label">${tr('Aflegstapel', 'Discard')}</div>
     </div>
   </div>`;
 }
@@ -307,15 +338,15 @@ function renderFace(def: CardDef): string {
     <div class="art" style="--art:${def.color}">${def.icon}</div>
     <div class="card-name">${esc(def.name)}</div>
     <div class="sect sect-top ${labels ? '' : 'no-label'}">
-      ${labels ? '<div class="sect-label">⤓ Afleggen</div>' : ''}
+      ${labels ? `<div class="sect-label">⤓ ${tr('Afleggen', 'Discard')}</div>` : ''}
       <div class="kws">${renderKeywords(def.top)}</div>
     </div>
     ${def.bottom.length
       ? `<div class="sect sect-bottom ${labels ? '' : 'no-label'}">
-          ${labels ? '<div class="sect-label">⚔ In een zone</div>' : ''}
+          ${labels ? `<div class="sect-label">⚔ ${tr('In een zone', 'In a zone')}</div>` : ''}
           <div class="kws">${renderKeywords(def.bottom)}</div>
         </div>`
-      : '<div class="sect sect-none"><div class="sect-label">Alleen afleggen</div></div>'}`;
+      : `<div class="sect sect-none"><div class="sect-label">${tr('Alleen afleggen', 'Discard only')}</div></div>`}`;
 }
 
 function renderMini(def: CardDef): string {
@@ -349,17 +380,23 @@ function renderZone(g: GameState, i: number, bottom: PlayerId, prev: GameState |
     const free = Math.max(0, zoneCapacity(z) - mine.length);
     const empty = `<div class="zslot empty p${pid}"></div>`.repeat(free);
     const full = z.owner === null && free === 0;
-    return `<div class="zrow ${full ? 'full' : ''}" title="${esc(g.players[pid].name)}: ${mine.length} van ${zoneCapacity(z)} plaatsen bezet">${cards}${empty}</div>`;
+    return `<div class="zrow ${full ? 'full' : ''}" title="${esc(g.players[pid].name)}: ${tr(
+      `${mine.length} van ${zoneCapacity(z)} plaatsen bezet`,
+      `${mine.length} of ${zoneCapacity(z)} slots taken`,
+    )}">${cards}${empty}</div>`;
   };
   const bar = (pid: PlayerId) => {
     const dmg = z.damage[pid];
     const before = prev && prev !== g ? prev.zones[i].damage[pid] : dmg;
     const d = dmg - before;
     return `
-    <div class="bar p${pid}" title="${esc(g.players[pid].name)}: ${dmg} van ${z.hp} schade">
+    <div class="bar p${pid}" title="${esc(g.players[pid].name)}: ${tr(`${dmg} van ${z.hp} schade`, `${dmg} of ${z.hp} damage`)}">
       <div class="fill ${d ? 'grow' : ''}" style="width:${(dmg / z.hp) * 100}%;--from:${(before / z.hp) * 100}%"></div>
       <span class="bar-text">${esc(g.players[pid].name)} · ${dmg}/${z.hp}</span>
-      ${z.shield[pid] ? `<span class="zshield" title="Schild: blokkeert de volgende ${z.shield[pid]} schade van de tegenstander">🛡️ ${z.shield[pid]}</span>` : ''}
+      ${z.shield[pid] ? `<span class="zshield" title="${tr(
+        `Schild: blokkeert de volgende ${z.shield[pid]} schade van de tegenstander`,
+        `Shield: blocks the next ${z.shield[pid]} damage from the opponent`,
+      )}">🛡️ ${z.shield[pid]}</span>` : ''}
       ${d ? `<div class="float ${d > 0 ? 'dmg' : 'heal'}">${d > 0 ? '+' : ''}${d}</div>` : ''}
     </div>`;
   };
@@ -369,15 +406,15 @@ function renderZone(g: GameState, i: number, bottom: PlayerId, prev: GameState |
     <div class="zcards">${row(top)}</div>
     <div class="zone-mid">
       ${bar(top)}
-      <div class="zone-name">${z.icon} ${esc(z.name)}</div>
+      <div class="zone-name">${z.icon} ${esc(zoneName(z))}</div>
       ${fx ? `<div class="zone-fx zfx-${fx.id}" data-zfx="${fx.id}">${fx.icon} ${esc(fx.label)}</div>` : ''}
       ${bar(bottom)}
     </div>
     <div class="zcards">${row(bottom)}</div>
     ${z.owner !== null
       ? `<div class="zone-banner p${z.owner}">
-          <div class="zone-banner-name">${z.icon} ${esc(z.name)}</div>
-          <div>🚩 Veroverd door</div>
+          <div class="zone-banner-name">${z.icon} ${esc(zoneName(z))}</div>
+          <div>🚩 ${tr('Veroverd door', 'Conquered by')}</div>
           <b>${esc(g.players[z.owner].name)}</b>
         </div>`
       : ''}
@@ -396,17 +433,20 @@ function renderShop(g: GameState): string {
           // Een Handelspost waar de speler aan zet voorstaat, maakt de kaart goedkoper.
           const price = shopPrice(g, g.active, card.defId);
           return price < (def.price ?? 0)
-            ? `<div class="price discount" title="Prijs in goud: ${price} in plaats van ${def.price} (Handelspost)">${price}</div>`
-            : `<div class="price" title="Prijs in goud">${def.price}</div>`;
+            ? `<div class="price discount" title="${tr(
+              `Prijs in goud: ${price} in plaats van ${def.price} (Handelspost)`,
+              `Price in gold: ${price} instead of ${def.price} (Trading Post)`,
+            )}">${price}</div>`
+            : `<div class="price" title="${tr('Prijs in goud', 'Price in gold')}">${def.price}</div>`;
         })()}
       </div>`;
     })
     .join('');
   return `
   <div class="shop">
-    <div class="shop-title">🏪 Winkel</div>
-    <div class="market">${slots || '<div class="sold-out">Uitverkocht!</div>'}</div>
-    <div class="shop-stock">${g.shop.pile.length} in voorraad</div>
+    <div class="shop-title">🏪 ${tr('Winkel', 'Shop')}</div>
+    <div class="market">${slots || `<div class="sold-out">${tr('Uitverkocht!', 'Sold out!')}</div>`}</div>
+    <div class="shop-stock">${tr(`${g.shop.pile.length} in voorraad`, `${g.shop.pile.length} in stock`)}</div>
   </div>`;
 }
 
@@ -416,17 +456,29 @@ function renderSidePanel(g: GameState): string {
   const thinking = (computerTurn(g) || remoteTurn(g)) && g.winner === null;
   return `
   <div class="side-panel">
-    <div class="match-score" title="Best-of-3: wie eerst ${GAMES_TO_WIN_MATCH} spellen wint, wint de match">
-      Spel ${match.gameNo} van 3<br>${renderScore(g)}
+    <div class="match-score" title="${tr(
+      `Best-of-3: wie eerst ${GAMES_TO_WIN_MATCH} spellen wint, wint de match`,
+      `Best of 3: whoever wins ${GAMES_TO_WIN_MATCH} games first wins the match`,
+    )}">
+      ${tr(`Spel ${match.gameNo} van 3`, `Game ${match.gameNo} of 3`)}<br>${renderScore(g)}
     </div>
-    <div class="turn-info ${thinking ? 'thinking' : ''}">Beurt ${g.turn}<br>${thinking
-      ? computerTurn(g) ? `${levelInfo().icon} <b>${esc(p.name)}</b> denkt na…` : `🌐 <b>${esc(p.name)}</b> is aan zet…`
-      : `<b>${esc(p.name)}</b> is aan zet`}</div>
-    <button class="end-turn" data-click="end-turn" ${locked ? 'disabled' : ''}>Einde<br>beurt</button>
-    <div class="hint">Sleep een kaart naar je <b>aflegstapel</b> (bovenste effect) of naar een <b>zone</b> (onderste effect).
-      Hover over een stapel om te zien wat erin zit. Hover over je kaart in een zone om ze terug te trekken (↩).</div>
+    <div class="turn-info ${thinking ? 'thinking' : ''}">${tr('Beurt', 'Turn')} ${g.turn}<br>${thinking
+      ? computerTurn(g)
+        ? `${levelInfo().icon} ${tr(`<b>${esc(p.name)}</b> denkt na…`, `<b>${esc(p.name)}</b> is thinking…`)}`
+        : `🌐 ${tr(`<b>${esc(p.name)}</b> is aan zet…`, `<b>${esc(p.name)}</b> is playing…`)}`
+      : tr(`<b>${esc(p.name)}</b> is aan zet`, `<b>${esc(p.name)}</b> to play`)}</div>
+    <button class="end-turn" data-click="end-turn" ${locked ? 'disabled' : ''}>${tr('Einde<br>beurt', 'End<br>turn')}</button>
+    <div class="hint">${tr(
+      `Sleep een kaart naar je <b>aflegstapel</b> (bovenste effect) of naar een <b>zone</b> (onderste effect).
+      Hover over een stapel om te zien wat erin zit. Hover over je kaart in een zone om ze terug te trekken (↩).`,
+      `Drag a card to your <b>discard pile</b> (top effect) or into a <b>zone</b> (bottom effect).
+      Hover over a pile to see what is in it. Hover over your card in a zone to withdraw it (↩).`,
+    )}</div>
     <div class="log">${g.log.slice(-16).reverse().map((l) => `<div>${esc(l)}</div>`).join('')}</div>
-    <button class="sound-toggle" data-click="sound">${isMuted() ? '🔇 Geluid uit' : '🔊 Geluid aan'}</button>
+    <div class="side-buttons">
+      <button class="sound-toggle" data-click="sound">${isMuted() ? `🔇 ${tr('Geluid uit', 'Sound off')}` : `🔊 ${tr('Geluid aan', 'Sound on')}`}</button>
+      ${renderLangButton('small')}
+    </div>
   </div>`;
 }
 
@@ -435,31 +487,34 @@ function renderHandoff(g: GameState, to: PlayerId): string {
   <div class="overlay">
     <div class="panel">
       <div class="big-icon">${heroIcon(to)}</div>
-      <h2>${esc(g.players[to].name)}, jij bent aan zet</h2>
-      <p>De andere speler kijkt even weg 🙈</p>
-      <button class="btn" data-click="continue">Toon mijn hand</button>
+      <h2>${tr(`${esc(g.players[to].name)}, jij bent aan zet`, `${esc(g.players[to].name)}, it's your turn`)}</h2>
+      <p>${tr('De andere speler kijkt even weg 🙈', 'The other player looks away for a moment 🙈')}</p>
+      <button class="btn" data-click="continue">${tr('Toon mijn hand', 'Show my hand')}</button>
     </div>
   </div>`;
 }
 
 function renderWinner(g: GameState): string {
   const w = g.winner as PlayerId;
-  const zones = g.zones.filter((z) => z.owner === w).map((z) => `${z.icon} ${esc(z.name)}`).join(' en ');
+  const zones = g.zones.filter((z) => z.owner === w).map((z) => `${z.icon} ${esc(zoneName(z))}`).join(tr(' en ', ' and '));
   const over = matchWinner() !== null;
   const starter = over ? null : nextStarter();
-  const label = over ? '🔁 Nieuwe match' : `▶ Volgende spel · ${esc(g.players[starter!].name)} begint`;
+  const label = over
+    ? `🔁 ${tr('Nieuwe match', 'New match')}`
+    : `▶ ${tr(`Volgende spel · ${esc(g.players[starter!].name)} begint`, `Next game · ${esc(g.players[starter!].name)} starts`)}`;
   const next = net?.waitingNext
-    ? `<p class="waiting">Wachten op ${esc(g.players[other(net.me)].name)}…</p>`
+    ? `<p class="waiting">${tr('Wachten op', 'Waiting for')} ${esc(g.players[other(net.me)].name)}…</p>`
     : `<button class="btn" data-click="next-game">${label}</button>`;
+  const name = esc(g.players[w].name);
   return `
   <div class="overlay">
     <div class="panel">
       <div class="big-icon">${vsComputer && w === COMPUTER ? levelInfo().icon : over ? '🏆' : '🚩'}</div>
-      <h2>${esc(g.players[w].name)} wint ${over ? 'de match' : `spel ${match.gameNo}`}!</h2>
-      <p>Veroverde ${zones}.</p>
-      <p class="match-line">${over ? 'Eindstand' : 'Stand'}: ${renderScore(g)}</p>
+      <h2>${over ? tr(`${name} wint de match!`, `${name} wins the match!`) : tr(`${name} wint spel ${match.gameNo}!`, `${name} wins game ${match.gameNo}!`)}</h2>
+      <p>${tr('Veroverde', 'Conquered')} ${zones}.</p>
+      <p class="match-line">${over ? tr('Eindstand', 'Final score') : tr('Stand', 'Score')}: ${renderScore(g)}</p>
       ${next}
-      <button class="btn small secondary" data-click="restart">${net ? 'Verlaten' : 'Terug naar het begin'}</button>
+      <button class="btn small secondary" data-click="restart">${net ? tr('Verlaten', 'Leave') : tr('Terug naar het begin', 'Back to the start')}</button>
     </div>
   </div>`;
 }
@@ -520,6 +575,9 @@ app.addEventListener('click', (e) => {
       handoff = null;
       render();
       if (game) sfx.deal(game.players[game.active].hand.length);
+      break;
+    case 'lang':
+      toggleLang();
       break;
     case 'sound':
       toggleMute();
@@ -718,8 +776,8 @@ app.addEventListener('mouseover', (e) => {
   } else if (recall && game) {
     tipEl.innerHTML = recallTip(game, recall.dataset.recall!);
   } else if (special) {
-    tipEl.innerHTML = `<b>✨ Speciaal effect</b><br>${esc(getSpecial(special.dataset.special!).text)}
-      <div class="tip-note">Dit effect heeft geen keyword: het hoort alleen bij deze kaart.</div>`;
+    tipEl.innerHTML = `<b>✨ ${tr('Speciaal effect', 'Special effect')}</b><br>${esc(getSpecial(special.dataset.special!).text)}
+      <div class="tip-note">${tr('Dit effect heeft geen keyword: het hoort alleen bij deze kaart.', 'This effect has no keyword: it belongs to this card only.')}</div>`;
   } else if (kw) {
     const key = kw.dataset.kw as Keyword;
     const n = Number(kw.dataset.n);
@@ -739,21 +797,29 @@ function recallTip(g: GameState, uid: string): string {
   const card = zone?.cards.find((c) => c.card.uid === uid);
   const price = recallPrice(g, g.active);
   const gold = g.players[g.active].gold;
-  const name = card ? getCard(card.card.defId).name : 'deze kaart';
-  const short = gold < price ? `<div class="tip-note tip-warn">Je hebt maar ${gold} goud.</div>` : '';
-  return `<b>↩ Terugtrekken · ${price} goud</b><br>
-    Stuur ${esc(name)} uit ${esc(zone?.name ?? 'deze zone')} terug naar je aflegstapel. Zo maak je een plek vrij.
-    <div class="tip-note">Elke keer dat je terugtrekt, wordt het 1 goud duurder. Daarna kost het ${price + 1} goud.</div>${short}`;
+  const name = esc(card ? getCard(card.card.defId).name : tr('deze kaart', 'this card'));
+  const where = esc(zone ? zoneName(zone) : tr('deze zone', 'this zone'));
+  const short = gold < price ? `<div class="tip-note tip-warn">${tr(`Je hebt maar ${gold} goud.`, `You only have ${gold} gold.`)}</div>` : '';
+  return tr(
+    `<b>↩ Terugtrekken · ${price} goud</b><br>
+    Stuur ${name} uit ${where} terug naar je aflegstapel. Zo maak je een plek vrij.
+    <div class="tip-note">Elke keer dat je terugtrekt, wordt het 1 goud duurder. Daarna kost het ${price + 1} goud.</div>`,
+    `<b>↩ Withdraw · ${price} gold</b><br>
+    Send ${name} from ${where} back to your discard pile. This frees up a slot.
+    <div class="tip-note">Each time you withdraw, it costs 1 gold more. Next time it costs ${price + 1} gold.</div>`,
+  ) + short;
 }
 
 function pileTip(owner: string, kind: 'deck' | 'discard', cards: CardInstance[], played: CardInstance[] = []): string {
-  const title = `${kind === 'deck' ? 'Stapel' : 'Aflegstapel'} van ${esc(owner)} (${cards.length})`;
-  const rows = cards.length ? tipRows(cards) : '<br><i>Leeg</i>';
+  const title = kind === 'deck'
+    ? tr(`Stapel van ${esc(owner)} (${cards.length})`, `${esc(owner)}'s deck (${cards.length})`)
+    : tr(`Aflegstapel van ${esc(owner)} (${cards.length})`, `${esc(owner)}'s discard pile (${cards.length})`);
+  const rows = cards.length ? tipRows(cards) : `<br><i>${tr('Leeg', 'Empty')}</i>`;
   // De volgorde van de trekstapel blijft geheim; enkel wat erin zit, is te zien.
-  const note = kind === 'deck' ? '<div class="tip-note">Volgorde blijft geheim</div>' : '';
+  const note = kind === 'deck' ? `<div class="tip-note">${tr('Volgorde blijft geheim', 'The order stays secret')}</div>` : '';
   const playedPart = played.length
-    ? `<div class="tip-section"><b>Deze beurt gespeeld (${played.length})</b>${tipRows(played)}
-        <div class="tip-note">Gaan bij Einde beurt naar de aflegstapel</div></div>`
+    ? `<div class="tip-section"><b>${tr('Deze beurt gespeeld', 'Played this turn')} (${played.length})</b>${tipRows(played)}
+        <div class="tip-note">${tr('Gaan bij Einde beurt naar de aflegstapel', 'Go to the discard pile at End turn')}</div></div>`
     : '';
   return `<b>${title}</b>${rows}${note}${playedPart}`;
 }
@@ -785,8 +851,47 @@ function hideTip(): void {
 function readNames(): void {
   names = [0, 1].map((i) => {
     const input = document.querySelector<HTMLInputElement>(`#name${i}`);
-    return input ? input.value.trim() || `Speler ${i + 1}` : names[i];
+    return input ? input.value.trim() || defaultName(i as PlayerId) : names[i];
   }) as [string, string];
+}
+
+function defaultName(i: PlayerId): string {
+  return tr(`Speler ${i + 1}`, `Player ${i + 1}`);
+}
+
+function loadLang(): Lang {
+  try {
+    const saved = localStorage.getItem(LANG_KEY);
+    if (saved === 'nl' || saved === 'en') return saved;
+  } catch {
+    // Lezen lukt niet: dan de taal van de browser.
+  }
+  return navigator.language?.toLowerCase().startsWith('nl') ? 'nl' : 'en';
+}
+
+/** Wisselt van taal. Standaardnamen ("Speler 1") gaan mee; een zelfgekozen naam blijft. */
+function toggleLang(): void {
+  readNames();
+  const old = [defaultName(0), defaultName(1)];
+  setLang(getLang() === 'nl' ? 'en' : 'nl');
+  names = names.map((n, i) => (n === old[i] ? defaultName(i as PlayerId) : n)) as [string, string];
+  try {
+    localStorage.setItem(LANG_KEY, getLang());
+  } catch {
+    // Opslaan lukt niet: de keuze geldt dan alleen voor deze sessie.
+  }
+  applyLangToPage();
+  render();
+}
+
+function applyLangToPage(): void {
+  document.documentElement.lang = getLang();
+  document.title = tr('Munt of Zwaard', 'Coin or Sword');
+  const rotate = document.querySelector('#rotate');
+  if (rotate) {
+    rotate.innerHTML = `<div class="rotate-icon">📱</div>${tr('Draai je toestel een kwartslag', 'Turn your device sideways')}<br>
+      <small>${tr('Munt of Zwaard speel je liggend', 'Coin or Sword is played in landscape')}</small>`;
+  }
 }
 
 function levelInfo(): (typeof AI_LEVELS)[number] {
@@ -794,7 +899,7 @@ function levelInfo(): (typeof AI_LEVELS)[number] {
 }
 
 function computerName(): string {
-  return `Computer (${levelInfo().label})`;
+  return `${tr('Computer', 'Computer')} (${levelInfo().label})`;
 }
 
 function loadLevel(): AiLevel {
@@ -866,7 +971,7 @@ function beginGame(seed: number | undefined, starter: PlayerId, gameNo: number):
   // Tegen de computer of online hoeft niemand weg te kijken.
   handoff = vsComputer || net ? null : starter;
   render();
-  showToast(`Spel ${gameNo}: ${game.players[starter].name} begint`);
+  showToast(tr(`Spel ${gameNo}: ${game.players[starter].name} begint`, `Game ${gameNo}: ${game.players[starter].name} starts`));
   if (computerTurn(game)) scheduleComputer(COMPUTER_THINK_MS);
   else if (handoff === null && !remoteTurn(game)) sfx.deal(game.players[game.active].hand.length);
 }
@@ -884,7 +989,7 @@ function stateCheck(g: GameState): string {
 
 const netEvents = {
   onMessage: (m: Msg) => onNetMessage(m),
-  onClose: () => leaveOnline('De verbinding met je tegenstander is verbroken.'),
+  onClose: () => leaveOnline(tr('De verbinding met je tegenstander is verbroken.', 'The connection to your opponent was lost.')),
 };
 
 function startHosting(code = makeCode()): void {
@@ -919,7 +1024,7 @@ function startJoining(): void {
   const code = (document.querySelector<HTMLInputElement>('#code')?.value ?? '').trim().toUpperCase();
   codeFromLink = code;
   if (code.length !== 4) {
-    netError = 'Een kamercode heeft 4 tekens.';
+    netError = tr('Een kamercode heeft 4 tekens.', 'A room code has 4 characters.');
     render();
     return;
   }
@@ -961,7 +1066,7 @@ function onNetMessage(m: Msg): void {
   switch (m.t) {
     case 'hello':
       if (net.me !== 0 || net.status === 'playing') return;
-      if (m.protocol !== PROTOCOL) return leaveOnline('Jullie spelen met een andere versie van het spel. Ververs allebei de pagina.');
+      if (m.protocol !== PROTOCOL) return leaveOnline(tr('Jullie spelen met een andere versie van het spel. Ververs allebei de pagina.', 'You are playing different versions of the game. Both of you, please refresh the page.'));
       netNames = [names[0], m.name];
       net.status = 'playing';
       match = newMatch();
@@ -969,7 +1074,7 @@ function onNetMessage(m: Msg): void {
       break;
     case 'start':
       if (net.me !== 1) return;
-      if (m.protocol !== PROTOCOL) return leaveOnline('Jullie spelen met een andere versie van het spel. Ververs allebei de pagina.');
+      if (m.protocol !== PROTOCOL) return leaveOnline(tr('Jullie spelen met een andere versie van het spel. Ververs allebei de pagina.', 'You are playing different versions of the game. Both of you, please refresh the page.'));
       net.status = 'playing';
       netNames = m.names;
       if (m.gameNo === 1) match = newMatch();
@@ -1009,7 +1114,7 @@ function pumpRemote(): void {
     if (id !== gameId) return;
     remoteBusy = false;
     dispatch(m.action, true);
-    if (game && stateCheck(game) !== m.check) showToast('Let op: jullie spel loopt niet meer gelijk. Start best een nieuw spel.');
+    if (game && stateCheck(game) !== m.check) showToast(tr('Let op: jullie spel loopt niet meer gelijk. Start best een nieuw spel.', 'Warning: your games are out of sync. Better start a new game.'));
     pumpRemote();
   };
   // Net als bij de computer: een kaart van de tegenstander wordt eerst in het midden getoond.
@@ -1092,8 +1197,8 @@ function showcase(g: GameState, action: Extract<Action, { type: 'play' }>, done:
   const label = document.createElement('div');
   label.className = 'showcase-label';
   label.innerHTML = toZone
-    ? `${esc(g.players[pid].name)} speelt in <b>${g.zones[target.zone].icon} ${esc(g.zones[target.zone].name)}</b>`
-    : `${esc(g.players[pid].name)} legt af`;
+    ? `${esc(g.players[pid].name)} ${tr('speelt in', 'plays in')} <b>${g.zones[target.zone].icon} ${esc(zoneName(g.zones[target.zone]))}</b>`
+    : `${esc(g.players[pid].name)} ${tr('legt af', 'discards')}`;
   const el = document.createElement('div');
   el.className = `card fx-card showcase ${toZone ? 'use-bottom' : 'use-top'}`;
   el.innerHTML = renderFace(def);
@@ -1470,5 +1575,6 @@ function fit(): void {
 }
 
 window.addEventListener('resize', fit);
+applyLangToPage();
 fit();
 render();

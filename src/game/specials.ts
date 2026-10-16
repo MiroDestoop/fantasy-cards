@@ -1,3 +1,4 @@
+import { tr } from './i18n';
 import type { GameState, PlayerId, PlayerState, Zone } from './types';
 
 /** Alles wat een speciaal effect mag gebruiken. Wat je hier aanpast, werkt op een kopie van het spel. */
@@ -19,8 +20,8 @@ export interface SpecialContext {
 }
 
 export interface SpecialDef {
-  /** De tekst op de kaart. Hou ze kort: er is maar plaats voor een regel of drie. */
-  text: string;
+  /** De tekst op de kaart (een getter, in de gekozen taal). Hou ze kort: er is maar plaats voor een regel of drie. */
+  readonly text: string;
   run: (ctx: SpecialContext) => void;
 }
 
@@ -28,37 +29,39 @@ export interface SpecialDef {
 // Gebruik ze op een kaart met special('naam') in cards.ts.
 export const SPECIALS: Record<string, SpecialDef> = {
   dubbelgoud: {
-    text: 'Verdubbel je goud (max. +6).',
+    get text() { return tr('Verdubbel je goud (max. +6).', 'Double your gold (max. +6).'); },
     run: ({ me }) => {
       me.gold += Math.min(me.gold, 6);
     },
   },
   diefstal: {
-    text: 'Steel al het goud van je tegenstander.',
+    get text() { return tr('Steel al het goud van je tegenstander.', "Steal all your opponent's gold."); },
     run: ({ me, opp, log }) => {
       const stolen = opp.gold;
       me.gold += stolen;
       opp.gold = 0;
-      log(stolen ? `👺 ${me.name} steelt ${stolen} goud van ${opp.name}!` : `👺 ${opp.name} heeft geen goud om te stelen.`);
+      log(stolen
+        ? tr(`👺 ${me.name} steelt ${stolen} goud van ${opp.name}!`, `👺 ${me.name} steals ${stolen} gold from ${opp.name}!`)
+        : tr(`👺 ${opp.name} heeft geen goud om te stelen.`, `👺 ${opp.name} has no gold to steal.`));
     },
   },
   ram: {
-    text: '+3 schade als je tegenstander hier een Schild heeft.',
+    get text() { return tr('+3 schade als je tegenstander hier een Schild heeft.', '+3 damage if your opponent has a Shield here.'); },
     run: ({ zone, oppId, damage }) => {
       if (zone && zone.shield[oppId] > 0) damage(3);
     },
   },
   // De twee volgende doen niets op het moment zelf: de engine kijkt ernaar (zie hasSpecial in engine.ts).
   huur: {
-    text: 'Gaat aan het einde van je beurt terug naar de winkel.',
+    get text() { return tr('Gaat aan het einde van je beurt terug naar de winkel.', 'Returns to the shop at the end of your turn.'); },
     run: () => {},
   },
   wedergeboorte: {
-    text: 'Vernietigd of teruggeroepen? Dan keert ze terug in je hand.',
+    get text() { return tr('Vernietigd of teruggeroepen? Dan keert ze terug in je hand.', 'Destroyed or recalled? She returns to your hand.'); },
     run: () => {},
   },
   wraak: {
-    text: '1 schade per kaart van je tegenstander hier.',
+    get text() { return tr('1 schade per kaart van je tegenstander hier.', "1 damage per opponent's card here."); },
     run: ({ zone, oppId, damage }) => {
       if (zone) damage(zone.cards.filter((c) => c.player === oppId).length);
     },

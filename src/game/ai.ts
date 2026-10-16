@@ -1,3 +1,4 @@
+import { tr } from './i18n';
 import { getCard } from './cards';
 import { applyAction, other, recallPrice, whyCantBuy, zoneCardCount } from './engine';
 import { ZONE_HP } from './rules';
@@ -18,12 +19,13 @@ import type { Action, CardDef, CardInstance, GameState, PlayerId, PlayTarget } f
  */
 export type AiLevel = 'normaal' | 'moeilijk' | 'extreem' | 'legendarisch';
 
-export const AI_LEVELS: { id: AiLevel; label: string; icon: string; bonusGold: number }[] = [
-  { id: 'normaal', label: 'Normaal', icon: '😐', bonusGold: 0 },
-  { id: 'moeilijk', label: 'Moeilijk', icon: '😠', bonusGold: 0 },
-  { id: 'extreem', label: 'Extreem', icon: '😈', bonusGold: 0 },
+// label is een getter, in de gekozen taal.
+export const AI_LEVELS: { id: AiLevel; readonly label: string; icon: string; bonusGold: number }[] = [
+  { id: 'normaal', get label() { return tr('Normaal', 'Normal'); }, icon: '😐', bonusGold: 0 },
+  { id: 'moeilijk', get label() { return tr('Moeilijk', 'Hard'); }, icon: '😠', bonusGold: 0 },
+  { id: 'extreem', get label() { return tr('Extreem', 'Extreme'); }, icon: '😈', bonusGold: 0 },
   // Slimmer denken levert boven Extreem niets meetbaars meer op; Legendarisch krijgt daarom een openlijke bonus.
-  { id: 'legendarisch', label: 'Legendarisch', icon: '💀', bonusGold: 1 },
+  { id: 'legendarisch', get label() { return tr('Legendarisch', 'Legendary'); }, icon: '💀', bonusGold: 1 },
 ];
 
 interface Profile {

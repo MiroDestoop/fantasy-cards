@@ -3,6 +3,7 @@
 // Beide kanten draaien dezelfde engine: omdat die voorspelbaar is (seed in de state), sturen we alleen de acties door.
 
 import Peer, { type DataConnection } from 'peerjs';
+import { tr } from './game/i18n';
 import type { Action, PlayerId } from './game/types';
 
 /** Verhoog dit als berichten of spelregels veranderen, zodat oude en nieuwe versies niet met elkaar spelen. */
@@ -93,8 +94,8 @@ export function hostRoom(
   });
   peer.on('error', (err) => {
     if (taken) return;
-    if (err.type === 'unavailable-id') ev.onError('Die kamercode is al in gebruik.', true);
-    else ev.onError('Geen verbinding met de server om een kamer te maken.', false);
+    if (err.type === 'unavailable-id') ev.onError(tr('Die kamercode is al in gebruik.', 'That room code is already in use.'), true);
+    else ev.onError(tr('Geen verbinding met de server om een kamer te maken.', 'No connection to the server to create a room.'), false);
   });
   return () => peer.destroy();
 }
@@ -112,7 +113,9 @@ export function joinRoom(code: string, ev: LinkEvents & { onJoined(link: Link): 
   });
   peer.on('error', (err) => {
     if (joined) return;
-    ev.onError(err.type === 'peer-unavailable' ? `Geen kamer gevonden met code ${code.toUpperCase()}.` : 'Verbinden lukt niet.');
+    ev.onError(err.type === 'peer-unavailable'
+      ? tr(`Geen kamer gevonden met code ${code.toUpperCase()}.`, `No room found with code ${code.toUpperCase()}.`)
+      : tr('Verbinden lukt niet.', 'Could not connect.'));
     peer.destroy();
   });
   return () => peer.destroy();

@@ -1,54 +1,69 @@
+import { cardsWord, tr } from './i18n';
 import { MAX_HAND, MAX_ZONE_CARDS, ZONE_HP } from './rules';
 import { getSpecial } from './specials';
 import type { CardDef, Effect, Keyword } from './types';
 
-const kaarten = (n: number) => (n === 1 ? '1 kaart' : `${n} kaarten`);
-
-export const KEYWORDS: Record<Keyword, { label: string; noAmount?: boolean; explain: (n: number) => string }> = {
+// label is een getter: zo geeft KEYWORDS[kw].label altijd de gekozen taal.
+export const KEYWORDS: Record<Keyword, { readonly label: string; noAmount?: boolean; explain: (n: number) => string }> = {
   goud: {
-    label: 'Goud',
-    explain: (n) => `Krijg ${n} goud. Daarmee koop je kaarten in de winkel. Goud blijft bewaard tot je het uitgeeft.`,
+    get label() { return tr('Goud', 'Gold'); },
+    explain: (n) => tr(
+      `Krijg ${n} goud. Daarmee koop je kaarten in de winkel. Goud blijft bewaard tot je het uitgeeft.`,
+      `Gain ${n} gold. You buy cards in the shop with it. Gold is kept until you spend it.`,
+    ),
   },
   aanval: {
-    label: 'Aanval',
-    explain: (n) => `Doe ${n} schade in de zone waar je deze kaart speelt. Wie als eerste de levens van een zone vol schade doet (meestal ${ZONE_HP}), verovert ze.`,
+    get label() { return tr('Aanval', 'Attack'); },
+    explain: (n) => tr(
+      `Doe ${n} schade in de zone waar je deze kaart speelt. Wie als eerste de levens van een zone vol schade doet (meestal ${ZONE_HP}), verovert ze.`,
+      `Deal ${n} damage in the zone where you play this card. Whoever first fills a zone's health with damage (usually ${ZONE_HP}) conquers it.`,
+    ),
   },
   storm: {
-    label: 'Storm',
-    explain: (n) => `Doe ${n} schade in elke zone die nog niet veroverd is.`,
+    get label() { return tr('Storm', 'Storm'); },
+    explain: (n) => tr(`Doe ${n} schade in elke zone die nog niet veroverd is.`, `Deal ${n} damage in every zone that has not been conquered yet.`),
   },
   herstel: {
-    label: 'Herstel',
-    explain: (n) => `Verwijder ${n} schade die je tegenstander in deze zone gedaan heeft.`,
+    get label() { return tr('Herstel', 'Heal'); },
+    explain: (n) => tr(`Verwijder ${n} schade die je tegenstander in deze zone gedaan heeft.`, `Remove ${n} damage your opponent has dealt in this zone.`),
   },
   schild: {
-    label: 'Schild',
-    explain: (n) => `Blokkeer de volgende ${n} schade die je tegenstander in deze zone doet.`,
+    get label() { return tr('Schild', 'Shield'); },
+    explain: (n) => tr(`Blokkeer de volgende ${n} schade die je tegenstander in deze zone doet.`, `Block the next ${n} damage your opponent deals in this zone.`),
   },
   trek: {
-    label: 'Trek',
-    explain: (n) =>
-      `Trek ${kaarten(n)}. Is je stapel leeg, dan wordt je aflegstapel geschud; kaarten die je deze beurt gespeeld hebt, zitten daar nog niet in. Je hand heeft een limiet van ${MAX_HAND}: wat je daarboven trekt, gaat naar je aflegstapel.`,
+    get label() { return tr('Trek', 'Draw'); },
+    explain: (n) => tr(
+      `Trek ${cardsWord(n)}. Is je stapel leeg, dan wordt je aflegstapel geschud; kaarten die je deze beurt gespeeld hebt, zitten daar nog niet in. Je hand heeft een limiet van ${MAX_HAND}: wat je daarboven trekt, gaat naar je aflegstapel.`,
+      `Draw ${cardsWord(n)}. If your deck is empty, your discard pile is shuffled; cards you played this turn are not in it yet. Your hand limit is ${MAX_HAND}: anything you draw above it goes to your discard pile.`,
+    ),
   },
   vertraag: {
-    label: 'Vertraag',
-    explain: (n) => `Je tegenstander trekt volgende beurt ${kaarten(n)} minder.`,
+    get label() { return tr('Vertraag', 'Slow'); },
+    explain: (n) => tr(`Je tegenstander trekt volgende beurt ${cardsWord(n)} minder.`, `Your opponent draws ${cardsWord(n)} fewer next turn.`),
   },
   vernietig: {
-    label: 'Vernietig',
+    get label() { return tr('Vernietig', 'Destroy'); },
     noAmount: true,
-    explain: () =>
+    explain: () => tr(
       `Verban al je andere kaarten in deze zone uit het spel; deze kaart blijft liggen. Zo maak je plaats (max. ${MAX_ZONE_CARDS} per zone) en raak je zwakke kaarten voorgoed kwijt. Je hebt wel een vrije plek nodig om ze te spelen.`,
+      `Banish all your other cards in this zone from the game; this card stays. This makes room (max. ${MAX_ZONE_CARDS} per zone) and gets rid of weak cards for good. You do need a free slot to play it.`,
+    ),
   },
   terugroep: {
-    label: 'Terugroep',
-    explain: (n) =>
+    get label() { return tr('Terugroep', 'Recall'); },
+    explain: (n) => tr(
       `Haal ${n === 1 ? 'je oudste andere kaart' : `je ${n} oudste andere kaarten`} in deze zone terug naar je aflegstapel; deze kaart blijft liggen. Je hebt wel een vrije plek nodig om ze te spelen.`,
+      `Return ${n === 1 ? 'your oldest other card' : `your ${n} oldest other cards`} in this zone to your discard pile; this card stays. You do need a free slot to play it.`,
+    ),
   },
   ververs: {
-    label: 'Ververs',
+    get label() { return tr('Ververs', 'Refresh'); },
     noAmount: true,
-    explain: () => 'Vervang alle kaarten in de winkel door nieuwe. De oude gaan onderaan de voorraad.',
+    explain: () => tr(
+      'Vervang alle kaarten in de winkel door nieuwe. De oude gaan onderaan de voorraad.',
+      'Replace all cards in the shop with new ones. The old ones go to the bottom of the supply.',
+    ),
   },
 };
 
@@ -96,6 +111,24 @@ const CARD_LIST: CardDef[] = [
   { id: 'goblin', name: 'Goblin', price: 2, icon: '👺', color: '#558b2f', top: [fx('goud', 1)], bottom: [special('diefstal')] },
   { id: 'geest', name: 'Wrekende Geest', price: 4, icon: '👻', color: '#455a64', top: [fx('trek', 1), fx('goud', 1)], bottom: [special('wraak')] },
 ];
+
+/** Engelse kaartnamen. Een kaart zonder vertaling hier houdt haar Nederlandse naam. */
+const NAMES_EN: Record<string, string> = {
+  koper: 'Copper Coin', zilver: 'Silver Coin', rekruut: 'Recruit',
+  vuurbal: 'Fireball', trol: 'Troll Smasher', draak: "Dragon's Breath", storm: 'Lightning Storm',
+  vampier: 'Vampire Bite', uil: 'Wise Owl', inzicht: 'Arcane Insight', heks: 'Ice Witch', zandloper: 'Hourglass',
+  golem: 'Stone Golem', bron: 'Healing Spring', schat: 'Dragon Hoard', offervuur: 'Sacrificial Fire',
+  terugtocht: 'Retreat', koerier: 'Courier', hoornblazer: 'Horn Blower', marskramer: 'Peddler',
+  bard: 'Wandering Bard', valkenier: 'Falconer', getijde: 'Tide Mage', bol: 'Crystal Ball', generaal: 'General',
+  alchemist: 'Alchemist', huurling: 'Mercenary', ram: 'Battering Ram', fenix: 'Phoenix', goblin: 'Goblin',
+  geest: 'Vengeful Spirit',
+};
+
+// De naam wordt een getter: def.name geeft altijd de naam in de gekozen taal.
+for (const def of CARD_LIST) {
+  const nl = def.name;
+  Object.defineProperty(def, 'name', { get: () => tr(nl, NAMES_EN[def.id] ?? nl), enumerable: true });
+}
 
 export const CARDS: Record<string, CardDef> = Object.fromEntries(CARD_LIST.map((c) => [c.id, c]));
 
