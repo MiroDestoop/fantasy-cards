@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { getCard, SHOP_SUPPLY } from './cards';
 import { getSpecial } from './specials';
-import { applyAction, createGame, recallPrice, shopPrice } from './engine';
+import { applyAction, createGame, recallPrice, shopPrice, drawOverflow } from './engine';
 import { FIRST_HAND_SIZE, HAND_SIZE, MARKET_SIZE, MAX_HAND, MAX_ZONE_CARDS, RECALL_PRICE, ZONE_HP } from './rules';
 import type { Action, GameState, PlayerId, PlayTarget } from './types';
 import { makeZone, type ZoneEffectId } from './zones';
@@ -640,6 +640,27 @@ describe('Dodenbezweerder', () => {
     s = play(s, 'dodenbezweerder', zone(0));
     expect(s.zones[0].cards.map((c) => c.card.defId)).toEqual(['dodenbezweerder']);
     expect(s.zones[0].damage[0]).toBe(4);
+  });
+});
+
+describe('Ravenkoningin', () => {
+  it('doet 2 schade per lege plek van de tegenstander in deze zone', () => {
+    let s = createGame(['Ana', 'Bo'], 6, { plainZones: true });
+    s.zones[0].cards.push({ player: 1, card: { uid: 'x1', defId: 'zilver' }, turn: 1 });
+    s = play(s, 'ravenkoningin', zone(0));
+    expect(s.zones[0].damage[0]).toBe(2 * (MAX_ZONE_CARDS - 1) + 2);
+  });
+});
+
+describe('drawOverflow: waarschuwing voor de handlimiet', () => {
+  it('telt de kaarten die boven de limiet getrokken zouden worden', () => {
+    const s = createGame(['Ana', 'Bo'], 6, { plainZones: true });
+    const p = s.players[0];
+    p.hand = Array.from({ length: MAX_HAND - 1 }, (_, i) => ({ uid: `h${i}`, defId: 'koper' }));
+    p.hand.push({ uid: 'aart', defId: 'aartsmagier' });
+    p.deck = Array.from({ length: 10 }, (_, i) => ({ uid: `d${i}`, defId: 'koper' }));
+    expect(drawOverflow(s, 'aart', DISCARD)).toBe(3);
+    expect(drawOverflow(s, 'h0', DISCARD)).toBe(0);
   });
 });
 

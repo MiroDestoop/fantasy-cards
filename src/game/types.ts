@@ -3,7 +3,7 @@ import type { ZoneEffectId } from './zones';
 export type PlayerId = 0 | 1;
 
 export type Keyword =
-  | 'goud' | 'aanval' | 'storm' | 'herstel' | 'schild' | 'trek' | 'vertraag' | 'vernietig' | 'terugroep' | 'ververs' | 'herschep';
+  | 'goud' | 'aanval' | 'storm' | 'herstel' | 'schild' | 'trek' | 'vertraag' | 'vernietig' | 'terugroep' | 'ververs' | 'herschep' | 'echo';
 
 /**
  * Eén effect op een kaart: een keyword met zijn waarde, zoals Aanval(2),

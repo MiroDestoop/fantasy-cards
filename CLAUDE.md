@@ -27,9 +27,10 @@ Repository: https://github.com/MiroDestoop/fantasy-cards. `vite.config.ts` gebru
 - **Terugtrekken:** tijdens je beurt kan je een eigen kaart uit een open zone terug naar je aflegstapel sturen voor goud (knop ↩ bij hover). Het kost eerst 3 goud (`RECALL_PRICE`) en elke keer dat je het doet, wordt het voor jou 1 goud duurder, voor de rest van het spel (`recalls` in `PlayerState`, actie `recall`).
 - **Winkel:** een gedeelde markt van 5 kaarten. Je koopt met goud; goud blijft bewaard over beurten heen. Een gekochte kaart gaat naar je aflegstapel en de vrije plek wordt aangevuld.
 - **Zone-effect veranderen:** keyword **Herschep** (alleen in een zone): deze zone krijgt een nieuw effect, willekeurig (seed) uit de effecten die nu in geen zone spelen (`newZoneEffect` / `setZoneEffect` in `engine.ts`). Altijd maar één zone tegelijk. Kaarten: Landmeter (5), Portaalmagiër (6), Weermaker (7). De levens volgen het nieuwe effect, maar blijven minstens 1 boven de hoogste schade: een nieuw effect verovert nooit zelf een zone. De schade blijft staan. De AI telt een veranderd zone-effect als iets dat onthuld wordt (`reveals`).
-- **Echo** (Windloper, Schaduwdanser, Tijdmagiër): de volgende kaart die je deze beurt in een zone speelt, werkt gewoon en keert daarna meteen terug naar je aflegstapel (`echo` in `PlayerState`, in `playCard`; een Huurling naar de winkel, een Fenix naar je hand). De kaart met echo zelf telt niet mee. Vervalt bij Einde beurt. Ze heeft wel een vrije plek nodig, net als Terugroep.
+- **Echo** (keyword, Windloper, Schaduwdanser, Tijdmagiër): de volgende kaart die je deze beurt in een zone speelt, werkt gewoon en keert daarna meteen terug naar je aflegstapel (`echo` in `PlayerState`, in `playCard`; een Huurling naar de winkel, een Fenix naar je hand). De kaart met echo zelf telt niet mee. Vervalt bij Einde beurt. Ze heeft wel een vrije plek nodig, net als Terugroep.
 - **Vernietig-kaarten:** Offervuur, Terugtocht, Zuiveraar, Brandstichter, Leegtescheur, en Dodenbezweerder (`zielenoogst`: Vernietig + 2 schade per verbannen kaart, via `destroy()` in de special-context).
-- **Dure kaarten (7–12 goud):** Generaal (7), Oorlogsmammoet (7), Aartsmagiër (8), Titaan (9), Leegtescheur (10), Meteoor (11), Drakenkoning (12). Elk maar 1 of 2 keer in de voorraad.
+- **Dure kaarten (7–12 goud):** Generaal (7), Oorlogsmammoet (7), Aartsmagiër (8), Titaan (9), Ravenkoningin (9, `leegveld`: 2 schade per lege plek van de tegenstander in deze zone), Leegtescheur (10), Meteoor (11), Drakenkoning (12). Elk maar 1 of 2 keer in de voorraad.
+- **Handlimiet-waarschuwing:** trekt een kaart die je speelt (Trek op die helft, plus het trekken van het zone-effect) boven de handlimiet, dan vraagt de UI eerst "Ben je zeker?" (`drawOverflow` in `engine.ts`, `pendingPlay` in `main.ts`). Alleen bij slepen door de mens; de AI vraagt niets.
 - **Er is geen mana.** Dat systeem is bewust verwijderd.
 
 **Keywords** (uitleg staat in `KEYWORDS` in `src/game/cards.ts` en verschijnt als tooltip bij hover):
@@ -46,6 +47,7 @@ Repository: https://github.com/MiroDestoop/fantasy-cards. `vite.config.ts` gebru
 | Terugroep(x) | je x oudste kaarten in deze zone gaan naar je aflegstapel |
 | Vernietig | verban al je kaarten in deze zone uit het spel |
 | Ververs | vervang de hele winkel; de oude kaarten gaan onderaan de voorraad |
+| Echo | de volgende kaart die je deze beurt in een zone speelt, keert na haar effect meteen terug naar je aflegstapel |
 | Herschep | deze zone krijgt een nieuw willekeurig effect (dat in geen andere zone speelt) |
 
 Een kaart in een zone wordt **eerst gelegd**, daarna werken haar effecten. Terugroep en Vernietig slaan de kaart zelf over. Een kaart met die keywords heeft dus ook een vrije plek nodig: je kunt ze niet als vijfde kaart spelen.

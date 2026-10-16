@@ -117,6 +117,22 @@ export function whyCantPlay(state: GameState, handUid: string, target: PlayTarge
   return null;
 }
 
+/**
+ * Zoveel kaarten zou deze zet trekken boven de handlimiet: die gaan meteen naar de aflegstapel.
+ * Telt Trek op de gespeelde helft en het trekken van het zone-effect, maar nooit meer dan er te trekken valt.
+ */
+export function drawOverflow(state: GameState, handUid: string, target: PlayTarget): number {
+  const p = state.players[state.active];
+  const card = p.hand.find((c) => c.uid === handUid);
+  if (!card) return 0;
+  const def = getCard(card.defId);
+  const half = target.kind === 'discard' ? def.top : def.bottom;
+  let draws = half.reduce((t, e) => t + (e.kw === 'trek' ? e.amount : 0), 0);
+  if (target.kind === 'zone') draws += zoneEffect(state.zones[target.zone])?.onPlay?.draw ?? 0;
+  draws = Math.min(draws, p.deck.length + p.discard.length);
+  return Math.max(0, p.hand.length - 1 + draws - MAX_HAND);
+}
+
 /** Wat het nu kost om een kaart uit een zone terug te trekken. */
 export function recallPrice(state: GameState, pid: PlayerId): number {
   return RECALL_PRICE + state.players[pid].recalls;
@@ -303,6 +319,10 @@ function applyEffect(s: GameState, pid: PlayerId, e: Effect, zoneIdx: number | n
       break;
     case 'herschep':
       if (zoneIdx !== null) newZoneEffect(s, zoneIdx);
+      break;
+    case 'echo':
+      p.echo++;
+      log(s, tr(`🌬️ De volgende kaart die ${p.name} in een zone speelt, keert meteen terug.`, `🌬️ The next card ${p.name} plays in a zone returns right away.`));
       break;
     case 'ververs':
       refreshShop(s);

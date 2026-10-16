@@ -1,5 +1,6 @@
 import { tr } from './i18n';
 import type { GameState, PlayerId, PlayerState, Zone } from './types';
+import { zoneCapacity } from './zones';
 
 /** Alles wat een speciaal effect mag gebruiken. Wat je hier aanpast, werkt op een kopie van het spel. */
 export interface SpecialContext {
@@ -70,12 +71,10 @@ export const SPECIALS: Record<string, SpecialDef> = {
       damage(destroy() * 2);
     },
   },
-  // Doet zelf niets: playCard kijkt naar me.echo.
-  echo: {
-    get text() { return tr('Je volgende kaart in een zone keert na haar effect terug.', 'Your next card in a zone returns after its effect.'); },
-    run: ({ me, log }) => {
-      me.echo++;
-      log(tr(`🌬️ De volgende kaart die ${me.name} in een zone speelt, keert meteen terug.`, `🌬️ The next card ${me.name} plays in a zone returns right away.`));
+  leegveld: {
+    get text() { return tr('2 schade per lege plek van je tegenstander hier.', "2 damage per empty opponent's slot here."); },
+    run: ({ zone, oppId, damage }) => {
+      if (zone) damage(2 * Math.max(0, zoneCapacity(zone) - zone.cards.filter((c) => c.player === oppId).length));
     },
   },
   wraak: {

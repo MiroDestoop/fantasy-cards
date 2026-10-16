@@ -3,9 +3,9 @@ import { AI_LEVELS, chooseAction, type AiLevel } from './game/ai';
 import { getCard, KEYWORDS, STARTER_DECK } from './game/cards';
 import { getSpecial } from './game/specials';
 import {
-  applyAction, createGame, other, recallPrice, shopPrice, whyCantBuy, whyCantPlay, zonesOwnedBy,
+  applyAction, createGame, drawOverflow, other, recallPrice, shopPrice, whyCantBuy, whyCantPlay, zonesOwnedBy,
 } from './game/engine';
-import { FIRST_HAND_SIZE, GAMES_TO_WIN_MATCH, HAND_SIZE, MAX_ZONE_CARDS, RECALL_PRICE, ZONE_HP, ZONES_TO_WIN } from './game/rules';
+import { FIRST_HAND_SIZE, GAMES_TO_WIN_MATCH, HAND_SIZE, MAX_HAND, MAX_ZONE_CARDS, RECALL_PRICE, ZONE_HP, ZONES_TO_WIN } from './game/rules';
 import type { Action, CardDef, CardInstance, Effect, GameState, Keyword, PlayerId, PlayTarget } from './game/types';
 import { hostRoom, joinRoom, makeCode, PROTOCOL, type Link, type Msg } from './online';
 import { isMuted, sfx, toggleMute } from './sound';
@@ -45,6 +45,8 @@ let game: GameState | null = null;
 let gameId = 0;
 /** Op een gedeeld scherm: de speler die het scherm moet krijgen voor diens hand zichtbaar wordt. */
 let handoff: PlayerId | null = null;
+/** Een zet die meer zou trekken dan de handlimiet: eerst vragen of je zeker bent. */
+let pendingPlay: { action: Extract<Action, { type: 'play' }>; lost: number } | null = null;
 /** Voor animaties: wat stond er bij de vorige weergave op tafel? */
 let prevRendered: GameState | null = null;
 const seenZoneCards = new Set<string>();
@@ -238,6 +240,7 @@ function renderGame(g: GameState): string {
     ${renderSidePanel(g)}
   </div>
   ${handoff !== null && g.winner === null ? renderHandoff(g, handoff) : ''}
+  ${pendingPlay && g.winner === null ? renderConfirmDraw(pendingPlay.lost) : ''}
   ${g.winner !== null ? renderWinner(g) : ''}`;
 
   for (const z of g.zones) for (const c of z.cards) seenZoneCards.add(`${c.card.uid}@${c.turn}`);
@@ -538,6 +541,24 @@ function renderHandoff(g: GameState, to: PlayerId): string {
   </div>`;
 }
 
+function renderConfirmDraw(lost: number): string {
+  return `
+  <div class="overlay">
+    <div class="panel">
+      <div class="big-icon">✋</div>
+      <h2>${tr('Ben je zeker?', 'Are you sure?')}</h2>
+      <p>${tr(
+        `Je handlimiet is ${MAX_HAND}. Met deze kaart trek je ${cardsWord(lost)} te veel: ${lost > 1 ? 'die gaan' : 'die gaat'} meteen naar je aflegstapel.`,
+        `Your hand limit is ${MAX_HAND}. With this card you draw ${cardsWord(lost)} too many: ${lost > 1 ? 'they go' : 'it goes'} straight to your discard pile.`,
+      )}</p>
+      <div class="buttons">
+        <button class="btn" data-click="confirm-play">${tr('Toch spelen', 'Play anyway')}</button>
+        <button class="btn secondary-plain" data-click="cancel-play">${tr('Annuleren', 'Cancel')}</button>
+      </div>
+    </div>
+  </div>`;
+}
+
 function renderWinner(g: GameState): string {
   const w = g.winner as PlayerId;
   const zones = g.zones.filter((z) => z.owner === w).map((z) => `${z.icon} ${esc(zoneName(z))}`).join(tr(' en ', ' and '));
@@ -628,6 +649,17 @@ app.addEventListener('click', (e) => {
       render();
       sfx.coin();
       break;
+    case 'confirm-play': {
+      const pending = pendingPlay;
+      pendingPlay = null;
+      if (pending && humanCanAct()) dispatch(pending.action);
+      else render();
+      break;
+    }
+    case 'cancel-play':
+      pendingPlay = null;
+      render();
+      break;
     case 'end-turn':
       if (humanCanAct()) dispatch({ type: 'endTurn' });
       break;
@@ -698,7 +730,14 @@ window.addEventListener('pointerup', (e) => {
   endDrag();
   if (!d.ghost) return;
   const target = parseDrop(dropTargetAt(e.clientX, e.clientY));
-  if (target) dispatch({ type: 'play', handUid: d.uid, target });
+  if (!target || !game) return;
+  const action = { type: 'play', handUid: d.uid, target } as const;
+  // Zou je boven de handlimiet trekken? Dan eerst vragen (alleen als de zet zelf mag).
+  const lost = whyCantPlay(game, d.uid, target) ? 0 : drawOverflow(game, d.uid, target);
+  if (lost) {
+    pendingPlay = { action, lost };
+    render();
+  } else dispatch(action);
 });
 window.addEventListener('pointercancel', endDrag);
 
@@ -1172,6 +1211,7 @@ function pumpRemote(): void {
 /** remote: de actie komt van de online tegenstander en moet niet teruggestuurd worden. */
 function dispatch(action: Action, remote = false): void {
   if (!game) return;
+  pendingPlay = null;
   const r = applyAction(game, action);
   if (!r.ok) {
     showToast(r.error);

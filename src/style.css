@@ -326,6 +326,7 @@ button { font: inherit; }
 .kw-terugroep { --edge: #5d4037; }
 .kw-ververs { --edge: #ad1457; }
 .kw-herschep { --edge: #2e7d32; }
+.kw-echo { --edge: #4f8a8b; }
 /* Een speciaal effect is een korte zin in plaats van een keyword. */
 .kw-speciaal {
   --edge: #4a2c6e;
@@ -829,6 +830,8 @@ button { font: inherit; }
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
 }
 .big-icon { font-size: 80px; }
+.panel .buttons { display: flex; gap: 16px; justify-content: center; }
+.btn.secondary-plain { background: #5a4630; color: #f3e3c3; }
 .panel h2 { margin: 12px 0; font-size: 32px; color: var(--gold); }
 .panel p { font-size: 18px; line-height: 1.4; margin-bottom: 24px; }
 
