@@ -1,6 +1,6 @@
 // Zones: elk spel krijgt 3 willekeurige namen uit ZONE_NAMES, elk met een ander willekeurig effect uit ZONE_EFFECTS.
 
-import { ZONE_HP } from './rules';
+import { MAX_ZONE_CARDS, ZONE_HP } from './rules';
 import type { Zone } from './types';
 
 export const ZONE_NAMES = [
@@ -14,7 +14,8 @@ export const ZONE_NAMES = [
 
 export type ZoneEffectId =
   | 'vesting' | 'bouwval' | 'slagveld' | 'mist' | 'goudader'
-  | 'schatkamer' | 'tolpoort' | 'zwaretocht' | 'bibliotheek';
+  | 'schatkamer' | 'tolpoort' | 'zwaretocht' | 'bibliotheek'
+  | 'bron' | 'handelspost' | 'smallepas';
 
 export interface ZoneEffectDef {
   id: ZoneEffectId;
@@ -41,6 +42,12 @@ export interface ZoneEffectDef {
   };
   /** Zoveel goud betaal je om hier een kaart te spelen; zonder dat goud kan het niet. */
   playCost?: number;
+  /** Aan het begin van je beurt verdwijnt zoveel schade van je tegenstander in deze open zone. */
+  healEachTurn?: number;
+  /** Sta je in deze open zone voor, dan kost elke winkelkaart zoveel goud minder (minimum 1). */
+  shopDiscountIfLeading?: number;
+  /** Zoveel kaarten per speler passen hier, in plaats van MAX_ZONE_CARDS. */
+  maxCards?: number;
 }
 
 export const ZONE_EFFECTS: Record<ZoneEffectId, ZoneEffectDef> = {
@@ -52,11 +59,24 @@ export const ZONE_EFFECTS: Record<ZoneEffectId, ZoneEffectDef> = {
   tolpoort: { id: 'tolpoort', icon: '🚧', label: 'Tolpoort', playCost: 1, text: 'Een kaart hier spelen kost 1 goud. Zonder goud kom je er niet in.' },
   zwaretocht: { id: 'zwaretocht', icon: '🥾', label: 'Zware tocht', onPlay: { selfSlow: 1 }, text: 'Speel je hier een kaart, dan trek je volgende beurt 1 kaart minder (Vertraag 1 op jezelf).' },
   bibliotheek: { id: 'bibliotheek', icon: '📚', label: 'Bibliotheek', onPlay: { draw: 1 }, text: 'Speel je hier een kaart, dan trek je 1 kaart.' },
+  bron: { id: 'bron', icon: '🕊️', label: 'Heilige bron', healEachTurn: 1, text: 'Aan het begin van je beurt verdwijnt hier 1 schade van je tegenstander.' },
+  handelspost: { id: 'handelspost', icon: '⚖️', label: 'Handelspost', shopDiscountIfLeading: 1, text: 'Sta je hier voor (meer schade dan je tegenstander), dan kost elke kaart in de winkel 1 goud minder (minimum 1).' },
+  smallepas: { id: 'smallepas', icon: '🏔️', label: 'Smalle pas', maxCards: 3, text: `Hier passen maar 3 kaarten per speler in plaats van ${MAX_ZONE_CARDS}.` },
   goudader: { id: 'goudader', icon: '💰', label: 'Goudader', goldIfLeading: 1, text: 'Sta je hier voor (meer schade dan je tegenstander) aan het begin van je beurt, dan krijg je 1 goud.' },
 };
 
 export function zoneEffect(z: Zone): ZoneEffectDef | null {
   return z.effect ? ZONE_EFFECTS[z.effect] : null;
+}
+
+/** Hoeveel kaarten elke speler in deze zone kwijt kan. */
+export function zoneCapacity(z: Zone): number {
+  return zoneEffect(z)?.maxCards ?? MAX_ZONE_CARDS;
+}
+
+/** Leidt deze speler in deze open zone (meer schade dan de tegenstander)? */
+export function leadsZone(z: Zone, pid: 0 | 1): boolean {
+  return z.owner === null && z.damage[pid] > z.damage[pid === 0 ? 1 : 0];
 }
 
 /** Maakt een zone met een naam en een effect (of zonder effect, voor tests). */

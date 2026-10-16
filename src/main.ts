@@ -3,13 +3,13 @@ import { AI_LEVELS, chooseAction, type AiLevel } from './game/ai';
 import { getCard, KEYWORDS, STARTER_DECK } from './game/cards';
 import { getSpecial } from './game/specials';
 import {
-  applyAction, createGame, other, recallPrice, whyCantBuy, whyCantPlay, zonesOwnedBy,
+  applyAction, createGame, other, recallPrice, shopPrice, whyCantBuy, whyCantPlay, zonesOwnedBy,
 } from './game/engine';
 import { FIRST_HAND_SIZE, GAMES_TO_WIN_MATCH, HAND_SIZE, MAX_ZONE_CARDS, RECALL_PRICE, ZONE_HP, ZONES_TO_WIN } from './game/rules';
 import type { Action, CardDef, CardInstance, Effect, GameState, Keyword, PlayerId, PlayTarget } from './game/types';
 import { hostRoom, joinRoom, makeCode, PROTOCOL, type Link, type Msg } from './online';
 import { isMuted, sfx, toggleMute } from './sound';
-import { ZONE_EFFECTS, zoneEffect } from './game/zones';
+import { zoneCapacity, ZONE_EFFECTS, zoneEffect } from './game/zones';
 import { ZONE_ART } from './zoneArt';
 
 const HERO_ICONS = ['🧙‍♂️', '🧝‍♀️'] as const;
@@ -112,7 +112,7 @@ function renderStart(): string {
       <h2>Zo speel je</h2>
       <ul>
         <li>Verover <b>${ZONES_TO_WIN} van de 3 zones</b> om te winnen. Een zone is van jou als je er als eerste haar levens vol schade doet (meestal ${ZONE_HP}).</li>
-        <li>Elk spel krijg je andere zones, elk met een <b>speciaal effect</b>: meer of minder levens, meer of minder schade, goud of een extra kaart, of juist tol betalen. Hover over het effect onder de zonenaam voor de uitleg.</li>
+        <li>Elk spel krijg je andere zones, elk met een <b>speciaal effect</b>: meer of minder levens, meer of minder schade, goud of een extra kaart, korting in de winkel, minder plaats, of juist tol betalen. Hover over het effect onder de zonenaam voor de uitleg.</li>
         <li>Je speelt een <b>best-of-3</b>: wie eerst ${GAMES_TO_WIN_MATCH} spellen wint, wint de match. Elke speler begint minstens één spel.</li>
         <li>Elke beurt trek je ${HAND_SIZE} kaarten (de beginspeler in de allereerste beurt maar ${FIRST_HAND_SIZE}). Elke kaart heeft twee helften:
           sleep ze naar je <b>aflegstapel</b> voor het bovenste effect, of naar een <b>zone</b> voor het onderste.</li>
@@ -343,10 +343,10 @@ function renderZone(g: GameState, i: number, bottom: PlayerId, prev: GameState |
       })
       .join('');
     // Vaste vakjes tonen in één oogopslag hoeveel plaats er nog is.
-    const free = Math.max(0, MAX_ZONE_CARDS - mine.length);
+    const free = Math.max(0, zoneCapacity(z) - mine.length);
     const empty = `<div class="zslot empty p${pid}"></div>`.repeat(free);
     const full = z.owner === null && free === 0;
-    return `<div class="zrow ${full ? 'full' : ''}" title="${esc(g.players[pid].name)}: ${mine.length} van ${MAX_ZONE_CARDS} plaatsen bezet">${cards}${empty}</div>`;
+    return `<div class="zrow ${full ? 'full' : ''}" title="${esc(g.players[pid].name)}: ${mine.length} van ${zoneCapacity(z)} plaatsen bezet">${cards}${empty}</div>`;
   };
   const bar = (pid: PlayerId) => {
     const dmg = z.damage[pid];
@@ -389,7 +389,13 @@ function renderShop(g: GameState): string {
       const affordable = canShop && !whyCantBuy(g, card.uid);
       return `<div class="shop-slot ${affordable ? 'affordable' : ''} ${shopDeal ? 'deal-in' : ''}" style="--i:${i}" data-click="buy:${card.uid}">
         <div class="card">${renderFace(def)}</div>
-        <div class="price" title="Prijs in goud">${def.price}</div>
+        ${(() => {
+          // Een Handelspost waar de speler aan zet voorstaat, maakt de kaart goedkoper.
+          const price = shopPrice(g, g.active, card.defId);
+          return price < (def.price ?? 0)
+            ? `<div class="price discount" title="Prijs in goud: ${price} in plaats van ${def.price} (Handelspost)">${price}</div>`
+            : `<div class="price" title="Prijs in goud">${def.price}</div>`;
+        })()}
       </div>`;
     })
     .join('');

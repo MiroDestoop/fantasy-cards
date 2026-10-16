@@ -1,7 +1,7 @@
 import { getCard } from './cards';
 import { applyAction, other, recallPrice, whyCantBuy, zoneCardCount } from './engine';
-import { MAX_ZONE_CARDS, ZONE_HP } from './rules';
-import { zoneEffect } from './zones';
+import { ZONE_HP } from './rules';
+import { zoneCapacity, zoneEffect } from './zones';
 import type { Action, CardDef, CardInstance, GameState, PlayerId, PlayTarget } from './types';
 
 /**
@@ -158,7 +158,7 @@ function buyRating(state: GameState, pid: PlayerId, def: CardDef): number {
   // Bijna een zone veroverd: schade is nu extra veel waard.
   if (open.some(({ z }) => z.damage[pid] >= z.hp * 0.6)) rating += 0.3 * attack;
   // Zones raken vol: Terugroep en Vernietig maken plaats.
-  if (has(['terugroep', 'vernietig']) && open.some(({ i }) => zoneCardCount(state, i, pid) >= MAX_ZONE_CARDS - 1)) {
+  if (has(['terugroep', 'vernietig']) && open.some(({ i }) => zoneCardCount(state, i, pid) >= zoneCapacity(state.zones[i]) - 1)) {
     rating += 1.5;
   }
   // De tegenstander wint bijna een zone: Herstel en Schild houden haar tegen.
@@ -174,7 +174,7 @@ function unblockingRecall(state: GameState, pid: PlayerId): Action | null {
   const me = state.players[pid];
   if (!me.hand.some((c) => getCard(c.defId).bottom.length)) return null;
   const open = state.zones.map((z, i) => ({ z, i })).filter(({ z }) => z.owner === null);
-  if (!open.length || open.some(({ i }) => zoneCardCount(state, i, pid) < MAX_ZONE_CARDS)) return null;
+  if (!open.length || open.some(({ z, i }) => zoneCardCount(state, i, pid) < zoneCapacity(z))) return null;
   if (me.gold < recallPrice(state, pid)) return null;
   const { z, i } = open.reduce((a, b) => (b.z.damage[pid] > a.z.damage[pid] ? b : a));
   const mine = z.cards.filter((c) => c.player === pid);
@@ -187,7 +187,7 @@ function recallActions(state: GameState, pid: PlayerId): Action[] {
   const actions: Action[] = [];
   state.zones.forEach((z, i) => {
     // Alleen in volle zones: anders is terugtrekken weggegooid goud.
-    if (z.owner !== null || zoneCardCount(state, i, pid) < MAX_ZONE_CARDS) return;
+    if (z.owner !== null || zoneCardCount(state, i, pid) < zoneCapacity(z)) return;
     const tried = new Set<string>();
     for (const c of z.cards) {
       if (c.player !== pid || tried.has(c.card.defId)) continue;

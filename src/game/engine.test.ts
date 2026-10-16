@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { getCard, SHOP_SUPPLY } from './cards';
 import { getSpecial } from './specials';
-import { applyAction, createGame, recallPrice } from './engine';
+import { applyAction, createGame, recallPrice, shopPrice } from './engine';
 import { FIRST_HAND_SIZE, HAND_SIZE, MARKET_SIZE, MAX_HAND, MAX_ZONE_CARDS, RECALL_PRICE, ZONE_HP } from './rules';
 import type { Action, GameState, PlayerId, PlayTarget } from './types';
 import { makeZone, type ZoneEffectId } from './zones';
@@ -466,6 +466,36 @@ describe('zones', () => {
     s = act(s, { type: 'endTurn' });
     s = act(s, { type: 'endTurn' });
     expect(s.players[0].hand).toHaveLength(HAND_SIZE - 2);
+  });
+
+  it('Heilige bron wist aan het begin van je beurt 1 schade van je tegenstander uit', () => {
+    let s = withEffect('bron');
+    s.zones[0].damage = [4, 3];
+    s = act(s, { type: 'endTurn' });
+    // Bo is aan zet: Ana's schade zakt.
+    expect(s.zones[0].damage).toEqual([3, 3]);
+    s = act(s, { type: 'endTurn' });
+    expect(s.zones[0].damage).toEqual([3, 2]);
+  });
+
+  it('Handelspost geeft 1 goud korting in de winkel als je er voorstaat', () => {
+    let s = withEffect('handelspost');
+    const card = s.shop.market[0];
+    const price = getCard(card.defId).price!;
+    expect(shopPrice(s, 0, card.defId)).toBe(price);
+    s.zones[0].damage = [2, 1];
+    expect(shopPrice(s, 0, card.defId)).toBe(Math.max(1, price - 1));
+    expect(shopPrice(s, 1, card.defId)).toBe(price);
+    s.players[0].gold = price - 1;
+    s = act(s, { type: 'buy', marketUid: card.uid });
+    expect(s.players[0].gold).toBe(price - 1 - Math.max(1, price - 1));
+  });
+
+  it('Smalle pas heeft maar 3 plaatsen per speler', () => {
+    let s = withEffect('smallepas');
+    for (let i = 0; i < 3; i++) s = play(s, 'zilver', zone(0));
+    const r = applyAction(s, { type: 'play', handUid: give(s, 0, 'zilver'), target: zone(0) });
+    expect(r.ok).toBe(false);
   });
 
   it('Goudader geeft 1 goud aan het begin van je beurt als je er voorstaat', () => {

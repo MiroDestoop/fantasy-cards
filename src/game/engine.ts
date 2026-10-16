@@ -1,9 +1,9 @@
 import { getCard, SHOP_SUPPLY, STARTER_DECK } from './cards';
 import { getSpecial } from './specials';
 import {
-  FIRST_HAND_SIZE, HAND_SIZE, MARKET_SIZE, MAX_HAND, MAX_ZONE_CARDS, RECALL_PRICE, ZONE_COUNT, ZONES_TO_WIN,
+  FIRST_HAND_SIZE, HAND_SIZE, MARKET_SIZE, MAX_HAND, RECALL_PRICE, ZONE_COUNT, ZONES_TO_WIN,
 } from './rules';
-import { makeZone, ZONE_EFFECTS, ZONE_NAMES, zoneEffect, type ZoneEffectId } from './zones';
+import { leadsZone, makeZone, zoneCapacity, ZONE_EFFECTS, ZONE_NAMES, zoneEffect, type ZoneEffectId } from './zones';
 import type {
   Action, ActionResult, CardInstance, Effect, GameState, PlayerId, PlayerState, PlayTarget,
 } from './types';
@@ -104,8 +104,9 @@ export function whyCantPlay(state: GameState, handUid: string, target: PlayTarge
     const cost = zoneEffect(zone)?.playCost ?? 0;
     if (cost > state.players[state.active].gold) return `${zoneEffect(zone)!.label}: een kaart in ${zone.name} spelen kost ${cost} goud.`;
     // Ook een kaart met Terugroep of Vernietig moet eerst gelegd kunnen worden; pas daarna werkt haar effect.
-    if (zoneCardCount(state, target.zone, state.active) >= MAX_ZONE_CARDS) {
-      return `Je hebt al ${MAX_ZONE_CARDS} kaarten in ${zone.name}. Trek er eerst een terug om plaats te maken.`;
+    const max = zoneCapacity(zone);
+    if (zoneCardCount(state, target.zone, state.active) >= max) {
+      return `Je hebt al ${max} kaarten in ${zone.name}. Trek er eerst een terug om plaats te maken.`;
     }
   }
   return null;
@@ -135,9 +136,16 @@ export function zoneCardCount(state: GameState, zoneIdx: number, pid: PlayerId):
 export function whyCantBuy(state: GameState, marketUid: string): string | null {
   const card = state.shop.market.find((c) => c.uid === marketUid);
   if (!card) return 'Die kaart ligt niet in de winkel.';
-  const price = getCard(card.defId).price ?? 0;
+  const price = shopPrice(state, state.active, card.defId);
   if (price > state.players[state.active].gold) return `Niet genoeg goud (${price} nodig).`;
   return null;
+}
+
+/** Wat een winkelkaart nu kost voor deze speler (een Handelspost waar je voorstaat, maakt ze goedkoper). */
+export function shopPrice(state: GameState, pid: PlayerId, defId: string): number {
+  const base = getCard(defId).price ?? 0;
+  const discount = state.zones.reduce((t, z) => t + (leadsZone(z, pid) ? zoneEffect(z)?.shopDiscountIfLeading ?? 0 : 0), 0);
+  return discount ? Math.max(1, base - discount) : base;
 }
 
 export function zonesOwnedBy(state: GameState, pid: PlayerId): number {
@@ -313,13 +321,14 @@ function buyCard(s: GameState, marketUid: string): string | null {
   const idx = s.shop.market.findIndex((c) => c.uid === marketUid);
   const card = s.shop.market[idx];
   const def = getCard(card.defId);
-  p.gold -= def.price ?? 0;
+  const price = shopPrice(s, s.active, card.defId);
+  p.gold -= price;
   p.discard.push(card);
   // Vul aan op dezelfde plek, zodat de rest van de markt niet verschuift.
   const refill = s.shop.pile.pop();
   if (refill) s.shop.market.splice(idx, 1, refill);
   else s.shop.market.splice(idx, 1);
-  log(s, `${p.name} koopt ${def.name} voor ${def.price} goud.`);
+  log(s, `${p.name} koopt ${def.name} voor ${price} goud.`);
   return null;
 }
 
@@ -357,8 +366,15 @@ function startTurn(s: GameState): void {
     log(s, `${p.name} krijgt ${p.bonusGold} bonusgoud.`);
   }
   for (const z of s.zones) {
+    const heal = zoneEffect(z)?.healEachTurn ?? 0;
+    const opp = other(pid);
+    if (heal && z.owner === null && z.damage[opp] > 0) {
+      const healed = Math.min(heal, z.damage[opp]);
+      z.damage[opp] -= healed;
+      log(s, `🕊️ De Heilige bron in ${z.name} wist ${healed} schade van ${s.players[opp].name} uit.`);
+    }
     const gold = zoneEffect(z)?.goldIfLeading ?? 0;
-    if (gold && z.owner === null && z.damage[pid] > z.damage[other(pid)]) {
+    if (gold && leadsZone(z, pid)) {
       p.gold += gold;
       log(s, `💰 ${p.name} staat voor in ${z.name} en krijgt ${gold} goud.`);
     }
