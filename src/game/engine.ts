@@ -207,7 +207,7 @@ function playCard(s: GameState, handUid: string, target: PlayTarget): string | n
   if (target.kind === 'discard') {
     log(s, tr(`${p.name} legt ${def.name} af.`, `${p.name} discards ${def.name}.`));
     p.played.push(card);
-    for (const e of def.top) applyEffect(s, pid, e, null);
+    for (const e of def.top) if (needMet(s, pid, null, e)) applyEffect(s, pid, e, null);
   } else {
     const zone = s.zones[target.zone];
     log(s, tr(`${p.name} speelt ${def.name} in ${zoneName(zone)}.`, `${p.name} plays ${def.name} in ${zoneName(zone)}.`));
@@ -221,7 +221,9 @@ function playCard(s: GameState, handUid: string, target: PlayTarget): string | n
     if (echo) p.echo--;
     // Eerst wordt de kaart gelegd, dan pas werken haar effecten. Terugroep en Vernietig slaan de kaart zelf over.
     zone.cards.push({ player: pid, card, turn: s.turn });
-    for (const e of def.bottom) applyEffect(s, pid, e, target.zone, card.uid);
+    // Rasvoorwaarden worden gecontroleerd vóór de effecten: een Terugroep of Vernietig op dezelfde kaart neemt de bonus niet weg.
+    const met = def.bottom.map((e) => needMet(s, pid, target.zone, e, card.uid));
+    def.bottom.forEach((e, i) => { if (met[i]) applyEffect(s, pid, e, target.zone, card.uid); });
     // Daarna het effect van de zone zelf.
     const onPlay = fx?.onPlay;
     if (onPlay?.gold) {
@@ -282,7 +284,6 @@ function refreshShop(s: GameState): void {
 function applyEffect(s: GameState, pid: PlayerId, e: Effect, zoneIdx: number | null, selfUid?: string): void {
   const p = s.players[pid];
   const opp = other(pid);
-  if (!needMet(s, pid, zoneIdx, e, selfUid)) return;
   if (e.kw === 'speciaal') {
     getSpecial(e.id).run({
       state: s,

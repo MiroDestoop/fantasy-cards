@@ -34,7 +34,7 @@ export interface SpecialDef {
 // Gebruik ze op een kaart met special('naam') in cards.ts.
 export const SPECIALS: Record<string, SpecialDef> = {
   dubbelgoud: {
-    get text() { return tr('Verdubbel je goud (max. +6).', 'Double your gold (max. +6).'); },
+    get text() { return tr('Verdubbel je goud (max. +10).', 'Double your gold (max. +10).'); },
     run: ({ me }) => {
       me.gold += Math.min(me.gold, 10);
     },

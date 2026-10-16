@@ -198,7 +198,7 @@ describe('terugtrekken', () => {
     let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
     s.zones[0].damage = [0, 6];
     s = play(s, 'bron', zone(0));
-    expect(s.zones[0].damage[1]).toBe(3);
+    expect(s.zones[0].damage[1]).toBe(2);
   });
 
   it('Vertraag laat de tegenstander minder trekken', () => {
@@ -683,6 +683,15 @@ describe('rassen', () => {
     expect(s.zones[1].damage[0]).toBe(4);
     // Afgelegd werkt de voorwaarde nooit.
     expect(needMet(s, 0, null, { kw: 'aanval', amount: 1, need: 'ork' })).toBe(false);
+  });
+
+  it('een Terugroep op dezelfde kaart neemt de rasbonus niet weg', () => {
+    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true, allRaces: true });
+    s.zones[0].cards.push({ player: 0, card: { uid: 'mens', defId: 'schildknaap' }, turn: 0 });
+    // Generaal: Aanval 3, Terugroep 3 (neemt de Schildknaap terug), en toch 🧑Aanval 2.
+    s = play(s, 'generaal', zone(0));
+    expect(s.players[0].discard.some((c) => c.uid === 'mens')).toBe(true);
+    expect(s.zones[0].damage[0]).toBe(5);
   });
 
   it('drawOverflow telt een Trek met voorwaarde alleen mee als de voorwaarde klopt', () => {
