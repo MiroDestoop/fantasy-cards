@@ -16,6 +16,8 @@ export function other(p: PlayerId): PlayerId {
 export interface GameOptions {
   /** Extra goud per beurt voor elke speler, bv. [0, 1] voor een computer met een bonus. */
   bonusGold?: [number, number];
+  /** Wie de eerste beurt speelt (standaard speler 0). In een best-of-3 begint elke speler minstens één keer. */
+  starter?: PlayerId;
 }
 
 export function createGame(
@@ -37,7 +39,7 @@ export function createGame(
   const s: GameState = {
     players: [makePlayer(names[0], 0), makePlayer(names[1], 1)],
     zones: ZONE_SETUP.map((z) => ({ ...z, damage: [0, 0], shield: [0, 0], owner: null, cards: [] })),
-    active: 0,
+    active: options.starter ?? 0,
     turn: 0,
     winner: null,
     shop: { pile: SHOP_SUPPLY.map((defId, i) => ({ uid: `s-${i}`, defId })), market: [] },

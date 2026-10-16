@@ -800,11 +800,11 @@ button { font: inherit; }
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 22px;
+  gap: 16px;
 }
 .start h1 {
   margin: 0;
-  font-size: 84px;
+  font-size: 72px;
   color: var(--gold);
   letter-spacing: 0.04em;
   text-shadow: 0 4px 0 #6b4226, 0 10px 30px rgba(0, 0, 0, 0.8);
@@ -853,7 +853,8 @@ button { font: inherit; }
   border: 1px solid rgba(230, 192, 104, 0.25);
 }
 .rules h2 { margin: 4px 0 8px; font-size: 20px; color: var(--gold); }
-.rules li { margin: 6px 0; line-height: 1.4; }
+.rules { font-size: 15px; }
+.rules li { margin: 4px 0; line-height: 1.35; }
 
 #toast {
   position: fixed;
@@ -955,3 +956,58 @@ button { font: inherit; }
 @media (orientation: portrait) and (pointer: coarse) {
   #rotate { display: flex; }
 }
+
+/* ---------- Match en online ---------- */
+
+.match-score {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(230, 192, 104, 0.3);
+  text-align: center;
+  font-size: 14px;
+  color: var(--ink-dim);
+}
+.match-score b.p0, .match-line b.p0 { color: var(--p0); }
+.match-score b.p1, .match-line b.p1 { color: var(--p1); }
+.match-line { font-size: 20px; }
+.btn.small { padding: 8px 20px; font-size: 16px; }
+.btn.secondary { background: transparent; border: 1px solid rgba(230, 192, 104, 0.5); color: var(--ink-dim); box-shadow: none; }
+
+.online-choice { display: flex; gap: 24px; }
+.online-box {
+  width: 300px;
+  padding: 16px 20px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(230, 192, 104, 0.3);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+.online-box.wide { width: 560px; }
+.online-box p { margin: 0; color: var(--ink-dim); }
+.online-box .btn { padding: 10px 24px; font-size: 18px; }
+.online-box b { color: var(--gold); }
+.code-input {
+  width: 160px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 2px solid #8a6a3a;
+  background: #24170d;
+  color: var(--ink);
+  font: inherit;
+  font-size: 28px;
+  letter-spacing: 0.3em;
+  text-align: center;
+  text-transform: uppercase;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.room-code { font-size: 64px; font-weight: bold; letter-spacing: 0.25em; color: var(--gold); }
+.room-link { font-size: 13px; word-break: break-all; user-select: text; -webkit-user-select: text; }
+.room-link b { color: var(--ink) !important; font-weight: normal; }
+.waiting { font-style: italic; animation: denken 1.6s ease-in-out infinite; }
+.net-error { margin: 0; color: #ff8a80; font-size: 16px; }

@@ -19,3 +19,5 @@ export const ZONE_SETUP = [
 ];
 /** Een kaart uit een zone terugtrekken kost eerst zoveel goud; elke keer dat je het doet, wordt het 1 duurder. */
 export const RECALL_PRICE = 3;
+/** Een match is best-of-3: wie eerst 2 spellen wint, wint de match. */
+export const GAMES_TO_WIN_MATCH = 2;

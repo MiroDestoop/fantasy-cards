@@ -35,6 +35,15 @@ describe('spelopzet', () => {
     expect(s.shop.market).toHaveLength(MARKET_SIZE);
   });
 
+  it('laat de gekozen speler beginnen, met een kortere eerste hand', () => {
+    const s = createGame(['Ana', 'Bo'], 1, { starter: 1 });
+    expect(s.active).toBe(1);
+    expect(s.players[1].hand).toHaveLength(FIRST_HAND_SIZE);
+    expect(s.players[0].hand).toHaveLength(0);
+    const next = act(s, { type: 'endTurn' });
+    expect(next.players[0].hand).toHaveLength(HAND_SIZE);
+  });
+
   it('is reproduceerbaar met dezelfde seed', () => {
     expect(createGame(['A', 'B'], 7)).toEqual(createGame(['A', 'B'], 7));
   });

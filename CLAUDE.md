@@ -1,6 +1,6 @@
 # Munt of Zwaard
 
-Een fantasy-deckbuilder voor twee spelers aan hetzelfde scherm (hotseat) of tegen de computer, op desktop, in 2D met bovenaanzicht van een speltafel.
+Een fantasy-deckbuilder voor twee spelers aan hetzelfde scherm (hotseat), online tegen elkaar, of tegen de computer, op desktop, in 2D met bovenaanzicht van een speltafel.
 TypeScript + Vite, zonder framework. Alle tekst in het spel én in de code (namen, commentaar, commits) is **Nederlands**.
 
 ## Starten
@@ -17,6 +17,7 @@ Repository: https://github.com/MiroDestoop/fantasy-cards. `vite.config.ts` gebru
 
 ## Spelregels (huidige stand)
 
+- **Match:** best-of-3 (`GAMES_TO_WIN_MATCH` = 2 gewonnen spellen). Spel 1: toeval beslist wie begint; spel 2: de andere speler; spel 3: wie spel 2 verloor. Zo begint elke speler minstens één keer. De engine krijgt de beginspeler via `createGame(names, seed, { starter })`; de stand van de match (`match`, `nextStarter`) zit in `main.ts`.
 - **Winnen:** verover 2 van de 3 zones (Wachttoren, Elfenwoud, Kristalgrot). Een zone is van jou als je er als eerste 10 schade doet; daarna is ze gesloten.
 - **Stapel:** je begint met 10 startkaarten: 5× Koperen Munt (alleen Goud 1), 3× Rekruut (Goud 1 / Aanval 1 + Terugroep 1), 2× Zilveren Munt (Goud 2 / Aanval 1).
 - **Beurt:** trek 5 kaarten (min Vertraag). Alleen de allereerste beurt van het spel (de beginspeler) trekt er 3 (`FIRST_HAND_SIZE`). Is je stapel leeg, dan wordt je aflegstapel geschud. Afgelegde kaarten liggen tot het einde van je beurt apart (`played`) en gaan pas bij Einde beurt, samen met je resterende hand, naar je aflegstapel. Zo kan Trek een kaart nooit twee keer in dezelfde beurt terugbrengen (vroeger gaf een kleine stapel met Trek een oneindige lus). Handlimiet 8: wat je daarboven trekt, gaat meteen naar je aflegstapel.
@@ -57,6 +58,7 @@ Een kaart in een zone wordt **eerst gelegd**, daarna werken haar effecten. Terug
 | `src/game/ai.test.ts` | Tests voor de computertegenstander (duren ~20 s door de sterke niveaus) |
 | `src/main.ts` | Weergave, klikken, slepen, tooltips, animaties, geluid-triggers |
 | `src/style.css` | Alle stijlen |
+| `src/online.ts` | Online spelen via PeerJS (WebRTC): kamer maken (`hostRoom`), meedoen (`joinRoom`), berichten (`Msg`), hartslag |
 | `src/sound.ts` | Geluidseffecten via Web Audio (geen bestanden), aan/uit bewaard in localStorage |
 | `src/zoneArt.ts` | Inline-SVG illustraties per zone (op zonenaam) |
 
@@ -74,6 +76,7 @@ Een kaart in een zone wordt **eerst gelegd**, daarna werken haar effecten. Terug
 - **Geluiden:** `playSounds` kiest de geluiden door de toestand voor en na een actie te vergelijken.
 - **Hotseat:** na "Einde beurt" verschijnt een wisselscherm (`handoff`) dat de hand verbergt. De speler die aan zet is, zit altijd onderaan.
 - **Tegen de computer:** keuze op het startscherm (`vsComputer`), met een niveau (`computerLevel`, onthouden in localStorage). De mens is speler 0 en zit altijd onderaan, er is geen wisselscherm. `scheduleComputer` laat de computer zet per zet spelen via `dispatch`, met een pauze ertussen. Elke kaart die de computer speelt of aflegt, toont `showcase` eerst groot in het midden van het scherm (met de gebruikte helft in het licht), startkaarten maar heel kort (`STARTER_HOLD_MS`); pas als ze op haar plek aankomt, wordt de zet uitgevoerd.
+- **Online:** de host (maakt de kamer, 4-tekencode, ook als link `?kamer=CODE`) is speler 0, de gast speler 1; jij zit altijd onderaan. De gratis PeerJS-server dient alleen om elkaar te vinden; daarna loopt alles rechtstreeks tussen de browsers. Beide kanten draaien dezelfde engine (lockstep): de host kiest seed en beginspeler per spel en stuurt `start`, daarna gaan alleen acties over en weer, met een `check` (`stateCheck`) om verschillen te melden. Acties van de tegenstander worden één voor één afgespeeld (`remoteQueue`), kaarten eerst via `showcase`. Elke 2 s een `ping`; 10 s stilte geldt als verbroken. Verhoog `PROTOCOL` in `online.ts` als berichten of spelregels veranderen. Beperking: de hele toestand staat bij beide spelers, dus wie de ontwikkelaarstools opent, kan de hand van de ander zien. Achter strenge netwerken (sommige bedrijfs- of mobiele netwerken) kan verbinden mislukken, want er is geen TURN-server.
 - **Computerniveaus** (`PROFILES` in `ai.ts`); elk niveau bouwt verder op het vorige:
   - **Normaal:** speelt haar hand kaart per kaart: voor elke kaart probeert ze elke bestemming op een kopie uit en kiest ze de beste toestand volgens `evaluate`. Daarna koopt ze de duurste betaalbare kaart (vanaf 3 goud).
   - **Moeilijk:** zoekt de beste volgorde voor haar hele hand met een beam search (6 beste tussenstanden), trekt kaarten terug als dat helpt, koopt slim (`smartBuy`: naar de situatie, en soms sparen) en verdedigt meer (`threatWeight`).
@@ -109,6 +112,6 @@ Een kaart in een zone wordt **eerst gelegd**, daarna werken haar effecten. Terug
 ## Ideeën en mogelijke volgende stappen
 
 - `ideeen/characterTypesImages.jpg`: een plaat met 12 personagetypes (paladin, archer, mage, druid, bard, necromancer, shaman, warrior, elementalist, thief, barbarian, priest). Dat is mogelijk inspiratie voor klassen of helden. Nog niet besproken of gebouwd.
-- Eerder geopperd, nog niet gebouwd: online multiplayer (de engine is al los van de UI), balans van kaartprijzen en waarden, echte illustraties voor kaarten.
+- Eerder geopperd, nog niet gebouwd: balans van kaartprijzen en waarden, echte illustraties voor kaarten.
 - Een sterkere computer zonder bonus kan alleen nog via een betere `evaluate` in `ai.ts`, bijvoorbeeld door de gewichten af te stellen met veel zelfspel. Dat is veel rekenwerk met een onzeker resultaat.
 - De computer ontwikkelt zich nog niet mee met nieuwe speciale effecten; ze ziet alleen het resultaat via haar simulaties.

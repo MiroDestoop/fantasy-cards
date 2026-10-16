@@ -5,8 +5,9 @@ import { getSpecial } from './game/specials';
 import {
   applyAction, createGame, other, recallPrice, whyCantBuy, whyCantPlay, zonesOwnedBy,
 } from './game/engine';
-import { HAND_SIZE, MAX_ZONE_CARDS, RECALL_PRICE, ZONE_HP, ZONES_TO_WIN } from './game/rules';
+import { FIRST_HAND_SIZE, GAMES_TO_WIN_MATCH, HAND_SIZE, MAX_ZONE_CARDS, RECALL_PRICE, ZONE_HP, ZONES_TO_WIN } from './game/rules';
 import type { Action, CardDef, CardInstance, Effect, GameState, Keyword, PlayerId, PlayTarget } from './game/types';
+import { hostRoom, joinRoom, makeCode, PROTOCOL, type Link, type Msg } from './online';
 import { isMuted, sfx, toggleMute } from './sound';
 import { ZONE_ART } from './zoneArt';
 
@@ -45,6 +46,36 @@ let prevRendered: GameState | null = null;
 const seenZoneCards = new Set<string>();
 let scale = 1;
 
+/** Een match is best-of-3. Spel 1: toeval beslist wie begint; spel 2: de andere speler; spel 3: wie spel 2 verloor. */
+interface Match {
+  wins: [number, number];
+  /** Het spel dat nu loopt (of net gedaan is); 0 voor het eerste spel. */
+  gameNo: number;
+  firstStarter: PlayerId | null;
+  lastWinner: PlayerId | null;
+}
+let match: Match = newMatch();
+
+/** Online: het startscherm toont de tab "Online" en, na verbinden, de verbinding met de tegenstander. */
+let onlineTab = false;
+interface Net {
+  /** De host is speler 0, de gast speler 1. */
+  me: PlayerId;
+  code: string;
+  status: 'opening' | 'waiting' | 'joining' | 'playing';
+  link: Link | null;
+  stop: () => void;
+  /** De gast vroeg het volgende spel en wacht op de host. */
+  waitingNext: boolean;
+}
+let net: Net | null = null;
+/** Namen in het online spel: [host, gast]. */
+let netNames: [string, string] = ['Host', 'Gast'];
+let netError = '';
+/** Een kamercode uit de link (?kamer=ABCD) wordt alvast ingevuld. */
+let codeFromLink = new URLSearchParams(location.search).get('kamer')?.toUpperCase() ?? '';
+if (codeFromLink) onlineTab = true;
+
 // ---------- Weergave ----------
 
 function render(): void {
@@ -56,12 +87,13 @@ function renderStart(): string {
   return `
   <div class="start">
     <h1>Munt of Zwaard</h1>
-    <p class="subtitle">Een fantasy-kaartduel aan één tafel, met z'n tweeën of tegen de computer</p>
+    <p class="subtitle">Een fantasy-kaartduel aan één tafel, online, of tegen de computer</p>
     <div class="mode">
-      <button class="${vsComputer ? '' : 'on'}" data-click="mode:pvp">👥 Twee spelers</button>
+      <button class="${!vsComputer && !onlineTab ? 'on' : ''}" data-click="mode:pvp">👥 Twee spelers</button>
+      <button class="${onlineTab ? 'on' : ''}" data-click="mode:online">🌐 Online</button>
       <button class="${vsComputer ? 'on' : ''}" data-click="mode:ai">${COMPUTER_ICON} Tegen de computer</button>
     </div>
-    ${vsComputer
+    ${onlineTab ? renderOnlineStart() : `${vsComputer
       ? `<div class="mode levels">${AI_LEVELS.map((l) =>
           `<button class="${l.id === computerLevel ? 'on' : ''}" data-click="level:${l.id}">${l.icon} ${l.label}</button>`).join('')}</div>
         ${levelInfo().bonusGold
@@ -74,12 +106,13 @@ function renderStart(): string {
         ? `<label>Tegenstander <div class="computer-name">${levelInfo().icon} ${esc(computerName())}</div></label>`
         : `<label>Speler 2 <input id="name1" maxlength="16" value="${esc(names[1])}"></label>`}
     </div>
-    <button class="btn" data-click="start">Aan tafel!</button>
+    <button class="btn" data-click="start">Aan tafel!</button>`}
     <div class="rules">
       <h2>Zo speel je</h2>
       <ul>
         <li>Verover <b>${ZONES_TO_WIN} van de 3 zones</b> om te winnen. Een zone is van jou als je er als eerste ${ZONE_HP} schade doet.</li>
-        <li>Elke beurt trek je ${HAND_SIZE} kaarten. Elke kaart heeft twee helften:
+        <li>Je speelt een <b>best-of-3</b>: wie eerst ${GAMES_TO_WIN_MATCH} spellen wint, wint de match. Elke speler begint minstens één spel.</li>
+        <li>Elke beurt trek je ${HAND_SIZE} kaarten (de beginspeler in de allereerste beurt maar ${FIRST_HAND_SIZE}). Elke kaart heeft twee helften:
           sleep ze naar je <b>aflegstapel</b> voor het bovenste effect, of naar een <b>zone</b> voor het onderste.</li>
         <li>Kaarten in een zone blijven liggen, maximaal ${MAX_ZONE_CARDS} per speler per zone.
           Met <b>Terugroep</b> haal je ze terug naar je aflegstapel, met <b>Vernietig</b> verban je ze uit het spel.
@@ -91,9 +124,47 @@ function renderStart(): string {
   </div>`;
 }
 
-/** Onderaan zit de speler die aan zet is; tegen de computer zit de mens altijd onderaan. */
+function renderOnlineStart(): string {
+  const error = netError ? `<p class="net-error">${esc(netError)}</p>` : '';
+  if (!net) {
+    return `
+    <div class="names"><label>Jouw naam <input id="name0" maxlength="16" value="${esc(names[0])}"></label></div>
+    ${error}
+    <div class="online-choice">
+      <div class="online-box">
+        <b>Een kamer maken</b>
+        <p>Je krijgt een code die je aan je tegenstander geeft.</p>
+        <button class="btn" data-click="host">🏠 Maak een kamer</button>
+      </div>
+      <div class="online-box">
+        <b>Meedoen</b>
+        <p>Typ de code die je kreeg.</p>
+        <input id="code" class="code-input" maxlength="4" placeholder="ABCD" value="${esc(codeFromLink)}" autocomplete="off">
+        <button class="btn" data-click="join">🚪 Doe mee</button>
+      </div>
+    </div>`;
+  }
+  const link = `${location.origin}${location.pathname}?kamer=${net.code}`;
+  const body =
+    net.status === 'opening' ? '<p>Kamer maken…</p>'
+    : net.status === 'waiting'
+      ? `<p>Geef deze code aan je tegenstander:</p>
+        <div class="room-code">${net.code}</div>
+        <p class="room-link">of stuur de link <b>${esc(link)}</b></p>
+        <p class="waiting">Wachten op een tegenstander…</p>`
+      : `<p class="waiting">Verbinden met kamer <b>${esc(net.code)}</b>…</p>`;
+  return `<div class="online-box wide">${body}<button class="btn small" data-click="cancel-online">Annuleren</button></div>`;
+}
+
+/** Onderaan zit de speler die aan zet is; tegen de computer of online zit jij altijd onderaan. */
 function bottomSeat(g: GameState): PlayerId {
+  if (net) return net.me;
   return vsComputer ? other(COMPUTER) : g.active;
+}
+
+/** Speelt de online tegenstander nu? */
+function remoteTurn(g: GameState): boolean {
+  return !!net && g.active !== net.me;
 }
 
 function computerTurn(g: GameState): boolean {
@@ -102,7 +173,7 @@ function computerTurn(g: GameState): boolean {
 
 /** Mag de mens nu kaarten spelen, kopen of de beurt beëindigen? */
 function humanCanAct(): boolean {
-  return !!game && handoff === null && game.winner === null && !computerTurn(game);
+  return !!game && handoff === null && game.winner === null && !computerTurn(game) && !remoteTurn(game);
 }
 
 function heroIcon(pid: PlayerId): string {
@@ -329,11 +400,14 @@ function renderShop(g: GameState): string {
 function renderSidePanel(g: GameState): string {
   const p = g.players[g.active];
   const locked = !humanCanAct();
-  const thinking = computerTurn(g) && g.winner === null;
+  const thinking = (computerTurn(g) || remoteTurn(g)) && g.winner === null;
   return `
   <div class="side-panel">
+    <div class="match-score" title="Best-of-3: wie eerst ${GAMES_TO_WIN_MATCH} spellen wint, wint de match">
+      Spel ${match.gameNo} van 3<br>${renderScore(g)}
+    </div>
     <div class="turn-info ${thinking ? 'thinking' : ''}">Beurt ${g.turn}<br>${thinking
-      ? `${levelInfo().icon} <b>${esc(p.name)}</b> denkt na…`
+      ? computerTurn(g) ? `${levelInfo().icon} <b>${esc(p.name)}</b> denkt na…` : `🌐 <b>${esc(p.name)}</b> is aan zet…`
       : `<b>${esc(p.name)}</b> is aan zet`}</div>
     <button class="end-turn" data-click="end-turn" ${locked ? 'disabled' : ''}>Einde<br>beurt</button>
     <div class="hint">Sleep een kaart naar je <b>aflegstapel</b> (bovenste effect) of naar een <b>zone</b> (onderste effect).
@@ -358,15 +432,27 @@ function renderHandoff(g: GameState, to: PlayerId): string {
 function renderWinner(g: GameState): string {
   const w = g.winner as PlayerId;
   const zones = g.zones.filter((z) => z.owner === w).map((z) => `${z.icon} ${esc(z.name)}`).join(' en ');
+  const over = matchWinner() !== null;
+  const starter = over ? null : nextStarter();
+  const label = over ? '🔁 Nieuwe match' : `▶ Volgende spel · ${esc(g.players[starter!].name)} begint`;
+  const next = net?.waitingNext
+    ? `<p class="waiting">Wachten op ${esc(g.players[other(net.me)].name)}…</p>`
+    : `<button class="btn" data-click="next-game">${label}</button>`;
   return `
   <div class="overlay">
     <div class="panel">
-      <div class="big-icon">${vsComputer && w === COMPUTER ? levelInfo().icon : '🏆'}</div>
-      <h2>${vsComputer && w === COMPUTER ? 'De computer wint!' : `${esc(g.players[w].name)} wint!`}</h2>
+      <div class="big-icon">${vsComputer && w === COMPUTER ? levelInfo().icon : over ? '🏆' : '🚩'}</div>
+      <h2>${esc(g.players[w].name)} wint ${over ? 'de match' : `spel ${match.gameNo}`}!</h2>
       <p>Veroverde ${zones}.</p>
-      <button class="btn" data-click="restart">Nieuw spel</button>
+      <p class="match-line">${over ? 'Eindstand' : 'Stand'}: ${renderScore(g)}</p>
+      ${next}
+      <button class="btn small secondary" data-click="restart">${net ? 'Verlaten' : 'Terug naar het begin'}</button>
     </div>
   </div>`;
+}
+
+function renderScore(g: GameState): string {
+  return `<b class="p0">${esc(g.players[0].name)}</b> ${match.wins[0]} – ${match.wins[1]} <b class="p1">${esc(g.players[1].name)}</b>`;
 }
 
 // ---------- Klikken ----------
@@ -377,11 +463,14 @@ app.addEventListener('click', (e) => {
   switch (kind) {
     case 'start':
       goFullscreen();
-      startGame();
+      startMatch();
       break;
     case 'mode':
       readNames();
+      if (net) leaveOnline('');
       vsComputer = arg === 'ai';
+      onlineTab = arg === 'online';
+      netError = '';
       render();
       break;
     case 'level':
@@ -391,10 +480,28 @@ app.addEventListener('click', (e) => {
       render();
       break;
     case 'restart':
+      if (net) {
+        leaveOnline('');
+        break;
+      }
       gameId++;
       game = null;
       prevRendered = null;
       render();
+      break;
+    case 'next-game':
+      nextGame();
+      break;
+    case 'host':
+      goFullscreen();
+      startHosting();
+      break;
+    case 'join':
+      goFullscreen();
+      startJoining();
+      break;
+    case 'cancel-online':
+      leaveOnline('');
       break;
     case 'continue':
       handoff = null;
@@ -691,21 +798,210 @@ function saveLevel(): void {
   }
 }
 
-function startGame(): void {
+function newMatch(): Match {
+  return { wins: [0, 0], gameNo: 0, firstStarter: null, lastWinner: null };
+}
+
+function matchWinner(): PlayerId | null {
+  const w = match.wins.findIndex((n) => n >= GAMES_TO_WIN_MATCH);
+  return w < 0 ? null : (w as PlayerId);
+}
+
+/** Wie begint het volgende spel van de match? */
+function nextStarter(): PlayerId {
+  if (match.gameNo === 0 || match.firstStarter === null) return Math.random() < 0.5 ? 0 : 1;
+  if (match.gameNo === 1) return other(match.firstStarter);
+  return other(match.lastWinner ?? match.firstStarter);
+}
+
+function startMatch(): void {
   readNames();
-  game = vsComputer
-    ? createGame([names[0], computerName()], undefined, { bonusGold: [0, levelInfo().bonusGold] })
-    : createGame(names);
+  match = newMatch();
+  beginGame(undefined, nextStarter(), 1);
+}
+
+/** Na een gewonnen spel: het volgende spel, of een nieuwe match als die gedaan is. */
+function nextGame(): void {
+  if (net) {
+    if (net.me === 0) hostStartGame();
+    else if (net.link) {
+      net.waitingNext = true;
+      net.link.send({ t: 'next' });
+      render();
+    }
+    return;
+  }
+  if (matchWinner() !== null) match = newMatch();
+  beginGame(undefined, nextStarter(), match.gameNo + 1);
+}
+
+function beginGame(seed: number | undefined, starter: PlayerId, gameNo: number): void {
+  match.gameNo = gameNo;
+  if (gameNo === 1) match.firstStarter = starter;
+  const gameNames: [string, string] = net ? netNames : vsComputer ? [names[0], computerName()] : names;
+  game = createGame(gameNames, seed, { starter, bonusGold: vsComputer ? [0, levelInfo().bonusGold] : undefined });
   gameId++;
   prevRendered = null;
   seenZoneCards.clear();
-  // Tegen de computer hoeft niemand weg te kijken.
-  handoff = vsComputer ? null : 0;
+  remoteQueue = [];
+  remoteBusy = false;
+  if (net) net.waitingNext = false;
+  // Tegen de computer of online hoeft niemand weg te kijken.
+  handoff = vsComputer || net ? null : starter;
   render();
-  if (vsComputer) sfx.deal(game.players[game.active].hand.length);
+  showToast(`Spel ${gameNo}: ${game.players[starter].name} begint`);
+  if (computerTurn(game)) scheduleComputer(COMPUTER_THINK_MS);
+  else if (handoff === null && !remoteTurn(game)) sfx.deal(game.players[game.active].hand.length);
 }
 
-function dispatch(action: Action): void {
+// ---------- Online ----------
+
+/** Acties van de tegenstander worden één voor één afgespeeld, elk met zijn animatie. */
+let remoteQueue: Extract<Msg, { t: 'action' }>[] = [];
+let remoteBusy = false;
+
+/** Een korte samenvatting van de toestand: verschilt die bij de twee spelers, dan lopen ze niet meer gelijk. */
+function stateCheck(g: GameState): string {
+  return [g.turn, g.seed, g.log.length, ...g.players.map((p) => `${p.gold}/${p.hand.length}/${p.deck.length}`)].join(':');
+}
+
+const netEvents = {
+  onMessage: (m: Msg) => onNetMessage(m),
+  onClose: () => leaveOnline('De verbinding met je tegenstander is verbroken.'),
+};
+
+function startHosting(code = makeCode()): void {
+  readNames();
+  netError = '';
+  const n: Net = { me: 0, code, status: 'opening', link: null, stop: () => {}, waitingNext: false };
+  net = n;
+  n.stop = hostRoom(code, {
+    ...netEvents,
+    onReady: () => {
+      if (net !== n) return;
+      n.status = 'waiting';
+      render();
+    },
+    onGuest: (link) => {
+      if (net !== n) return link.close();
+      n.link = link;
+    },
+    onError: (msg, retry) => {
+      if (net !== n) return;
+      n.stop();
+      net = null;
+      if (retry) startHosting();
+      else leaveOnline(msg);
+    },
+  });
+  render();
+}
+
+function startJoining(): void {
+  readNames();
+  const code = (document.querySelector<HTMLInputElement>('#code')?.value ?? '').trim().toUpperCase();
+  codeFromLink = code;
+  if (code.length !== 4) {
+    netError = 'Een kamercode heeft 4 tekens.';
+    render();
+    return;
+  }
+  netError = '';
+  const n: Net = { me: 1, code, status: 'joining', link: null, stop: () => {}, waitingNext: false };
+  net = n;
+  n.stop = joinRoom(code, {
+    ...netEvents,
+    onJoined: (link) => {
+      if (net !== n) return link.close();
+      n.link = link;
+      link.send({ t: 'hello', name: names[0], protocol: PROTOCOL });
+    },
+    onError: (msg) => {
+      if (net === n) leaveOnline(msg);
+    },
+  });
+  render();
+}
+
+/** Stopt het online spel en gaat terug naar het startscherm, eventueel met een melding. */
+function leaveOnline(msg: string): void {
+  if (!net) return;
+  const n = net;
+  net = null;
+  n.link?.close();
+  n.stop();
+  netError = msg;
+  onlineTab = true;
+  gameId++;
+  game = null;
+  prevRendered = null;
+  remoteQueue = [];
+  render();
+}
+
+function onNetMessage(m: Msg): void {
+  if (!net?.link) return;
+  switch (m.t) {
+    case 'hello':
+      if (net.me !== 0 || net.status === 'playing') return;
+      if (m.protocol !== PROTOCOL) return leaveOnline('Jullie spelen met een andere versie van het spel. Ververs allebei de pagina.');
+      netNames = [names[0], m.name];
+      net.status = 'playing';
+      match = newMatch();
+      hostStartGame();
+      break;
+    case 'start':
+      if (net.me !== 1) return;
+      if (m.protocol !== PROTOCOL) return leaveOnline('Jullie spelen met een andere versie van het spel. Ververs allebei de pagina.');
+      net.status = 'playing';
+      netNames = m.names;
+      if (m.gameNo === 1) match = newMatch();
+      match.wins = [...m.wins];
+      beginGame(m.seed, m.starter, m.gameNo);
+      break;
+    case 'action':
+      remoteQueue.push(m);
+      pumpRemote();
+      break;
+    case 'next':
+      if (net.me === 0 && game?.winner !== null) hostStartGame();
+      break;
+    case 'ping':
+      break;
+  }
+}
+
+/** De host beslist over het toeval van elk spel (seed en beginspeler) en stuurt dat door. */
+function hostStartGame(): void {
+  if (!net?.link) return;
+  if (matchWinner() !== null || match.gameNo === 0) match = newMatch();
+  const starter = nextStarter();
+  const seed = Math.floor(Math.random() * 2 ** 31);
+  const gameNo = match.gameNo + 1;
+  net.link.send({ t: 'start', protocol: PROTOCOL, seed, starter, gameNo, wins: match.wins, names: netNames });
+  beginGame(seed, starter, gameNo);
+}
+
+function pumpRemote(): void {
+  if (remoteBusy || !game) return;
+  const m = remoteQueue.shift();
+  if (!m) return;
+  const id = gameId;
+  remoteBusy = true;
+  const run = () => {
+    if (id !== gameId) return;
+    remoteBusy = false;
+    dispatch(m.action, true);
+    if (game && stateCheck(game) !== m.check) showToast('Let op: jullie spel loopt niet meer gelijk. Start best een nieuw spel.');
+    pumpRemote();
+  };
+  // Net als bij de computer: een kaart van de tegenstander wordt eerst in het midden getoond.
+  if (m.action.type === 'play') showcase(game, m.action, run);
+  else run();
+}
+
+/** remote: de actie komt van de online tegenstander en moet niet teruggestuurd worden. */
+function dispatch(action: Action, remote = false): void {
   if (!game) return;
   const r = applyAction(game, action);
   if (!r.ok) {
@@ -716,18 +1012,23 @@ function dispatch(action: Action): void {
   }
   const before = game;
   game = r.state;
+  if (net?.link && !remote) net.link.send({ t: 'action', action, check: stateCheck(game) });
+  if (before.winner === null && game.winner !== null) {
+    match.wins[game.winner]++;
+    match.lastWinner = game.winner;
+  }
   // Wat er gaat verdwijnen, moet vastgelegd worden voordat de tafel opnieuw getekend wordt.
   const flights = captureEffects(before, game);
-  if (action.type === 'endTurn' && game.winner === null && !vsComputer) handoff = game.active;
+  if (action.type === 'endTurn' && game.winner === null && !vsComputer && !net) handoff = game.active;
   render();
   shopDeal = false;
   playEffects(flights);
   const impacts = findImpacts(action, before, game);
   playImpacts(impacts);
   playSounds(action, before, game, flights, impacts);
-  if (vsComputer && action.type === 'endTurn' && game.winner === null) {
+  if ((vsComputer || net) && action.type === 'endTurn' && game.winner === null) {
     if (computerTurn(game)) scheduleComputer(COMPUTER_THINK_MS);
-    else sfx.deal(game.players[game.active].hand.length, 0.3);
+    else if (humanCanAct()) sfx.deal(game.players[game.active].hand.length, 0.3);
   }
 }
 
