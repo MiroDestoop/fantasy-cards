@@ -80,6 +80,13 @@ export const KEYWORDS: Record<Keyword, { readonly label: string; noAmount?: bool
       `Your ${n === 1 ? 'oldest other card' : `${n} oldest other cards`} in this zone ${n === 1 ? 'goes' : 'go'} to your opponent's discard pile: from now on ${n === 1 ? 'it belongs' : 'they belong'} to them.`,
     ),
   },
+  verban: {
+    get label() { return tr('Verban', 'Banish'); },
+    explain: (n) => tr(
+      `Kies deze beurt ${n === 1 ? 'een kaart' : `${n} kaarten`} in de winkel (knop ✖ op de kaart): ${n === 1 ? 'ze gaat' : 'ze gaan'} onderaan de voorraad en ${n === 1 ? 'wordt' : 'worden'} vervangen door een nieuwe. Vervalt aan het einde van je beurt.`,
+      `This turn, pick ${n === 1 ? 'a card' : `${n} cards`} in the shop (✖ button on the card): ${n === 1 ? 'it goes' : 'they go'} to the bottom of the supply and ${n === 1 ? 'is' : 'are'} replaced by a new one. Expires at the end of your turn.`,
+    ),
+  },
   ververs: {
     get label() { return tr('Ververs', 'Refresh'); },
     noAmount: true,
@@ -111,7 +118,7 @@ const special = (id: string): Effect => (getSpecial(id), { kw: 'speciaal', id })
 const CARD_LIST: CardDef[] = [
   // Startkaarten
   { id: 'koper', name: 'Koperen Munt', icon: '🪙', color: '#b87333', top: [fx('goud', 1)], bottom: [] },
-  { id: 'zilver', name: 'Zilveren Munt', icon: '💰', color: '#9e9e9e', top: [fx('goud', 2)], bottom: [fx('aanval', 1)] },
+  { id: 'zilver', name: 'Zilveren Munt', icon: '💰', color: '#9e9e9e', top: [fx('goud', 2)], bottom: [fx('verban', 1)] },
   { id: 'rekruut', name: 'Rekruut', icon: '🗡️', color: '#6b8e23', top: [fx('goud', 1)], bottom: [fx('aanval', 1), fx('terugroep', 1)] },
 
   // Winkelkaarten

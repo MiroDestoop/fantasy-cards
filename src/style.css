@@ -349,6 +349,7 @@ button { font: inherit; }
 .kw-herschep { --edge: #2e7d32; }
 .kw-echo { --edge: #4f8a8b; }
 .kw-schenk { --edge: #6a4c93; }
+.kw-verban { --edge: #c62828; }
 /* Een speciaal effect is een korte zin in plaats van een keyword. */
 .kw-speciaal {
   --edge: #4a2c6e;
@@ -614,16 +615,38 @@ button { font: inherit; }
   font-weight: bold;
   text-shadow: 0 1px 2px #000;
 }
+/* Een balk met schild krijgt een stalen rand, met een groot wapenschild ernaast. */
+.bar.shielded {
+  border: 2px solid #b0c4de;
+  box-shadow: 0 0 0 2px rgba(20, 30, 45, 0.9), 0 0 14px 3px rgba(144, 202, 249, 0.75);
+}
 .zshield {
   position: absolute;
-  right: -6px;
-  top: -12px;
-  padding: 0 6px;
-  border-radius: 999px;
-  background: #24170d;
-  border: 1px solid #b0c4de;
-  font-size: 12px;
-  font-weight: bold;
+  right: -16px;
+  top: 50%;
+  width: 36px;
+  height: 42px;
+  margin-top: -21px;
+  display: grid;
+  place-items: center;
+  /* Vorm van een wapenschild. */
+  clip-path: polygon(50% 0, 100% 12%, 100% 52%, 50% 100%, 0 52%, 0 12%);
+  background: linear-gradient(160deg, #eceff1, #90a4ae 45%, #455a64);
+  filter: drop-shadow(0 0 6px rgba(144, 202, 249, 0.9));
+  z-index: 2;
+}
+.zshield b {
+  margin-top: -4px;
+  font-size: 20px;
+  color: #102030;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+.zshield.up { animation: shield-up 0.6s cubic-bezier(0.2, 1.4, 0.4, 1); }
+.zshield.hit { animation: shield-hit 0.5s ease-out; }
+@keyframes shield-up { from { transform: scale(0.2) rotate(-30deg); opacity: 0; filter: brightness(2.5); } }
+@keyframes shield-hit {
+  25% { transform: translateX(-4px) scale(1.15); filter: brightness(2) drop-shadow(0 0 10px #90caf9); }
+  50% { transform: translateX(4px); }
 }
 
 .zone-area.closed { filter: saturate(0.6); }
@@ -713,6 +736,37 @@ button { font: inherit; }
   box-shadow: 0 0 0 4px #ffd54f, 0 0 22px 6px rgba(255, 213, 79, 0.55), 0 8px 18px rgba(0, 0, 0, 0.6);
 }
 .shop-slot:hover .card { transform: translate(10px, -40px) scale(1.15); filter: none; }
+/* Verban: een rode knop op elke winkelkaart, en de winkel gloeit zolang je er een mag kiezen. */
+.banish-hint {
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: rgba(198, 40, 40, 0.85);
+  color: #fff;
+  font-size: 12px;
+  font-weight: bold;
+  text-align: center;
+  max-width: 130px;
+  animation: denken 1.4s ease-in-out infinite;
+}
+.shop-slot.banishable .card { box-shadow: 0 0 0 3px #e57373, 0 0 18px 4px rgba(229, 115, 115, 0.6); }
+.banish-btn {
+  position: absolute;
+  right: -10px;
+  top: -10px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  background: #c62828;
+  color: #fff;
+  font: inherit;
+  font-size: 15px;
+  font-weight: bold;
+  cursor: pointer;
+  z-index: 3;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+}
+.banish-btn:hover { background: #e53935; transform: scale(1.15); }
 .price {
   position: absolute;
   left: -10px;
@@ -823,6 +877,7 @@ button { font: inherit; }
 }
 .float.dmg { color: #ffeb3b; }
 .float.heal { color: #69f0ae; }
+.float.block { color: #90caf9; left: 78%; font-size: 22px; }
 @keyframes float {
   from { opacity: 0; transform: translate(-50%, 6px) scale(0.6); }
   12% { opacity: 1; transform: translate(-50%, 0) scale(1.6); }

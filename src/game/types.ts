@@ -4,7 +4,7 @@ export type PlayerId = 0 | 1;
 
 export type Keyword =
   | 'goud' | 'aanval' | 'storm' | 'herstel' | 'schild' | 'trek' | 'vertraag' | 'vernietig' | 'terugroep' | 'ververs' | 'herschep' | 'echo'
-  | 'schenk';
+  | 'schenk' | 'verban';
 
 /** De vijf rassen van de winkelkaarten. Elk spel doet er één niet mee. */
 export type Race = 'mens' | 'elf' | 'dwerg' | 'ork' | 'ondood';
@@ -60,6 +60,8 @@ export interface PlayerState {
   slow: number;
   /** Zoveel volgende kaarten die je deze beurt in een zone speelt, keren na hun effect meteen terug (special 'echo'). */
   echo: number;
+  /** Zoveel winkelkaarten mag je deze beurt nog kiezen om te verbannen (keyword Verban). Vervalt bij Einde beurt. */
+  banish: number;
 }
 
 /** Een kaart in een zone. Ze blijft liggen tot Terugroep of Vernietig, ook nadat de zone veroverd is. */
@@ -116,6 +118,8 @@ export type Action =
   | { type: 'buy'; marketUid: string }
   /** Trek een eigen kaart uit een open zone terug naar je aflegstapel, voor goud. */
   | { type: 'recall'; zone: number; cardUid: string }
+  /** Verban: een winkelkaart gaat onderaan de voorraad en wordt vervangen. Kan alleen met een Verban van deze beurt. */
+  | { type: 'banish'; marketUid: string }
   | { type: 'endTurn' };
 
 export type ActionResult = { ok: true; state: GameState } | { ok: false; error: string };

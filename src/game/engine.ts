@@ -42,6 +42,7 @@ export function createGame(
     bonusGold: options.bonusGold?.[pid] ?? 0,
     slow: 0,
     echo: 0,
+    banish: 0,
   });
   const s: GameState = {
     players: [makePlayer(names[0], 0), makePlayer(names[1], 1)],
@@ -94,6 +95,9 @@ export function applyAction(state: GameState, action: Action): ActionResult {
       break;
     case 'recall':
       error = recallCard(s, action.zone, action.cardUid);
+      break;
+    case 'banish':
+      error = banishCard(s, action.marketUid);
       break;
     case 'endTurn':
       endTurn(s);
@@ -188,6 +192,12 @@ export function shopPrice(state: GameState, pid: PlayerId, defId: string): numbe
   const base = getCard(defId).price ?? 0;
   const discount = state.zones.reduce((t, z) => t + (leadsZone(z, pid) ? zoneEffect(z)?.shopDiscountIfLeading ?? 0 : 0), 0);
   return discount ? Math.max(1, base - discount) : base;
+}
+
+export function whyCantBanish(state: GameState, marketUid: string): string | null {
+  if (state.players[state.active].banish <= 0) return tr('Je kunt nu geen winkelkaart verbannen.', 'You cannot banish a shop card right now.');
+  if (!state.shop.market.some((c) => c.uid === marketUid)) return tr('Die kaart ligt niet in de winkel.', 'That card is not in the shop.');
+  return null;
 }
 
 export function zonesOwnedBy(state: GameState, pid: PlayerId): number {
@@ -355,6 +365,10 @@ function applyEffect(s: GameState, pid: PlayerId, e: Effect, zoneIdx: number | n
       p.echo++;
       log(s, tr(`🌬️ De volgende kaart die ${p.name} in een zone speelt, keert meteen terug.`, `🌬️ The next card ${p.name} plays in a zone returns right away.`));
       break;
+    case 'verban':
+      p.banish += e.amount;
+      log(s, tr(`✖ ${p.name} mag ${e.amount === 1 ? 'een winkelkaart' : `${e.amount} winkelkaarten`} verbannen.`, `✖ ${p.name} may banish ${e.amount === 1 ? 'a shop card' : `${e.amount} shop cards`}.`));
+      break;
     case 'ververs':
       refreshShop(s);
       log(s, tr('De winkel krijgt een volledig nieuw aanbod.', 'The shop gets a completely new offer.'));
@@ -438,6 +452,22 @@ function buyCard(s: GameState, marketUid: string): string | null {
   return null;
 }
 
+function banishCard(s: GameState, marketUid: string): string | null {
+  const blocked = whyCantBanish(s, marketUid);
+  if (blocked) return blocked;
+  const p = s.players[s.active];
+  const idx = s.shop.market.findIndex((c) => c.uid === marketUid);
+  const card = s.shop.market[idx];
+  p.banish--;
+  // Eerst de vervanger van bovenaan, dan gaat de verbannen kaart onderaan: zo komt ze niet meteen terug.
+  const refill = s.shop.pile.pop();
+  s.shop.pile.unshift(card);
+  if (refill) s.shop.market.splice(idx, 1, refill);
+  else s.shop.market.splice(idx, 1);
+  log(s, tr(`✖ ${p.name} verbant ${getCard(card.defId).name} uit de winkel.`, `✖ ${p.name} banishes ${getCard(card.defId).name} from the shop.`));
+  return null;
+}
+
 function recallCard(s: GameState, zoneIdx: number, cardUid: string): string | null {
   const blocked = whyCantRecall(s, zoneIdx, cardUid);
   if (blocked) return blocked;
@@ -490,6 +520,7 @@ function endTurn(s: GameState): void {
   p.discard.push(...p.played, ...p.hand);
   p.played = [];
   p.echo = 0;
+  p.banish = 0;
   p.hand = [];
   s.active = other(s.active);
   startTurn(s);

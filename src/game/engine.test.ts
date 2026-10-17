@@ -91,7 +91,7 @@ describe('kaarten spelen', () => {
     s = play(s, 'offervuur', zone(0));
     expect(s.zones[0].cards.map((c) => c.card.defId).sort()).toEqual(['offervuur', 'rekruut']);
     expect(s.players[0].discard).toHaveLength(discardBefore);
-    expect(s.zones[0].damage[0]).toBe(MAX_ZONE_CARDS - 1 + 3);
+    expect(s.zones[0].damage[0]).toBe(3);
   });
 
   it('Terugroep haalt je oudste kaart in de zone terug naar je aflegstapel', () => {
@@ -170,6 +170,30 @@ describe('terugtrekken', () => {
     expect(s.shop.market.some((c) => before.includes(c.uid))).toBe(false);
     expect(s.shop.pile).toHaveLength(pileBefore);
     expect(s.shop.pile.slice(0, MARKET_SIZE).map((c) => c.uid)).toEqual(before);
+  });
+
+  it('Verban: kies één winkelkaart, ze gaat onderaan de voorraad en wordt vervangen', () => {
+    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
+    const target = s.shop.market[2];
+    const others = s.shop.market.filter((c) => c !== target).map((c) => c.uid);
+    const top = s.shop.pile.at(-1)!;
+    expect(applyAction(s, { type: 'banish', marketUid: target.uid }).ok).toBe(false);
+    s = play(s, 'zilver', zone(0));
+    expect(s.players[0].banish).toBe(1);
+    expect(s.zones[0].damage[0]).toBe(0);
+    s = act(s, { type: 'banish', marketUid: target.uid });
+    expect(s.shop.market[2].uid).toBe(top.uid);
+    expect(s.shop.market.filter((c) => c.uid !== top.uid).map((c) => c.uid)).toEqual(others);
+    expect(s.shop.pile[0].uid).toBe(target.uid);
+    expect(s.players[0].banish).toBe(0);
+    expect(applyAction(s, { type: 'banish', marketUid: s.shop.market[0].uid }).ok).toBe(false);
+  });
+
+  it('Verban vervalt aan het einde van je beurt', () => {
+    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
+    s = play(s, 'zilver', zone(0));
+    s = act(s, { type: 'endTurn' });
+    expect(s.players[0].banish).toBe(0);
   });
 
   it('kaarten zonder onderste effect kan je alleen afleggen', () => {
@@ -333,13 +357,13 @@ describe('winkel', () => {
 describe('winnen', () => {
   it(`${ZONE_HP} schade verovert een zone, 2 zones winnen het spel`, () => {
     let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
-    s.zones[0].damage = [ZONE_HP - 1, 0];
+    s.zones[0].damage = [ZONE_HP - 2, 0];
     s.zones[0].cards.push({ player: 1, card: { uid: 'bo-1', defId: 'rekruut' }, turn: 0 });
-    s = play(s, 'zilver', zone(0));
+    s = play(s, 'alchemist', zone(0));
     expect(s.zones[0].owner).toBe(0);
     expect(s.winner).toBeNull();
     // Bij een verovering blijven de kaarten in die zone liggen.
-    expect(s.zones[0].cards.map((c) => c.card.defId).sort()).toEqual(['rekruut', 'zilver']);
+    expect(s.zones[0].cards.map((c) => c.card.defId).sort()).toEqual(['alchemist', 'rekruut']);
     s.zones[1].damage = [ZONE_HP - 2, 5];
     s = play(s, 'vuurbal', zone(1));
     expect(s.winner).toBe(0);
@@ -411,8 +435,8 @@ describe('zones', () => {
     expect(withEffect('vesting').zones[0].hp).toBe(ZONE_HP + 2);
     let s = withEffect('bouwval');
     expect(s.zones[0].hp).toBe(ZONE_HP - 2);
-    s.zones[0].damage = [ZONE_HP - 3, 0];
-    s = play(s, 'zilver', zone(0));
+    s.zones[0].damage = [ZONE_HP - 4, 0];
+    s = play(s, 'alchemist', zone(0));
     expect(s.zones[0].owner).toBe(0);
   });
 
@@ -422,10 +446,10 @@ describe('zones', () => {
   });
 
   it('Slagveld geeft elke aanval 1 schade meer, ook Storm', () => {
-    let s = play(withEffect('slagveld'), 'zilver', zone(0));
-    expect(s.zones[0].damage[0]).toBe(2);
+    let s = play(withEffect('slagveld'), 'alchemist', zone(0));
+    expect(s.zones[0].damage[0]).toBe(3);
     s = play(s, 'vuurbal', DISCARD);
-    expect(s.zones[0].damage[0]).toBe(4);
+    expect(s.zones[0].damage[0]).toBe(5);
     expect(s.zones[1].damage[0]).toBe(1);
   });
 
@@ -446,9 +470,9 @@ describe('zones', () => {
     s.players[0].gold = 0;
     expect(applyAction(s, { type: 'play', handUid: give(s, 0, 'zilver'), target: zone(0) }).ok).toBe(false);
     s.players[0].gold = 2;
-    const after = play(s, 'zilver', zone(0));
+    const after = play(s, 'alchemist', zone(0));
     expect(after.players[0].gold).toBe(1);
-    expect(after.zones[0].damage[0]).toBe(1);
+    expect(after.zones[0].damage[0]).toBe(2);
   });
 
   it('Bibliotheek laat je 1 kaart trekken', () => {

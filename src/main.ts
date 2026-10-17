@@ -469,13 +469,21 @@ function renderZone(g: GameState, i: number, bottom: PlayerId, prev: GameState |
     const before = prev && prev !== g ? prev.zones[i].damage[pid] : dmg;
     const d = dmg - before;
     return `
-    <div class="bar p${pid}" title="${esc(g.players[pid].name)}: ${tr(`${dmg} van ${z.hp} schade`, `${dmg} of ${z.hp} damage`)}">
+    <div class="bar p${pid} ${z.shield[pid] ? 'shielded' : ''}" title="${esc(g.players[pid].name)}: ${tr(`${dmg} van ${z.hp} schade`, `${dmg} of ${z.hp} damage`)}">
       <div class="fill ${d ? 'grow' : ''}" style="width:${(dmg / z.hp) * 100}%;--from:${(before / z.hp) * 100}%"></div>
       <span class="bar-text">${esc(g.players[pid].name)} · ${dmg}/${z.hp}</span>
-      ${z.shield[pid] ? `<span class="zshield" title="${tr(
-        `Schild: blokkeert de volgende ${z.shield[pid]} schade van de tegenstander`,
-        `Shield: blocks the next ${z.shield[pid]} damage from the opponent`,
-      )}">🛡️ ${z.shield[pid]}</span>` : ''}
+      ${(() => {
+        // Het schild staat als groot wapenschild naast de balk; het springt op als het groeit en flitst als het schade tegenhoudt.
+        const sh = z.shield[pid];
+        const was = prev && prev !== g ? prev.zones[i].shield[pid] : sh;
+        const blocked = Math.max(0, was - sh);
+        const flash = blocked ? `<div class="float block">🛡️ −${blocked}</div>` : '';
+        if (!sh) return flash;
+        return `<span class="zshield ${sh > was ? 'up' : blocked ? 'hit' : ''}" title="${tr(
+          `Schild van ${esc(g.players[pid].name)}: de volgende ${sh} schade van de tegenstander in deze zone wordt tegengehouden`,
+          `${esc(g.players[pid].name)}'s shield: the next ${sh} damage from the opponent in this zone is blocked`,
+        )}"><b>${sh}</b></span>${flash}`;
+      })()}
       ${d ? `<div class="float ${d > 0 ? 'dmg' : 'heal'}">${d > 0 ? '+' : ''}${d}</div>` : ''}
     </div>`;
   };
@@ -502,12 +510,18 @@ function renderZone(g: GameState, i: number, bottom: PlayerId, prev: GameState |
 
 function renderShop(g: GameState): string {
   const canShop = humanCanAct();
+  // Met een Verban van deze beurt krijgt elke winkelkaart een knop om ze weg te sturen.
+  const banish = canShop ? g.players[g.active].banish : 0;
   const slots = g.shop.market
     .map((card, i) => {
       const def = getCard(card.defId);
       const affordable = canShop && !whyCantBuy(g, card.uid);
-      return `<div class="shop-slot ${affordable ? 'affordable' : ''} ${shopDeal ? 'deal-in' : shopRefill.has(card.uid) ? 'refill' : ''}" style="--i:${i}" data-click="buy:${card.uid}">
+      return `<div class="shop-slot ${affordable ? 'affordable' : ''} ${banish ? 'banishable' : ''} ${shopDeal ? 'deal-in' : shopRefill.has(card.uid) ? 'refill' : ''}" style="--i:${i}" data-click="buy:${card.uid}">
         <div class="card">${renderFace(def)}</div>
+        ${banish ? `<button class="banish-btn" data-click="banish:${card.uid}" title="${tr(
+          `Verban ${def.name}: ze gaat onderaan de voorraad en wordt vervangen`,
+          `Banish ${def.name}: it goes to the bottom of the supply and is replaced`,
+        )}">✖</button>` : ''}
         ${(() => {
           // Een Handelspost waar de speler aan zet voorstaat, maakt de kaart goedkoper.
           const price = shopPrice(g, g.active, card.defId);
@@ -524,6 +538,10 @@ function renderShop(g: GameState): string {
   return `
   <div class="shop">
     <div class="shop-title">🏪 ${tr('Winkel', 'Shop')}</div>
+    ${banish ? `<div class="banish-hint">✖ ${tr(
+      `Kies ${banish === 1 ? 'een kaart' : `${banish} kaarten`} om te verbannen`,
+      `Pick ${banish === 1 ? 'a card' : `${banish} cards`} to banish`,
+    )}</div>` : ''}
     <div class="market">${slots || `<div class="sold-out">${tr('Uitverkocht!', 'Sold out!')}</div>`}</div>
     <div class="shop-stock">${tr(`${g.shop.pile.length} in voorraad`, `${g.shop.pile.length} in stock`)}</div>
   </div>`;
@@ -747,6 +765,9 @@ app.addEventListener('click', (e) => {
       break;
     case 'recall':
       if (humanCanAct()) dispatch({ type: 'recall', zone: Number(arg), cardUid: arg2 });
+      break;
+    case 'banish':
+      if (humanCanAct()) dispatch({ type: 'banish', marketUid: arg });
       break;
   }
 });
@@ -1823,6 +1844,12 @@ function captureEffects(action: Action, before: GameState, after: GameState): Fl
     flights.slice(start).forEach((f, i) => (f.index = i));
   } else {
     for (const c of after.shop.market) if (!oldMarket.includes(c.uid)) shopRefill.add(c.uid);
+  }
+
+  // Een verbannen winkelkaart zakt weg in de voorraad.
+  if (action.type === 'banish') {
+    const el = app.querySelector<HTMLElement>(`[data-click="buy:${action.marketUid}"] .card`);
+    if (el) grab(el, 'shop-out', before.active);
   }
 
   // Een gekochte kaart vliegt uit de winkel naar de aflegstapel (bij de tegenstander deed showcaseBuy dat al).
