@@ -1537,6 +1537,7 @@ function playSounds(action: Action, before: GameState, after: GameState, flights
     if (f.kind === 'return' || f.kind === 'to-shop') sfx.whoosh(f.index * 0.11);
     if (f.kind === 'to-hand') sfx.rebirth(f.index * 0.11);
     if (f.kind === 'banish') sfx.burn(f.index * 0.09);
+    if (f.kind === 'curse') sfx.whoosh(0.4 + f.index * 0.18);
   }
   if (flights.some((f) => f.kind === 'shop-out')) sfx.shuffle(0.05);
 
@@ -1788,7 +1789,7 @@ function flashZone(el: HTMLElement | undefined, color: string): void {
 interface Flight {
   clone: HTMLElement;
   from: DOMRect;
-  kind: 'return' | 'to-hand' | 'to-shop' | 'banish' | 'shop-out' | 'bought' | 'discard';
+  kind: 'return' | 'to-hand' | 'to-shop' | 'banish' | 'shop-out' | 'bought' | 'discard' | 'curse';
   pid: PlayerId;
   index: number;
   /** Breedte van het element zonder schaal (een kaartrug is smaller dan een kaart). */
@@ -1832,6 +1833,41 @@ function captureEffects(action: Action, before: GameState, after: GameState): Fl
       clone.className = 'card';
       clone.innerHTML = renderFace(getCard(card.defId));
       flights.push({ clone, from: spot.getBoundingClientRect(), kind, pid, index: flights.length, w: CARD_W });
+    }
+  }
+
+  // Een kaart met Verdwijn (de Vloek) verbrandt op de aflegstapel.
+  if (action.type === 'play' && action.target.kind === 'discard') {
+    const pid = before.active;
+    const card = before.players[pid].hand.find((c) => c.uid === action.handUid);
+    const pile = app.querySelector(`[data-pile="discard:${pid}"]`);
+    if (card && pile && getCard(card.defId).top.some((e) => e.kw === 'verdwijn')) {
+      const clone = document.createElement('div');
+      clone.className = 'card';
+      clone.innerHTML = renderFace(getCard(card.defId));
+      flights.push({ clone, from: pile.getBoundingClientRect(), kind: 'banish', pid, index: flights.length, w: CARD_W });
+    }
+  }
+
+  // Nieuwe Vloeken vliegen van de gespeelde kaart naar de stapel van de tegenstander.
+  if (action.type === 'play') {
+    const pid = before.active;
+    const opp = other(pid);
+    const curses = after.players[opp].deck.filter((c) => c.defId === 'vloek' && !before.players[opp].deck.some((d) => d.uid === c.uid));
+    const source = action.target.kind === 'zone'
+      ? app.querySelectorAll('.zone-area')[action.target.zone]
+      : app.querySelector(`[data-pile="discard:${pid}"]`);
+    if (curses.length && source) {
+      const r = source.getBoundingClientRect();
+      const w = CARD_W * scale * 0.6;
+      const h = CARD_H * scale * 0.6;
+      curses.forEach((c, i) => {
+        const clone = document.createElement('div');
+        clone.className = 'card';
+        clone.innerHTML = renderFace(getCard(c.defId));
+        const from = new DOMRect(r.left + r.width / 2 - w / 2, r.top + r.height / 2 - h / 2, w, h);
+        flights.push({ clone, from, kind: 'curse', pid: opp, index: i, w: CARD_W });
+      });
     }
   }
 
@@ -1918,6 +1954,25 @@ function playEffects(flights: Flight[]): void {
           { transform: `translate(${pile.left}px, ${pile.top}px) scale(${s1}) rotate(0deg)` },
         ],
         { duration: 700, delay: f.index * 110, easing: 'cubic-bezier(.45,0,.25,1)', fill: 'both' },
+      );
+    } else if (f.kind === 'curse') {
+      // De Vloek verschijnt paars gloeiend, zweeft even en duikt dan in de stapel van de tegenstander.
+      const target = app.querySelector(`[data-pile="deck:${f.pid}"]`);
+      if (!target) {
+        c.remove();
+        continue;
+      }
+      const r = target.getBoundingClientRect();
+      const s1 = r.width / CARD_W;
+      const glow = 'drop-shadow(0 0 14px #ce93d8) brightness(1.3)';
+      anim = c.animate(
+        [
+          { transform: `${start} scale(0.3) rotate(-20deg)`, filter: glow, opacity: 0 },
+          { transform: `${start} translateY(-30px) scale(1.15)`, filter: glow, opacity: 1, offset: 0.3 },
+          { transform: `${start} translateY(-30px) scale(1.15) rotate(6deg)`, filter: glow, opacity: 1, offset: 0.5 },
+          { transform: `translate(${r.left}px, ${r.top}px) scale(${s1}) rotate(180deg)`, filter: 'none', opacity: 0.9 },
+        ],
+        { duration: 1100, delay: 250 + f.index * 180, easing: 'cubic-bezier(.45,0,.3,1)', fill: 'both' },
       );
     } else if (f.kind === 'banish') {
       anim = c.animate(
