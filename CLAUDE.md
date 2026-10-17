@@ -51,6 +51,8 @@ Repository: https://github.com/MiroDestoop/fantasy-cards. `vite.config.ts` gebru
 | Vernietig | verban al je kaarten in deze zone uit het spel |
 | Ververs | vervang de hele winkel; de oude kaarten gaan onderaan de voorraad |
 | Verban(x) | kies deze beurt x winkelkaarten (rode knop ✖ op de kaart): ze gaan onderaan de voorraad en worden vervangen. `banish` in `PlayerState`, actie `banish`; vervalt bij Einde beurt. De computer gebruikt het (nog) niet |
+| Vervloek(x) | schud x Vloeken op een willekeurige plek in de stapel van de tegenstander (uid `vloek-n` via `curses` in `GameState`). Kaarten: Orkse Sjamaan (3), Moerasheks (3), Voodoopop (4), Vervloekte Schat (4), Duistere Elf (5), Lich (8) |
+| Verdwijn | afgelegd verdwijnt de kaart zelf uit het spel (alleen op de **Vloek**: geen winkelkaart, geen ras, alleen afleggen, verder niets). De computer telt een Vloek als −2 in haar eigen stapel en +2 in die van de tegenstander (`CURSE_WORTH` in `ai.ts`) |
 | Echo | de volgende kaart die je deze beurt in een zone speelt, keert na haar effect meteen terug naar je aflegstapel |
 | Herschep | deze zone krijgt een nieuw willekeurig effect (dat in geen andere zone speelt) |
 | Schenk(x) | je x oudste andere kaarten in deze zone gaan naar de aflegstapel van je tegenstander (een Fenix keert terug in je eigen hand) |

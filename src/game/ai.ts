@@ -399,10 +399,17 @@ function evaluate(s: GameState, pid: PlayerId, profile: Profile): number {
   score += 1.5 * s.players[opp].slow;
   // Kaarten in je stapel komen terug; verbannen kaarten niet. Startkaarten zijn weinig waard.
   for (const c of [...me.deck, ...me.discard, ...me.played, ...me.hand]) score += cardWorth(c);
+  // Een Vloek in de stapel van de tegenstander is goed voor jou.
+  const them = s.players[opp];
+  for (const c of [...them.deck, ...them.discard, ...them.played, ...them.hand]) if (c.defId === 'vloek') score -= CURSE_WORTH;
   return score;
 }
 
+/** Een Vloek in je stapel kost je een plek in je hand. */
+const CURSE_WORTH = -2;
+
 function cardWorth(c: CardInstance): number {
+  if (c.defId === 'vloek') return CURSE_WORTH;
   const price = getCard(c.defId).price;
   return price ? price * 0.35 : 0.1;
 }

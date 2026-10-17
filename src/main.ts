@@ -379,7 +379,7 @@ function raceTip(race: Race): string {
 function renderFace(def: CardDef): string {
   // Alleen de startkaarten tonen "Afleggen" en "In een zone": zo leer je het spel. Op de andere kaarten
   // is die plaats nodig voor de effecten; de kleur van elke helft toont welke welke is.
-  const labels = STARTER_DECK.includes(def.id);
+  const labels = STARTER_DECK.includes(def.id) || def.id === 'vloek';
   return `
     <div class="art" style="--art:${def.color}">${def.icon}${def.race ? `<span class="race" data-race="${def.race}">${RACES[def.race].icon}</span>` : ''}</div>
     <div class="card-name">${esc(def.name)}</div>
@@ -622,7 +622,7 @@ function renderTestPicker(): string {
       <div class="test-grid">${Object.values(CARDS).sort((a, b) => (a.price ?? 0) - (b.price ?? 0)).map((def) => `
         <div class="test-card" data-click="test-card:${def.id}">
           <div class="card">${renderFace(def)}</div>
-          <div class="test-price">${def.price ? `${def.price} 🪙` : tr('start', 'starter')}</div>
+          <div class="test-price">${def.price ? `${def.price} 🪙` : def.id === 'vloek' ? tr('vloek', 'curse') : tr('start', 'starter')}</div>
         </div>`).join('')}
       </div>
       <button class="btn" data-click="test-close">${tr('Klaar', 'Done')}</button>

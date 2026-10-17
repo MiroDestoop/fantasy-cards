@@ -7,7 +7,7 @@ import { tr } from './game/i18n';
 import type { Action, PlayerId } from './game/types';
 
 /** Verhoog dit als berichten of spelregels veranderen, zodat oude en nieuwe versies niet met elkaar spelen. */
-export const PROTOCOL = 14;
+export const PROTOCOL = 15;
 const PREFIX = 'munt-of-zwaard-';
 /** Zonder letters die op elkaar lijken (0/O, 1/I/L). */
 const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';

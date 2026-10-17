@@ -87,6 +87,21 @@ export const KEYWORDS: Record<Keyword, { readonly label: string; noAmount?: bool
       `This turn, pick ${n === 1 ? 'a card' : `${n} cards`} in the shop (✖ button on the card): ${n === 1 ? 'it goes' : 'they go'} to the bottom of the supply and ${n === 1 ? 'is' : 'are'} replaced by a new one. Expires at the end of your turn.`,
     ),
   },
+  vervloek: {
+    get label() { return tr('Vervloek', 'Curse'); },
+    explain: (n) => tr(
+      `Schud ${n === 1 ? 'een Vloek' : `${n} Vloeken`} in de stapel van je tegenstander. Een Vloek neemt een plaats in zijn hand in en doet niets; afgelegd verdwijnt ze uit het spel.`,
+      `Shuffle ${n === 1 ? 'a Curse' : `${n} Curses`} into your opponent's deck. A Curse takes up a spot in their hand and does nothing; when discarded, it leaves the game.`,
+    ),
+  },
+  verdwijn: {
+    get label() { return tr('Verdwijn', 'Vanish'); },
+    noAmount: true,
+    explain: () => tr(
+      'Deze kaart verdwijnt uit het spel: ze komt niet meer terug in je stapel.',
+      'This card leaves the game: it does not come back to your deck.',
+    ),
+  },
   ververs: {
     get label() { return tr('Ververs', 'Refresh'); },
     noAmount: true,
@@ -119,6 +134,8 @@ const CARD_LIST: CardDef[] = [
   // Startkaarten
   { id: 'koper', name: 'Koperen Munt', icon: '🪙', color: '#b87333', top: [fx('goud', 1)], bottom: [] },
   { id: 'zilver', name: 'Zilveren Munt', icon: '💰', color: '#9e9e9e', top: [fx('goud', 2)], bottom: [fx('verban', 1)] },
+  // De Vloek komt niet in de winkel: het keyword Vervloek schudt ze in de stapel van de tegenstander.
+  { id: 'vloek', name: 'Vloek', icon: '🕸️', color: '#2e1a2e', top: [fx('verdwijn', 0)], bottom: [] },
   { id: 'rekruut', name: 'Rekruut', icon: '🗡️', color: '#6b8e23', top: [fx('goud', 1)], bottom: [fx('aanval', 1), fx('terugroep', 1)] },
 
   // Winkelkaarten
@@ -127,9 +144,9 @@ const CARD_LIST: CardDef[] = [
   { id: 'draak', name: 'Drakenadem', price: 8, icon: '🐉', color: '#b23a48', top: [fx('storm', 3)], bottom: [fx('aanval', 7), als('ork', fx('aanval', 3))] },
   { id: 'storm', name: 'Bliksemstorm', price: 6, icon: '⚡', color: '#3949ab', top: [fx('storm', 2), fx('trek', 2)], bottom: [fx('aanval', 3), fx('trek', 2)] },
   { id: 'vampier', name: 'Vampierbeet', price: 5, icon: '🧛', color: '#6a1b2a', top: [fx('trek', 2)], bottom: [fx('aanval', 2),als('ondood', fx('herstel', 5))] },
-  { id: 'uil', name: 'Wijze Uil', price: 3, icon: '🦉', color: '#795548', top: [fx('trek', 2)], bottom: [fx('aanval', 1), fx('trek', 1), als('elf', fx('trek', 1))] },
+  { id: 'uil', name: 'Wijze Uil', price: 3, icon: '🦉', color: '#795548', top: [fx('trek', 2)], bottom: [fx('aanval', 1), fx('trek', 1), als('elf', fx('verban', 1))] },
   { id: 'inzicht', name: 'Arcaan Inzicht', price: 5, icon: '📜', color: '#8e24aa', top: [fx('trek', 2)], bottom: [fx('aanval', 2), fx('trek', 2)] },
-  { id: 'heks', name: 'IJsheks', price: 4, icon: '❄️', color: '#0277bd', top: [fx('vertraag', 1)], bottom: [fx('aanval', 2), fx('vertraag', 1), als('ondood', fx('vertraag', 1))] },
+  { id: 'heks', name: 'IJsheks', price: 4, icon: '❄️', color: '#0277bd', top: [fx('vertraag', 1),fx('verban', 1)], bottom: [fx('aanval', 2), fx('vertraag', 1), als('ondood', fx('vertraag', 1))] },
   { id: 'zandloper', name: 'Zandloper', price: 6, icon: '⏳', color: '#a1887f', top: [fx('vertraag', 2)], bottom: [fx('aanval', 2), als('elf',fx('vertraag', 3))] },
   { id: 'golem', name: 'Steengolem', price: 4, icon: '🗿', color: '#757575', top: [fx('goud', 2)], bottom: [fx('schild', 4), als('dwerg', fx('schild', 3))] },
   { id: 'bron', name: 'Helende Bron', price: 3, icon: '💧', color: '#00897b', top: [fx('goud', 1)], bottom: [fx('herstel', 4)] },
@@ -138,15 +155,15 @@ const CARD_LIST: CardDef[] = [
   { id: 'terugtocht', name: 'Terugtocht', price: 3, icon: '🏳️', color: '#607d8b', top: [fx('trek', 1), fx('goud', 1)], bottom: [fx('vernietig', 0), fx('schild', 2)] },
   { id: 'koerier', name: 'Koerier', price: 3, icon: '🐎', color: '#8d6e63', top: [fx('trek', 1), fx('goud', 1)], bottom: [fx('aanval', 2), fx('terugroep', 1)] },
   { id: 'hoornblazer', name: 'Hoornblazer', price: 5, icon: '📯', color: '#bf8f00', top: [fx('goud', 3)], bottom: [fx('aanval', 2), fx('terugroep', 2), als('mens', fx('goud', 2))] },
-  { id: 'marskramer', name: 'Marskramer', price: 2, icon: '🛒', color: '#ad1457', top: [fx('goud', 2), fx('ververs', 0)], bottom: [fx('aanval', 2),fx('trek', 1), als('mens', fx('trek', 2))] },
+  { id: 'marskramer', name: 'Marskramer', price: 2, icon: '🛒', color: '#ad1457', top: [fx('goud', 2), fx('ververs', 0)], bottom: [fx('aanval', 2),fx('verban', 1), als('mens', fx('trek', 2))] },
   { id: 'bard', name: 'Zwervende Bard', price: 3, icon: '🪕', color: '#7b1fa2', top: [fx('ververs', 0), fx('trek', 1)], bottom: [fx('terugroep', 2), als('mens', fx('trek', 2))] },
   { id: 'valkenier', name: 'Valkenier', price: 4, icon: '🦅', color: '#8d6e63', top: [fx('ververs', 0), fx('goud', 2)], bottom: [fx('aanval', 1), fx('terugroep', 2)] },
   { id: 'getijde', name: 'Getijdenmagiër', price: 5, icon: '🌊', color: '#00695c', top: [fx('ververs', 0), fx('goud', 3)], bottom: [fx('terugroep', 3), fx('schild', 3)] },
-  { id: 'bol', name: 'Kristallen Bol', price: 4, icon: '🔮', color: '#5e35b1', top: [fx('goud', 2)], bottom: [fx('schenk', 1), fx('goud', 4)] },
+  { id: 'bol', name: 'Kristallen Bol', price: 4, icon: '🔮', color: '#5e35b1', top: [fx('goud', 2), fx('verban', 1)], bottom: [fx('schenk', 1), fx('goud', 4)] },
   { id: 'generaal', name: 'Generaal', price: 7, icon: '🎖️', color: '#4e342e', top: [fx('goud', 3)], bottom: [fx('aanval', 3), fx('terugroep', 3), als('mens', fx('aanval', 2))] },
 
   { id: 'schildknaap', name: 'Schildknaap', price: 2, icon: '🛡️', color: '#78909c', top: [fx('goud', 1)], bottom: [fx('schild', 3), als('mens', fx('schild', 2))] },
-  { id: 'pestdrager', name: 'Pestdrager', price: 3, icon: '🐀', color: '#5f6b3a', top: [fx('goud', 1), fx('vertraag', 1)], bottom: [fx('aanval', 2), fx('schenk', 2)] },
+  { id: 'pestdrager', name: 'Pestdrager', price: 3, icon: '🐀', color: '#5f6b3a', top: [fx('verban', 2)], bottom: [fx('aanval', 2), fx('schenk', 1)] },
 
   // Kaarten met een speciaal effect (zie specials.ts)
   { id: 'alchemist', name: 'Alchemist', price: 5, icon: '⚗️', color: '#6a1b9a', top: [special('dubbelgoud')], bottom: [fx('aanval', 2)] },
@@ -159,7 +176,7 @@ const CARD_LIST: CardDef[] = [
   // Kaarten die het effect van een zone veranderen
   { id: 'landmeter', name: 'Landmeter', price: 4, icon: '🧭', color: '#5d7b3a', top: [fx('goud', 2)], bottom: [fx('herschep', 0), fx('aanval', 2)] },
   { id: 'portaal', name: 'Portaalmagiër', price: 6, icon: '🌀', color: '#4527a0', top: [fx('trek', 1), fx('goud', 2)], bottom: [fx('herschep', 0), fx('aanval', 3)] },
-  { id: 'weermaker', name: 'Weermaker', price: 7, icon: '🌦️', color: '#0288d1', top: [fx('goud', 3)], bottom: [fx('herschep', 0), fx('aanval', 3), fx('schild', 2)] },
+  { id: 'weermaker', name: 'Weermaker', price: 7, icon: '🌦️', color: '#0288d1', top: [fx('goud', 3), fx('verban', 1)], bottom: [fx('herschep', 0), fx('aanval', 3), fx('schild', 2)] },
 
   // Meer Vernietig
   { id: 'zuiveraar', name: 'Zuiveraar', price: 5, icon: '✨', color: '#9e8c3a', top: [fx('goud', 3)], bottom: [fx('vernietig', 0), fx('herstel', 3)] },
@@ -168,8 +185,16 @@ const CARD_LIST: CardDef[] = [
 
   // Je volgende kaart in een zone keert meteen terug
   { id: 'windloper', name: 'Windloper', price: 3, icon: '🌬️', color: '#4f8a8b', top: [fx('goud', 1), fx('echo', 0)], bottom: [fx('aanval', 2)] },
-  { id: 'schaduwdanser', name: 'Schaduwdanser', price: 4, icon: '🥷', color: '#3e2a4f', top: [fx('goud', 3)], bottom: [fx('aanval', 2), fx('echo', 0)] },
+  { id: 'schaduwdanser', name: 'Schaduwdanser', price: 4, icon: '🥷', color: '#3e2a4f', top: [fx('goud', 3)], bottom: [fx('aanval', 2), fx('echo', 0), fx('terugroep', 1)] },
   { id: 'tijdmagier', name: 'Tijdmagiër', price: 5, icon: '🕰️', color: '#6d5a2b', top: [fx('trek', 1), fx('echo', 0)], bottom: [fx('aanval', 3), fx('echo', 0), als('elf', fx('aanval', 2))] },
+
+  // Vervloek: Vloeken in de stapel van de tegenstander
+  { id: 'sjamaan', name: 'Orkse Sjamaan', price: 3, icon: '🪬', color: '#5d4037', top: [fx('goud', 1), fx('vervloek', 1)], bottom: [fx('aanval', 2), als('ork', fx('vervloek', 1))] },
+  { id: 'moerasheks', name: 'Moerasheks', price: 3, icon: '🧙‍♀️', color: '#4e5d2a', top: [fx('vervloek', 1)], bottom: [fx('aanval', 2), fx('vervloek', 1)] },
+  { id: 'voodoo', name: 'Voodoopop', price: 4, icon: '🪆', color: '#6a1b4d', top: [fx('trek', 1), fx('vervloek', 1)], bottom: [fx('aanval', 2), fx('vervloek', 1), als('ondood', fx('vervloek', 1))] },
+  { id: 'vloekschat', name: 'Vervloekte Schat', price: 4, icon: '💎', color: '#4a3b6b', top: [fx('goud', 2), fx('vervloek', 1)], bottom: [fx('schild', 3), fx('vervloek', 1)] },
+  { id: 'duisterelf', name: 'Duistere Elf', price: 5, icon: '🏹', color: '#2c2a4a', top: [fx('trek', 2)], bottom: [fx('aanval', 3), fx('vervloek', 1), als('elf', fx('trek', 1))] },
+  { id: 'lich', name: 'Lich', price: 8, icon: '🦴', color: '#1f2b3a', top: [fx('storm', 2), fx('vervloek', 2)], bottom: [fx('aanval', 5), fx('vervloek', 2)] },
 
   // Heel dure kaarten
   { id: 'mammoet', name: 'Oorlogsmammoet', price: 7, icon: '🦣', color: '#6d4c41', top: [fx('goud', 4), fx('trek', 2)], bottom: [fx('aanval', 4), fx('schild', 4)] },
@@ -177,13 +202,15 @@ const CARD_LIST: CardDef[] = [
   { id: 'titaan', name: 'Titaan', price: 9, icon: '⛰️', color: '#546e7a', top: [fx('goud', 5), fx('storm', 2)], bottom: [fx('aanval', 6), fx('schild', 4), als('dwerg', fx('aanval', 3))] },
   { id: 'leegte', name: 'Leegtescheur', price: 10, icon: '🕳️', color: '#1a1030', top: [fx('storm', 2), fx('vertraag', 3)], bottom: [fx('vernietig', 0), fx('aanval', 7), fx('vertraag', 2)] },
   { id: 'meteoor', name: 'Meteoor', price: 11, icon: '☄️', color: '#d84315', top: [fx('storm', 5), fx('goud', 2)], bottom: [fx('storm', 7)] },
-  { id: 'ravenkoningin', name: 'Ravenkoningin', price: 8, icon: '🐦‍⬛', color: '#263238', top: [fx('goud', 3), fx('trek', 1)], bottom: [special('leegveld')] },
+  { id: 'ravenkoningin', name: 'Ravenkoningin', price: 7, icon: '🐦‍⬛', color: '#263238', top: [fx('goud', 2), fx('trek', 1)], bottom: [special('leegveld')] },
   { id: 'drakenkoning', name: 'Drakenkoning', price: 12, icon: '🐲', color: '#7f0000', top: [fx('storm', 4), fx('goud', 3)], bottom: [fx('aanval', 10), fx('schild', 6)] },
 ];
 
 /** Engelse kaartnamen. Een kaart zonder vertaling hier houdt haar Nederlandse naam. */
 const NAMES_EN: Record<string, string> = {
-  koper: 'Copper Coin', zilver: 'Silver Coin', rekruut: 'Recruit',
+  koper: 'Copper Coin', zilver: 'Silver Coin', rekruut: 'Recruit', vloek: 'Curse',
+  sjamaan: 'Orc Shaman', moerasheks: 'Swamp Witch', voodoo: 'Voodoo Doll', vloekschat: 'Cursed Treasure',
+  duisterelf: 'Dark Elf', lich: 'Lich',
   vuurbal: 'Fireball', trol: 'Troll Smasher', draak: "Dragon's Breath", storm: 'Lightning Storm',
   vampier: 'Vampire Bite', uil: 'Wise Owl', inzicht: 'Arcane Insight', heks: 'Ice Witch', zandloper: 'Hourglass',
   golem: 'Stone Golem', bron: 'Healing Spring', schat: 'Dragon Hoard', offervuur: 'Sacrificial Fire',
@@ -211,6 +238,7 @@ const RACE_OF: Record<string, Race> = {
   inzicht: 'elf', tijdmagier: 'elf', weermaker: 'elf', meteoor: 'elf',
   terugtocht: 'dwerg', golem: 'dwerg', bol: 'dwerg', schat: 'dwerg', alchemist: 'dwerg',
   zuiveraar: 'dwerg', portaal: 'dwerg', mammoet: 'dwerg', titaan: 'dwerg',
+  duisterelf: 'elf', vloekschat: 'dwerg', sjamaan: 'ork', moerasheks: 'ondood', voodoo: 'ondood', lich: 'ondood',
   goblin: 'ork', vuurbal: 'ork', huurling: 'ork', offervuur: 'ork', brandstichter: 'ork',
   trol: 'ork', storm: 'ork', draak: 'ork', drakenkoning: 'ork',
   pestdrager: 'ondood', heks: 'ondood', geest: 'ondood', vampier: 'ondood', dodenbezweerder: 'ondood',
@@ -249,5 +277,6 @@ export const SHOP_SUPPLY = expand([
   ['landmeter', 3], ['portaal', 2], ['weermaker', 2],
   ['zuiveraar', 3], ['brandstichter', 2], ['dodenbezweerder', 2],
   ['windloper', 3], ['schaduwdanser', 2], ['tijdmagier', 2],
+  ['sjamaan', 3], ['moerasheks', 3], ['voodoo', 2], ['vloekschat', 2], ['duisterelf', 2], ['lich', 1],
   ['mammoet', 2], ['aartsmagier', 1], ['titaan', 1], ['ravenkoningin', 1], ['leegte', 1], ['meteoor', 1], ['drakenkoning', 1],
 ]);

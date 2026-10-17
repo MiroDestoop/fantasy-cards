@@ -54,6 +54,7 @@ export function createGame(
     log: [],
     seed,
     outRace: null,
+    curses: 0,
   };
   // Elk spel doet één ras niet mee: zijn kaarten verdwijnen uit de voorraad.
   if (!options.allRaces) {
@@ -217,7 +218,7 @@ function playCard(s: GameState, handUid: string, target: PlayTarget): string | n
   if (target.kind === 'discard') {
     log(s, tr(`${p.name} legt ${def.name} af.`, `${p.name} discards ${def.name}.`));
     p.played.push(card);
-    for (const e of def.top) if (needMet(s, pid, null, e)) applyEffect(s, pid, e, null);
+    for (const e of def.top) if (needMet(s, pid, null, e)) applyEffect(s, pid, e, null, card.uid);
   } else {
     const zone = s.zones[target.zone];
     log(s, tr(`${p.name} speelt ${def.name} in ${zoneName(zone)}.`, `${p.name} plays ${def.name} in ${zoneName(zone)}.`));
@@ -368,6 +369,20 @@ function applyEffect(s: GameState, pid: PlayerId, e: Effect, zoneIdx: number | n
     case 'verban':
       p.banish += e.amount;
       log(s, tr(`✖ ${p.name} mag ${e.amount === 1 ? 'een winkelkaart' : `${e.amount} winkelkaarten`} verbannen.`, `✖ ${p.name} may banish ${e.amount === 1 ? 'a shop card' : `${e.amount} shop cards`}.`));
+      break;
+    case 'vervloek': {
+      // Elke Vloek komt op een willekeurige plek in de stapel van de tegenstander.
+      const deck = s.players[opp].deck;
+      for (let i = 0; i < e.amount; i++) {
+        deck.splice(Math.floor(random(s) * (deck.length + 1)), 0, { uid: `vloek-${s.curses++}`, defId: 'vloek' });
+      }
+      log(s, tr(`🕸️ ${p.name} schudt ${e.amount === 1 ? 'een Vloek' : `${e.amount} Vloeken`} in de stapel van ${s.players[opp].name}.`, `🕸️ ${p.name} shuffles ${e.amount === 1 ? 'a Curse' : `${e.amount} Curses`} into ${s.players[opp].name}'s deck.`));
+      break;
+    }
+    case 'verdwijn':
+      // Afgelegd: de kaart zelf gaat niet naar de aflegstapel maar uit het spel.
+      p.played = p.played.filter((c) => c.uid !== selfUid);
+      log(s, tr('🕸️ De kaart verdwijnt uit het spel.', '🕸️ The card leaves the game.'));
       break;
     case 'ververs':
       refreshShop(s);

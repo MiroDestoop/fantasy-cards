@@ -350,6 +350,8 @@ button { font: inherit; }
 .kw-echo { --edge: #4f8a8b; }
 .kw-schenk { --edge: #6a4c93; }
 .kw-verban { --edge: #c62828; }
+.kw-vervloek { --edge: #7b1fa2; }
+.kw-verdwijn { --edge: #5c4a6e; }
 /* Een speciaal effect is een korte zin in plaats van een keyword. */
 .kw-speciaal {
   --edge: #4a2c6e;

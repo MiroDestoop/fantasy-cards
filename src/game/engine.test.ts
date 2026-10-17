@@ -196,6 +196,28 @@ describe('terugtrekken', () => {
     expect(s.players[0].banish).toBe(0);
   });
 
+  it('Vervloek schudt Vloeken in de stapel van de tegenstander', () => {
+    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
+    const deckBefore = s.players[1].deck.length;
+    s = play(s, 'lich', zone(0));
+    const curses = s.players[1].deck.filter((c) => c.defId === 'vloek');
+    expect(s.players[1].deck).toHaveLength(deckBefore + 2);
+    expect(curses).toHaveLength(2);
+    expect(new Set(curses.map((c) => c.uid)).size).toBe(2);
+    expect(s.players[0].deck.some((c) => c.defId === 'vloek')).toBe(false);
+  });
+
+  it('een Vloek kan je alleen afleggen, gratis, en dan verdwijnt ze uit het spel', () => {
+    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
+    const uid = give(s, 0, 'vloek');
+    expect(applyAction(s, { type: 'play', handUid: uid, target: zone(0) }).ok).toBe(false);
+    s = act(s, { type: 'play', handUid: uid, target: DISCARD });
+    expect(s.players[0].gold).toBe(0);
+    s = act(s, { type: 'endTurn' });
+    const all = [...s.players[0].deck, ...s.players[0].discard, ...s.players[0].hand, ...s.players[0].played];
+    expect(all.some((c) => c.uid === uid)).toBe(false);
+  });
+
   it('kaarten zonder onderste effect kan je alleen afleggen', () => {
     const s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
     expect(applyAction(s, { type: 'play', handUid: give(s, 0, 'koper'), target: zone(0) }).ok).toBe(false);
@@ -722,11 +744,11 @@ describe('rassen', () => {
     const s = createGame(['Ana', 'Bo'], 6, { plainZones: true });
     const p = s.players[0];
     p.hand = Array.from({ length: MAX_HAND }, (_, i) => ({ uid: `h${i}`, defId: 'koper' }));
-    p.hand.push({ uid: 'uil', defId: 'uil' });
+    p.hand.push({ uid: 'elf', defId: 'duisterelf' });
     p.deck = Array.from({ length: 10 }, (_, i) => ({ uid: `d${i}`, defId: 'koper' }));
-    expect(drawOverflow(s, 'uil', zone(0))).toBe(1);
-    s.zones[0].cards.push({ player: 0, card: { uid: 'elf', defId: 'bron' }, turn: 0 });
-    expect(drawOverflow(s, 'uil', zone(0))).toBe(2);
+    expect(drawOverflow(s, 'elf', zone(0))).toBe(0);
+    s.zones[0].cards.push({ player: 0, card: { uid: 'bron', defId: 'bron' }, turn: 0 });
+    expect(drawOverflow(s, 'elf', zone(0))).toBe(1);
   });
 });
 
@@ -741,9 +763,9 @@ describe('Schenk', () => {
     );
     const before = s.players[1].discard.length;
     s = play(s, 'pestdrager', zone(0));
-    expect(s.players[1].discard.slice(before).map((c) => c.uid)).toEqual(['oud1', 'oud2']);
-    expect(s.zones[0].cards.map((c) => c.card.uid)).toEqual(['bo1', 'oud3', s.zones[0].cards[2].card.uid]);
-    expect(getCard(s.zones[0].cards[2].card.defId).id).toBe('pestdrager');
+    expect(s.players[1].discard.slice(before).map((c) => c.uid)).toEqual(['oud1']);
+    expect(s.zones[0].cards.map((c) => c.card.uid)).toEqual(['bo1', 'oud2', 'oud3', s.zones[0].cards[3].card.uid]);
+    expect(getCard(s.zones[0].cards[3].card.defId).id).toBe('pestdrager');
     expect(s.zones[0].damage[0]).toBe(2);
   });
 

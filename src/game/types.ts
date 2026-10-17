@@ -4,7 +4,7 @@ export type PlayerId = 0 | 1;
 
 export type Keyword =
   | 'goud' | 'aanval' | 'storm' | 'herstel' | 'schild' | 'trek' | 'vertraag' | 'vernietig' | 'terugroep' | 'ververs' | 'herschep' | 'echo'
-  | 'schenk' | 'verban';
+  | 'schenk' | 'verban' | 'vervloek' | 'verdwijn';
 
 /** De vijf rassen van de winkelkaarten. Elk spel doet er één niet mee. */
 export type Race = 'mens' | 'elf' | 'dwerg' | 'ork' | 'ondood';
@@ -107,6 +107,8 @@ export interface GameState {
   outRace: Race | null;
   /** Toestand van de toevalsgenerator, zodat een spel volledig reproduceerbaar is. */
   seed: number;
+  /** Zoveel Vloeken zijn er al gemaakt (keyword Vervloek); zo krijgt elke Vloek een eigen uid. */
+  curses: number;
 }
 
 export type PlayTarget = { kind: 'discard' } | { kind: 'zone'; zone: number };
