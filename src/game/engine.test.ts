@@ -207,15 +207,29 @@ describe('terugtrekken', () => {
     expect(s.players[0].deck.some((c) => c.defId === 'vloek')).toBe(false);
   });
 
-  it('een Vloek kan je alleen afleggen, gratis, en dan verdwijnt ze uit het spel', () => {
+  it('een Vloek kan je alleen afleggen, voor 1 goud, en dan verdwijnt ze uit het spel', () => {
     let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
     const uid = give(s, 0, 'vloek');
     expect(applyAction(s, { type: 'play', handUid: uid, target: zone(0) }).ok).toBe(false);
+    // Zonder goud kan je ze niet afleggen.
+    s.players[0].gold = 0;
+    expect(applyAction(s, { type: 'play', handUid: uid, target: DISCARD }).ok).toBe(false);
+    s.players[0].gold = 3;
     s = act(s, { type: 'play', handUid: uid, target: DISCARD });
-    expect(s.players[0].gold).toBe(0);
+    expect(s.players[0].gold).toBe(2);
     s = act(s, { type: 'endTurn' });
     const all = [...s.players[0].deck, ...s.players[0].discard, ...s.players[0].hand, ...s.players[0].played];
     expect(all.some((c) => c.uid === uid)).toBe(false);
+  });
+
+  it('Alles afleggen betaalt een Vloek met het goud van de andere kaarten, of laat ze liggen', () => {
+    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
+    s.players[0].gold = 0;
+    s.players[0].hand = [{ uid: 'v1', defId: 'vloek' }, { uid: 'k1', defId: 'koper' }, { uid: 'v2', defId: 'vloek' }];
+    s = act(s, { type: 'discardAll' });
+    // De Koperen Munt betaalt één Vloek; de tweede blijft in je hand.
+    expect(s.players[0].gold).toBe(0);
+    expect(s.players[0].hand.map((c) => c.uid)).toEqual(['v2']);
   });
 
   it('kaarten zonder onderste effect kan je alleen afleggen', () => {

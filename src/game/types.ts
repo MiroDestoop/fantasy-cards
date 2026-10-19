@@ -4,7 +4,7 @@ export type PlayerId = 0 | 1;
 
 export type Keyword =
   | 'goud' | 'aanval' | 'storm' | 'herstel' | 'schild' | 'trek' | 'vertraag' | 'vernietig' | 'terugroep' | 'ververs' | 'herschep' | 'echo'
-  | 'schenk' | 'verban' | 'vervloek' | 'verdwijn';
+  | 'schenk' | 'verban' | 'vervloek' | 'verdwijn' | 'betaal';
 
 /** De vijf rassen van de winkelkaarten. Elk spel doet er één niet mee. */
 export type Race = 'mens' | 'elf' | 'dwerg' | 'ork' | 'ondood';

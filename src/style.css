@@ -352,6 +352,7 @@ button { font: inherit; }
 .kw-verban { --edge: #c62828; }
 .kw-vervloek { --edge: #7b1fa2; }
 .kw-verdwijn { --edge: #5c4a6e; }
+.kw-betaal { --edge: #b8860b; }
 /* Een speciaal effect is een korte zin in plaats van een keyword. */
 .kw-speciaal {
   --edge: #4a2c6e;

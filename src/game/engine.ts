@@ -112,14 +112,21 @@ export function applyAction(state: GameState, action: Action): ActionResult {
 export function whyCantPlay(state: GameState, handUid: string, target: PlayTarget): string | null {
   const card = state.players[state.active].hand.find((c) => c.uid === handUid);
   if (!card) return tr('Die kaart zit niet in je hand.', 'That card is not in your hand.');
-  if (target.kind === 'zone') {
+  const gold = state.players[state.active].gold;
+  if (target.kind === 'discard') {
+    const def = getCard(card.defId);
+    const cost = payCost(def.top);
+    if (cost > gold) return tr(`${def.name} afleggen kost ${cost} goud.`, `Discarding ${def.name} costs ${cost} gold.`);
+  } else {
     const def = getCard(card.defId);
     const zone = state.zones[target.zone];
     if (!zone) return tr('Die zone bestaat niet.', 'That zone does not exist.');
     if (def.bottom.length === 0) return tr(`${def.name} kan je alleen afleggen.`, `${def.name} can only be discarded.`);
     if (zone.owner !== null) return tr(`${zoneName(zone)} is al veroverd.`, `${zoneName(zone)} has already been conquered.`);
-    const cost = zoneEffect(zone)?.playCost ?? 0;
-    if (cost > state.players[state.active].gold) return tr(`${zoneEffect(zone)!.label}: een kaart in ${zoneName(zone)} spelen kost ${cost} goud.`, `${zoneEffect(zone)!.label}: playing a card in ${zoneName(zone)} costs ${cost} gold.`);
+    const toll = zoneEffect(zone)?.playCost ?? 0;
+    const cost = payCost(def.bottom);
+    if (toll + cost > gold && cost) return tr(`${def.name} in ${zoneName(zone)} spelen kost ${toll + cost} goud.`, `Playing ${def.name} in ${zoneName(zone)} costs ${toll + cost} gold.`);
+    if (toll > gold) return tr(`${zoneEffect(zone)!.label}: een kaart in ${zoneName(zone)} spelen kost ${toll} goud.`, `${zoneEffect(zone)!.label}: playing a card in ${zoneName(zone)} costs ${toll} gold.`);
     // Ook een kaart met Terugroep of Vernietig moet eerst gelegd kunnen worden; pas daarna werkt haar effect.
     const max = zoneCapacity(zone);
     if (zoneCardCount(state, target.zone, state.active) >= max) {
@@ -130,6 +137,11 @@ export function whyCantPlay(state: GameState, handUid: string, target: PlayTarge
     }
   }
   return null;
+}
+
+/** Wat het keyword Betaal op deze helft kost. */
+export function payCost(half: Effect[]): number {
+  return half.reduce((t, e) => t + (e.kw === 'betaal' ? e.amount : 0), 0);
 }
 
 /**
@@ -214,9 +226,12 @@ function playCard(s: GameState, handUid: string, target: PlayTarget): string | n
   const p = s.players[pid];
   const [card] = p.hand.splice(p.hand.findIndex((c) => c.uid === handUid), 1);
   const def = getCard(card.defId);
+  // Betaal wordt vooraf betaald, net als de tol van een zone.
+  const cost = payCost(target.kind === 'discard' ? def.top : def.bottom);
 
   if (target.kind === 'discard') {
     log(s, tr(`${p.name} legt ${def.name} af.`, `${p.name} discards ${def.name}.`));
+    if (cost) payFor(s, p.name, cost);
     p.played.push(card);
     for (const e of def.top) if (needMet(s, pid, null, e)) applyEffect(s, pid, e, null, card.uid);
   } else {
@@ -227,6 +242,7 @@ function playCard(s: GameState, handUid: string, target: PlayTarget): string | n
       p.gold -= fx.playCost;
       log(s, tr(`${fx.icon} ${p.name} betaalt ${fx.playCost} goud tol.`, `${fx.icon} ${p.name} pays ${fx.playCost} gold toll.`));
     }
+    if (cost) payFor(s, p.name, cost);
     // Een eerdere kaart met 'echo' laat deze kaart na haar effecten meteen terugkeren (haar eigen echo telt pas voor de volgende).
     const echo = p.echo > 0;
     if (echo) p.echo--;
@@ -261,9 +277,17 @@ function playCard(s: GameState, handUid: string, target: PlayTarget): string | n
   return null;
 }
 
+function payFor(s: GameState, name: string, cost: number): void {
+  s.players[s.active].gold -= cost;
+  log(s, tr(`🪙 ${name} betaalt ${cost} goud.`, `🪙 ${name} pays ${cost} gold.`));
+}
+
 function discardAll(s: GameState): string | null {
   // Alleen de kaarten die er nu zitten: wat Trek onderweg bijbrengt, blijft in je hand.
-  const uids = s.players[s.active].hand.map((c) => c.uid);
+  // Kaarten die goud kosten (Betaal) komen als laatste, zodat het goud van de rest ze kan betalen.
+  // Wat je dan nog niet kunt betalen, blijft in je hand.
+  const hand = s.players[s.active].hand;
+  const uids = [...hand.filter((c) => !payCost(getCard(c.defId).top)), ...hand.filter((c) => payCost(getCard(c.defId).top))].map((c) => c.uid);
   if (!uids.length) return tr('Je hebt geen kaarten in je hand.', 'You have no cards in your hand.');
   for (const uid of uids) {
     if (s.players[s.active].hand.some((c) => c.uid === uid)) playCard(s, uid, { kind: 'discard' });
@@ -383,6 +407,9 @@ function applyEffect(s: GameState, pid: PlayerId, e: Effect, zoneIdx: number | n
       // Afgelegd: de kaart zelf gaat niet naar de aflegstapel maar uit het spel.
       p.played = p.played.filter((c) => c.uid !== selfUid);
       log(s, tr('🕸️ De kaart verdwijnt uit het spel.', '🕸️ The card leaves the game.'));
+      break;
+    case 'betaal':
+      // Al betaald in playCard, vóór de andere effecten.
       break;
     case 'ververs':
       refreshShop(s);

@@ -21,6 +21,16 @@ function playOut(s: GameState, levels: [AiLevel, AiLevel], seed = 1, maxActions 
 }
 
 describe('computertegenstander', () => {
+  it('de computer blijft niet hangen op een Vloek die ze niet kan betalen', () => {
+    const s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
+    s.players[0].gold = 0;
+    s.players[0].hand = [{ uid: 'v1', defId: 'vloek' }];
+    for (const level of AI_LEVELS.map((l) => l.id)) {
+      const action = chooseAction(s, level, () => 0.5);
+      expect(applyAction(s, action).ok).toBe(true);
+    }
+  });
+
   it('kiest altijd een geldige actie en speelt een spel uit tot er een winnaar is', () => {
     for (const seed of [1, 2, 3, 4, 5]) {
       expect(playOut(createGame(['A', 'B'], seed), ['normaal', 'normaal']).winner).not.toBeNull();

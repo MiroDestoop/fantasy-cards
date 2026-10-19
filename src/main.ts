@@ -282,8 +282,9 @@ function renderInfo(g: GameState, pid: PlayerId): string {
 function renderDiscardAllButton(g: GameState): string {
   const hand = g.players[g.active].hand;
   if (!hand.length || g.winner !== null) return '';
+  // Betaal (de Vloek) gaat van het goud af.
   const gold = hand.reduce(
-    (t, c) => t + getCard(c.defId).top.reduce((s, e) => s + (e.kw === 'goud' ? e.amount : 0), 0),
+    (t, c) => t + getCard(c.defId).top.reduce((s, e) => s + (e.kw === 'goud' ? e.amount : e.kw === 'betaal' ? -e.amount : 0), 0),
     0,
   );
   return `<button class="discard-all" data-click="discard-all"
@@ -291,7 +292,7 @@ function renderDiscardAllButton(g: GameState): string {
       `Speel alle ${hand.length} kaarten in je hand af op je aflegstapel en krijg hun bovenste effect`,
       `Discard all ${hand.length} cards in your hand and get their top effect`,
     )}">
-    ⤓ ${tr('Alles afleggen', 'Discard all')}${gold ? ` <span>+${gold} 🪙</span>` : ''}
+    ⤓ ${tr('Alles afleggen', 'Discard all')}${gold ? ` <span>${gold > 0 ? '+' : '−'}${Math.abs(gold)} 🪙</span>` : ''}
   </button>`;
 }
 

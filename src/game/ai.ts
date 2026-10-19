@@ -1,6 +1,6 @@
 import { tr } from './i18n';
 import { getCard } from './cards';
-import { applyAction, other, recallPrice, whyCantBuy, zoneCardCount } from './engine';
+import { applyAction, other, recallPrice, whyCantBuy, whyCantPlay, zoneCardCount } from './engine';
 import { ZONE_HP } from './rules';
 import { zoneCapacity, zoneEffect } from './zones';
 import type { Action, CardDef, CardInstance, GameState, PlayerId, PlayTarget } from './types';
@@ -68,7 +68,8 @@ const ROLLOUT_SELF: Profile = { ...PROFILES.normaal, buy: 'slim', recall: true, 
 function decide(state: GameState, profile: Profile, level: AiLevel, rnd: () => number): Action {
   const pid = state.active;
   const hand = state.players[pid].hand;
-  if (hand.length) {
+  // Een Vloek die ze niet kan betalen, blijft in haar hand: dan is ze klaar met spelen.
+  if (playActions(state, pid).some((a) => a.type === 'play' && !whyCantPlay(state, a.handUid, a.target))) {
     if (profile.beam) return plannedAction(state, level, profile, rnd);
     if (profile.recall) {
       const recall = unblockingRecall(state, pid);
