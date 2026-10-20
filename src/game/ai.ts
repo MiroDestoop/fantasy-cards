@@ -389,7 +389,8 @@ function evaluate(s: GameState, pid: PlayerId, profile: Profile): number {
       score -= z.shield[opp] * 0.6;
     }
     // Een kaart in een zone doet niet meer mee in je stapel en neemt een van de 4 plaatsen in.
-    for (const c of z.cards) if (c.player === pid) score -= 0.4 + cardWorth(c.card);
+    // Een Vloek is daar uit je stapel, maar houdt een plaats bezet.
+    for (const c of z.cards) if (c.player === pid) score += c.card.defId === 'vloek' ? CURSE_IN_ZONE : -(0.4 + cardWorth(c.card));
   }
 
   // Goud is veel waard tot je er een sterke kaart mee kunt kopen, daarna minder.
@@ -408,6 +409,7 @@ function evaluate(s: GameState, pid: PlayerId, profile: Profile): number {
 
 /** Een Vloek in je stapel kost je een plek in je hand. */
 const CURSE_WORTH = -2;
+const CURSE_IN_ZONE = -1;
 
 function cardWorth(c: CardInstance): number {
   if (c.defId === 'vloek') return CURSE_WORTH;

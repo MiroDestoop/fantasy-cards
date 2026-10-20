@@ -90,8 +90,8 @@ export const KEYWORDS: Record<Keyword, { readonly label: string; noAmount?: bool
   vervloek: {
     get label() { return tr('Vervloek', 'Curse'); },
     explain: (n) => tr(
-      `Schud ${n === 1 ? 'een Vloek' : `${n} Vloeken`} in de stapel van je tegenstander. Een Vloek neemt een plaats in zijn hand in en doet niets; afleggen kost 1 goud en dan verdwijnt ze uit het spel.`,
-      `Shuffle ${n === 1 ? 'a Curse' : `${n} Curses`} into your opponent's deck. A Curse takes up a spot in their hand and does nothing; discarding it costs 1 gold, and then it leaves the game.`,
+      `Schud ${n === 1 ? 'een Vloek' : `${n} Vloeken`} in de stapel van je tegenstander. Een Vloek neemt een plaats in zijn hand in en doet niets; afleggen kost 1 goud en dan verdwijnt ze uit het spel. In een zone neemt ze gratis een plek in.`,
+      `Shuffle ${n === 1 ? 'a Curse' : `${n} Curses`} into your opponent's deck. A Curse takes up a spot in their hand and does nothing; discarding it costs 1 gold, and then it leaves the game. In a zone it takes up a spot for free.`,
     ),
   },
   verdwijn: {
@@ -142,7 +142,7 @@ const CARD_LIST: CardDef[] = [
   { id: 'koper', name: 'Koperen Munt', icon: '🪙', color: '#b87333', top: [fx('goud', 1)], bottom: [] },
   { id: 'zilver', name: 'Zilveren Munt', icon: '💰', color: '#9e9e9e', top: [fx('goud', 2)], bottom: [fx('verban', 1)] },
   // De Vloek komt niet in de winkel: het keyword Vervloek schudt ze in de stapel van de tegenstander.
-  { id: 'vloek', name: 'Vloek', icon: '🕸️', color: '#2e1a2e', top: [fx('betaal', 1), fx('verdwijn', 0)], bottom: [] },
+  { id: 'vloek', name: 'Vloek', icon: '🕸️', color: '#2e1a2e', top: [fx('betaal', 1), fx('verdwijn', 0)], bottom: [special('bezet')] },
   { id: 'rekruut', name: 'Rekruut', icon: '🗡️', color: '#6b8e23', top: [fx('goud', 1)], bottom: [fx('aanval', 1), fx('terugroep', 1)] },
 
   // Winkelkaarten

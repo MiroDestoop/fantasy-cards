@@ -56,6 +56,11 @@ export const SPECIALS: Record<string, SpecialDef> = {
       if (zone && zone.shield[oppId] > 0) damage(5);
     },
   },
+  // De Vloek in een zone: ze neemt er een plek in en doet verder niets.
+  bezet: {
+    get text() { return tr('Neemt hier een plek in en doet niets.', 'Takes up a spot here and does nothing.'); },
+    run: () => {},
+  },
   // De twee volgende doen niets op het moment zelf: de engine kijkt ernaar (zie hasSpecial in engine.ts).
   huur: {
     get text() { return tr('Gaat aan het einde van je beurt terug naar de winkel.', 'Returns to the shop at the end of your turn.'); },
