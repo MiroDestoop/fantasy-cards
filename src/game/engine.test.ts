@@ -328,7 +328,7 @@ describe('beurten en stapel', () => {
     s = act(s, { type: 'play', handUid: 'schat', target: DISCARD });
     s = act(s, { type: 'play', handUid: 'inzicht', target: DISCARD });
     expect(s.players[0].hand).toHaveLength(0);
-    expect(s.players[0].gold).toBe(5);
+    expect(s.players[0].gold).toBe(4);
     // Volgende beurt zijn ze er gewoon weer.
     s = act(s, { type: 'endTurn' });
     s = act(s, { type: 'endTurn' });
@@ -495,9 +495,9 @@ describe('zones', () => {
 
   it('Slagveld geeft elke aanval 1 schade meer, ook Storm', () => {
     let s = play(withEffect('slagveld'), 'alchemist', zone(0));
-    expect(s.zones[0].damage[0]).toBe(3);
+    expect(s.zones[0].damage[0]).toBe(4);
     s = play(s, 'vuurbal', DISCARD);
-    expect(s.zones[0].damage[0]).toBe(5);
+    expect(s.zones[0].damage[0]).toBe(6);
     expect(s.zones[1].damage[0]).toBe(1);
   });
 
@@ -520,7 +520,7 @@ describe('zones', () => {
     s.players[0].gold = 2;
     const after = play(s, 'alchemist', zone(0));
     expect(after.players[0].gold).toBe(1);
-    expect(after.zones[0].damage[0]).toBe(2);
+    expect(after.zones[0].damage[0]).toBe(3);
   });
 
   it('Bibliotheek laat je 1 kaart trekken', () => {
@@ -760,21 +760,22 @@ describe('rassen', () => {
   it('een Terugroep op dezelfde kaart neemt de rasbonus niet weg', () => {
     let s = createGame(['Ana', 'Bo'], 42, { plainZones: true, allRaces: true });
     s.zones[0].cards.push({ player: 0, card: { uid: 'mens', defId: 'schildknaap' }, turn: 0 });
-    // Generaal: Aanval 3, Terugroep 3 (neemt de Schildknaap terug), en toch 🧑Aanval 2.
+    // Generaal: Terugroep 3 (neemt de Schildknaap terug), en toch 🧑Aanval 6.
     s = play(s, 'generaal', zone(0));
     expect(s.players[0].discard.some((c) => c.uid === 'mens')).toBe(true);
-    expect(s.zones[0].damage[0]).toBe(5);
+    expect(s.zones[0].damage[0]).toBe(6);
   });
 
   it('drawOverflow telt een Trek met voorwaarde alleen mee als de voorwaarde klopt', () => {
     const s = createGame(['Ana', 'Bo'], 6, { plainZones: true });
     const p = s.players[0];
     p.hand = Array.from({ length: MAX_HAND }, (_, i) => ({ uid: `h${i}`, defId: 'koper' }));
-    p.hand.push({ uid: 'elf', defId: 'duisterelf' });
+    // Marskramer: 🧑Trek 2.
+    p.hand.push({ uid: 'mk', defId: 'marskramer' });
     p.deck = Array.from({ length: 10 }, (_, i) => ({ uid: `d${i}`, defId: 'koper' }));
-    expect(drawOverflow(s, 'elf', zone(0))).toBe(0);
-    s.zones[0].cards.push({ player: 0, card: { uid: 'bron', defId: 'bron' }, turn: 0 });
-    expect(drawOverflow(s, 'elf', zone(0))).toBe(1);
+    expect(drawOverflow(s, 'mk', zone(0))).toBe(0);
+    s.zones[0].cards.push({ player: 0, card: { uid: 'mens', defId: 'schildknaap' }, turn: 0 });
+    expect(drawOverflow(s, 'mk', zone(0))).toBe(2);
   });
 });
 
@@ -867,7 +868,7 @@ describe('echo: de volgende kaart keert meteen terug', () => {
 describe('dure kaarten', () => {
   it('bestaan van 7 tot 12 goud en liggen in de winkelvoorraad', () => {
     const prices = ['mammoet', 'aartsmagier', 'titaan', 'leegte', 'meteoor', 'drakenkoning'].map((id) => getCard(id).price);
-    expect(prices).toEqual([7, 8, 9, 10, 11, 12]);
+    expect(prices).toEqual([7, 8, 9, 9, 11, 12]);
     for (const id of ['mammoet', 'drakenkoning']) expect(SHOP_SUPPLY).toContain(id);
   });
 });
@@ -895,10 +896,32 @@ describe('tafelversie: eenvoudigere regels voor echte kaarten', () => {
     expect(s.zones[1].effect).toBe('vesting');
   });
 
+  it('laat alle rassen meedoen', () => {
+    for (let seed = 1; seed <= 10; seed++) {
+      const s = createGame(['Ana', 'Bo'], seed, { tafel: true });
+      expect(s.outRace).toBeNull();
+      const races = new Set([...s.shop.pile, ...s.shop.market].map((c) => getCard(c.defId).race));
+      expect(races.size).toBe(RACE_IDS.length);
+    }
+  });
+
   it('verbiedt terugtrekken', () => {
     let s = createGame(['Ana', 'Bo'], 1, { plainZones: true, tafel: true });
     s.players[0].gold = 20;
     s = play(s, 'rekruut', zone(0));
     expect(applyAction(s, { type: 'recall', zone: 0, cardUid: s.zones[0].cards[0].card.uid }).ok).toBe(false);
+  });
+});
+
+describe('Poortbeuker: een goedkope Belegeringsram', () => {
+  it('doet Aanval 2, en 5 schade meer als de tegenstander hier een Schild heeft', () => {
+    let s = createGame(['Ana', 'Bo'], 1, { plainZones: true, allRaces: true });
+    expect(getCard('poortbeuker').price).toBe(1);
+    expect(getCard('poortbeuker').race).toBe('mens');
+    s = play(s, 'poortbeuker', zone(0));
+    expect(s.zones[0].damage[0]).toBe(2);
+    s.zones[1].shield[1] = 1;
+    s = play(s, 'poortbeuker', zone(1));
+    expect(s.zones[1].damage[0]).toBe(6);
   });
 });

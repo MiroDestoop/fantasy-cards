@@ -59,8 +59,8 @@ export function createGame(
     curses: 0,
     tafel: !!options.tafel,
   };
-  // Elk spel doet één ras niet mee: zijn kaarten verdwijnen uit de voorraad.
-  if (!options.allRaces) {
+  // Elk spel doet één ras niet mee: zijn kaarten verdwijnen uit de voorraad. In de tafelversie doen ze allemaal mee.
+  if (!options.allRaces && !options.tafel) {
     const out = RACE_IDS[Math.floor(random(s) * RACE_IDS.length)];
     s.outRace = out;
     s.shop.pile = s.shop.pile.filter((c) => getCard(c.defId).race !== out);
