@@ -138,6 +138,7 @@ Een kaart in een zone wordt **eerst gelegd**, daarna werken haar effecten. Terug
 
 ## Ideeën en mogelijke volgende stappen
 
+- **Tafelversie met echte kaarten:** advies over wat te vereenvoudigen staat in `ideeen/reallife-versie.md` (Echo, Herschep en terugtrekken weg; eenvoudigere zones; tellers en fiches op tafel). Nog niet gebouwd; de gebruiker werkt eerst verder aan het digitale spel.
 - `ideeen/characterTypesImages.jpg`: een plaat met 12 personagetypes (paladin, archer, mage, druid, bard, necromancer, shaman, warrior, elementalist, thief, barbarian, priest). Dat is mogelijk inspiratie voor klassen of helden. Nog niet besproken of gebouwd.
 - Eerder geopperd, nog niet gebouwd: balans van kaartprijzen en waarden, echte illustraties voor kaarten, een aparte indeling met grotere kaarten voor telefoons, opnieuw verbinden na een verbroken online spel.
 - **Aandachtspunten voor de balans:** de Goblin (2 goud, steelt al het goud) kan te sterk zijn omdat goud bewaard blijft; mogelijke rem: duurder of max. 3 stelen. De Fenix met Terugroep/Vernietig (bv. Offervuur) kan elke beurt opnieuw gespeeld worden; mogelijke rem: één keer per beurt terugkeren.
