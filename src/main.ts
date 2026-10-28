@@ -128,8 +128,8 @@ function renderStart(): string {
     </div>
     ${tafelversie
       ? `<p class="level-note">🎲 ${tr(
-        'Zonder Echo, Herschep en Schenk, zonder terugtrekken (↩), en met eenvoudige zones.',
-        'No Echo, Reshape or Give, no withdrawing (↩), and simple zones.',
+        'Echo wordt Trek 1, Herschep wordt Aanval 1, Schenk wordt Terugroep. Geen terugtrekken (↩), eenvoudige zones en alle rassen.',
+        'Echo becomes Draw 1, Reshape becomes Attack 1, Give becomes Recall. No withdrawing (↩), simple zones and all races.',
       )}${onlineTab ? ` ${tr('Online kiest wie de kamer maakt.', 'Online, whoever creates the room decides.')}` : ''}</p>`
       : ''}
     ${onlineTab ? renderOnlineStart() : `${vsComputer

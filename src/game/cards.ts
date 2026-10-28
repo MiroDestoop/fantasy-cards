@@ -175,8 +175,8 @@ const CARD_LIST: CardDef[] = [
   // Kaarten met een speciaal effect (zie specials.ts)
   { id: 'alchemist', name: 'Alchemist', price: 6, icon: '⚗️', color: '#6a1b9a', top: [special('dubbelgoud')], bottom: [fx('aanval', 3)] },
   { id: 'huurling', name: 'Huurling', price: 4, icon: '🗡️', color: '#5d4037', top: [fx('goud', 1)], bottom: [fx('aanval', 4), special('huur')] },
-  { id: 'poortbeuker', name: 'Poortbeuker', price: 1, icon: '🪵', color: '#8d6e4a', top: [fx('goud', 1)], bottom: [special('ram'), fx('aanval', 2)] },
-  { id: 'ram', name: 'Belegeringsram', price: 4, icon: '🐏', color: '#6d4c41', top: [fx('goud', 2)], bottom: [special('ram'), fx('aanval', 2)] },
+  { id: 'poortbeuker', name: 'Poortbeuker', price: 2, icon: '🪵', color: '#8d6e4a', top: [fx('goud', 2)], bottom: [special('ram'),] },
+  { id: 'ram', name: 'Belegeringsram', price: 4, icon: '🐏', color: '#6d4c41', top: [fx('goud', 2),fx('verban', 1)], bottom: [special('ram'), fx('aanval', 2)] },
   { id: 'fenix', name: 'Fenix', price: 6, icon: '🐦‍🔥', color: '#e64a19', top: [fx('goud', 2)], bottom: [fx('aanval', 3), special('wedergeboorte')] },
   { id: 'goblin', name: 'Goblin', price: 2, icon: '👺', color: '#558b2f', top: [fx('goud', 1)], bottom: [special('diefstal')] },
   { id: 'geest', name: 'Wrekende Geest', price: 4, icon: '👻', color: '#455a64', top: [fx('trek', 1), fx('verban', 1)], bottom: [special('wraak'), fx('schild', 2)] },
@@ -270,12 +270,30 @@ export function getCard(id: string): CardDef {
   return def;
 }
 
-/** De tafelversie (om later met echte kaarten te spelen) laat deze keywords weg van elke kaart. */
-export const TAFEL_WEG: string[] = ['echo', 'herschep', 'schenk'];
+/**
+ * De tafelversie (om later met echte kaarten te spelen) vervangt deze keywords op elke kaart:
+ * Echo wordt Trek 1, Herschep wordt Aanval 1, Schenk(x) wordt Terugroep(x).
+ */
+export const TAFEL_IN_PLAATS: Partial<Record<Keyword, Keyword>> = { echo: 'trek', herschep: 'aanval', schenk: 'terugroep' };
 
-/** Een helft van een kaart zoals ze in dit spel werkt: in de tafelversie zonder de keywords uit TAFEL_WEG. */
+/**
+ * Een helft van een kaart zoals ze in dit spel werkt: in de tafelversie met de vervangingen uit TAFEL_IN_PLAATS.
+ * Staat hetzelfde keyword (zonder rasvoorwaarde) al op de helft, dan telt de vervanging erbij op: Aanval 2 + Aanval 1 = Aanval 3.
+ */
 export function cardHalf(half: Effect[], tafel: boolean): Effect[] {
-  return tafel ? half.filter((e) => !TAFEL_WEG.includes(e.kw)) : half;
+  if (!tafel || !half.some((e) => TAFEL_IN_PLAATS[e.kw as Keyword])) return half;
+  const out: Effect[] = [];
+  for (const e of half) {
+    const kw = TAFEL_IN_PLAATS[e.kw as Keyword];
+    const n = e.kw === 'schenk' && 'amount' in e ? e.amount : 1;
+    const next: Effect = kw ? { kw, amount: n, ...(e.need ? { need: e.need } : {}) } : e;
+    // Samenvoegen met een gelijk keyword zonder voorwaarde, vóór of na deze plek.
+    const same = (x: Effect) => x.kw === next.kw && x.kw !== 'speciaal' && !x.need && !next.need;
+    const i = out.findIndex(same);
+    if (i >= 0 && 'amount' in next) out[i] = { ...out[i], amount: (out[i] as { amount: number }).amount + next.amount } as Effect;
+    else out.push(next);
+  }
+  return out;
 }
 
 const expand = (counts: [string, number][]) => counts.flatMap(([id, n]) => Array<string>(n).fill(id));
