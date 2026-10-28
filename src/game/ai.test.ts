@@ -37,6 +37,12 @@ describe('computertegenstander', () => {
     }
   });
 
+  it('speelt de tafelversie uit zonder terug te trekken', () => {
+    for (const seed of [1, 2, 3]) {
+      expect(playOut(createGame(['A', 'B'], seed, { tafel: true }), ['moeilijk', 'normaal'], seed).winner).not.toBeNull();
+    }
+  }, 60000);
+
   it('speelt eerst haar hele hand voordat ze haar beurt eindigt', () => {
     const s = createGame(['A', 'B'], 9, { plainZones: true });
     expect(chooseAction(s).type).toBe('play');

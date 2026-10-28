@@ -4,7 +4,7 @@ import { getSpecial } from './specials';
 import { applyAction, createGame, drawOverflow, needMet, recallPrice, shopPrice } from './engine';
 import { FIRST_HAND_SIZE, HAND_SIZE, MARKET_SIZE, MAX_HAND, MAX_ZONE_CARDS, RECALL_PRICE, ZONE_HP } from './rules';
 import type { Action, GameState, PlayerId, PlayTarget } from './types';
-import { makeZone, type ZoneEffectId } from './zones';
+import { makeZone, TAFEL_ZONE_EFFECTS, type ZoneEffectId } from './zones';
 
 let counter = 0;
 function give(s: GameState, player: PlayerId, defId: string): string {
@@ -869,5 +869,36 @@ describe('dure kaarten', () => {
     const prices = ['mammoet', 'aartsmagier', 'titaan', 'leegte', 'meteoor', 'drakenkoning'].map((id) => getCard(id).price);
     expect(prices).toEqual([7, 8, 9, 10, 11, 12]);
     for (const id of ['mammoet', 'drakenkoning']) expect(SHOP_SUPPLY).toContain(id);
+  });
+});
+
+describe('tafelversie: eenvoudigere regels voor echte kaarten', () => {
+  it('kiest alleen eenvoudige zone-effecten', () => {
+    for (let seed = 1; seed <= 30; seed++) {
+      const s = createGame(['Ana', 'Bo'], seed, { tafel: true });
+      for (const z of s.zones) expect(TAFEL_ZONE_EFFECTS).toContain(z.effect);
+    }
+  });
+
+  it('laat Echo, Schenk en Herschep weg, de rest van de kaart werkt', () => {
+    let s = createGame(['Ana', 'Bo'], 1, { plainZones: true, allRaces: true, tafel: true });
+    s.players[0].gold = 0;
+    s = play(s, 'windloper', DISCARD);
+    expect(s.players[0].echo).toBe(0);
+    expect(s.players[0].gold).toBe(1);
+    s = play(s, 'rekruut', zone(0));
+    s = play(s, 'pestdrager', zone(0));
+    expect(s.zones[0].cards.filter((c) => c.player === 0)).toHaveLength(2);
+    expect(s.zones[0].damage[0]).toBe(3);
+    s.zones[1].effect = 'vesting';
+    s = play(s, 'landmeter', zone(1));
+    expect(s.zones[1].effect).toBe('vesting');
+  });
+
+  it('verbiedt terugtrekken', () => {
+    let s = createGame(['Ana', 'Bo'], 1, { plainZones: true, tafel: true });
+    s.players[0].gold = 20;
+    s = play(s, 'rekruut', zone(0));
+    expect(applyAction(s, { type: 'recall', zone: 0, cardUid: s.zones[0].cards[0].card.uid }).ok).toBe(false);
   });
 });

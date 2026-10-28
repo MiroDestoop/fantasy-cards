@@ -71,7 +71,7 @@ function decide(state: GameState, profile: Profile, level: AiLevel, rnd: () => n
   // Een Vloek die ze niet kan betalen, blijft in haar hand: dan is ze klaar met spelen.
   if (playActions(state, pid).some((a) => a.type === 'play' && !whyCantPlay(state, a.handUid, a.target))) {
     if (profile.beam) return plannedAction(state, level, profile, rnd);
-    if (profile.recall) {
+    if (profile.recall && !state.tafel) {
       const recall = unblockingRecall(state, pid);
       if (recall) return recall;
     }
@@ -279,7 +279,7 @@ function expand(node: Node, pid: PlayerId, profile: Profile): Node[] {
   const s = node.state;
   if (!s.players[pid].hand.length || s.winner !== null) return [];
   const actions = playActions(s, pid);
-  if (profile.recall) actions.push(...recallActions(s, pid));
+  if (profile.recall && !s.tafel) actions.push(...recallActions(s, pid));
   const key = stateKey(s);
   const children: Node[] = [];
   for (const action of actions) {

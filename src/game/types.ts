@@ -109,6 +109,8 @@ export interface GameState {
   seed: number;
   /** Zoveel Vloeken zijn er al gemaakt (keyword Vervloek); zo krijgt elke Vloek een eigen uid. */
   curses: number;
+  /** Tafelversie: zonder Echo, Herschep en Schenk, met eenvoudige zones en zonder terugtrekken. */
+  tafel: boolean;
 }
 
 export type PlayTarget = { kind: 'discard' } | { kind: 'zone'; zone: number };

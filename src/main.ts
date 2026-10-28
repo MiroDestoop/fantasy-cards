@@ -1,6 +1,6 @@
 import './style.css';
 import { AI_LEVELS, chooseAction, type AiLevel } from './game/ai';
-import { CARDS, getCard, KEYWORDS, RACES, STARTER_DECK } from './game/cards';
+import { cardHalf, CARDS, getCard, KEYWORDS, RACES, STARTER_DECK } from './game/cards';
 import { getSpecial } from './game/specials';
 import {
   applyAction, createGame, drawOverflow, other, recallPrice, shopPrice, whyCantBuy, whyCantPlay, zonesOwnedBy,
@@ -21,6 +21,7 @@ const COMPUTER: PlayerId = 1;
 const COMPUTER_THINK_MS = 1000;
 const COMPUTER_STEP_MS = 750;
 const LEVEL_KEY = 'fantasy-cards-niveau';
+const TAFEL_KEY = 'fantasy-cards-tafel';
 const LANG_KEY = 'fantasy-cards-taal';
 const STAGE_W = 1600;
 const STAGE_H = 900;
@@ -45,6 +46,8 @@ let testPicker = false;
 let testCount = 0;
 /** Het niveau van de computer; onthouden voor de volgende keer. */
 let computerLevel: AiLevel = loadLevel();
+/** Tafelversie: de eenvoudigere regels om later met echte kaarten te spelen; onthouden voor de volgende keer. */
+let tafelversie = loadTafel();
 let game: GameState | null = null;
 /** Verhoogt bij elk nieuw spel, zodat een geplande zet van de computer uit een oud spel niets meer doet. */
 let gameId = 0;
@@ -86,6 +89,8 @@ interface Net {
 let net: Net | null = null;
 /** Namen in het online spel: [host, gast]. */
 let netNames: [string, string] = ['Host', 'Gast'];
+/** Online kiest de host of het spel in de tafelversie gaat. */
+let netTafel = false;
 let netError = '';
 /** Een kamercode uit de link (?kamer=ABCD) wordt alvast ingevuld. */
 let codeFromLink = new URLSearchParams(location.search).get('kamer')?.toUpperCase() ?? '';
@@ -114,6 +119,19 @@ function renderStart(): string {
         'A normal game against the computer, but with a button to take any card into your hand',
       )}">🧪 ${tr('Testspel', 'Test game')}</button>
     </div>
+    <div class="mode variant">
+      <button class="${tafelversie ? '' : 'on'}" data-click="tafel:0">🃏 ${tr('Gewone versie', 'Normal version')}</button>
+      <button class="${tafelversie ? 'on' : ''}" data-click="tafel:1" title="${tr(
+        'De eenvoudigere regels om met echte kaarten te spelen',
+        'The simpler rules for playing with real cards',
+      )}">🎲 ${tr('Tafelversie', 'Table version')}</button>
+    </div>
+    ${tafelversie
+      ? `<p class="level-note">🎲 ${tr(
+        'Zonder Echo, Herschep en Schenk, zonder terugtrekken (↩), en met eenvoudige zones.',
+        'No Echo, Reshape or Give, no withdrawing (↩), and simple zones.',
+      )}${onlineTab ? ` ${tr('Online kiest wie de kamer maakt.', 'Online, whoever creates the room decides.')}` : ''}</p>`
+      : ''}
     ${onlineTab ? renderOnlineStart() : `${vsComputer
       ? `<div class="mode levels">${AI_LEVELS.map((l) =>
           `<button class="${l.id === computerLevel ? 'on' : ''}" data-click="level:${l.id}">${l.icon} ${l.label}</button>`).join('')}</div>
@@ -378,6 +396,7 @@ function raceTip(race: Race): string {
 }
 
 function renderFace(def: CardDef): string {
+  const tafel = !!game?.tafel;
   // Alleen de startkaarten tonen "Afleggen" en "In een zone": zo leer je het spel. Op de andere kaarten
   // is die plaats nodig voor de effecten; de kleur van elke helft toont welke welke is.
   const labels = STARTER_DECK.includes(def.id) || def.id === 'vloek';
@@ -386,12 +405,12 @@ function renderFace(def: CardDef): string {
     <div class="card-name">${esc(def.name)}</div>
     <div class="sect sect-top ${labels ? '' : 'no-label'}">
       ${labels ? `<div class="sect-label">⤓ ${tr('Afleggen', 'Discard')}</div>` : ''}
-      <div class="kws">${renderKeywords(def.top)}</div>
+      <div class="kws">${renderKeywords(cardHalf(def.top, tafel))}</div>
     </div>
     ${def.bottom.length
       ? `<div class="sect sect-bottom ${labels ? '' : 'no-label'}">
           ${labels ? `<div class="sect-label">⚔ ${tr('In een zone', 'In a zone')}</div>` : ''}
-          <div class="kws">${renderKeywords(def.bottom)}</div>
+          <div class="kws">${renderKeywords(cardHalf(def.bottom, tafel))}</div>
         </div>`
       : `<div class="sect sect-none"><div class="sect-label">${tr('Alleen afleggen', 'Discard only')}</div></div>`}`;
 }
@@ -442,7 +461,7 @@ function renderZone(g: GameState, i: number, bottom: PlayerId, prev: GameState |
   const fx = zoneEffect(z);
   const top = other(bottom);
   // Je eigen kaarten in een open zone kan je tijdens je beurt terugtrekken voor goud.
-  const canRecall = z.owner === null && humanCanAct();
+  const canRecall = z.owner === null && humanCanAct() && !g.tafel;
   const price = recallPrice(g, bottom);
   const row = (pid: PlayerId) => {
     const mine = z.cards.filter((c) => c.player === pid);
@@ -570,10 +589,11 @@ function renderSidePanel(g: GameState): string {
       title="${tr('Neem eender welke kaart in je hand', 'Take any card into your hand')}">🧪 Test</button>` : ''}
     <div class="hint">${tr(
       `Sleep een kaart naar je <b>aflegstapel</b> (bovenste effect) of naar een <b>zone</b> (onderste effect).
-      Hover over een stapel om te zien wat erin zit. Hover over je kaart in een zone om ze terug te trekken (↩).`,
+      Hover over een stapel om te zien wat erin zit.${g.tafel ? '' : ' Hover over je kaart in een zone om ze terug te trekken (↩).'}`,
       `Drag a card to your <b>discard pile</b> (top effect) or into a <b>zone</b> (bottom effect).
-      Hover over a pile to see what is in it. Hover over your card in a zone to withdraw it (↩).`,
+      Hover over a pile to see what is in it.${g.tafel ? '' : ' Hover over your card in a zone to withdraw it (↩).'}`,
     )}</div>
+    ${g.tafel ? `<div class="out-race">🎲 ${tr('Tafelversie', 'Table version')}</div>` : ''}
     ${g.outRace ? `<div class="out-race" data-race="${g.outRace}">🚫 ${RACES[g.outRace].icon} ${tr(`Zonder ${RACES[g.outRace].plural}`, `No ${RACES[g.outRace].plural}`)}</div>` : ''}
     <div class="log">${g.log.slice(-16).reverse().map((l) => `<div>${esc(l)}</div>`).join('')}</div>
     <div class="side-buttons">
@@ -677,6 +697,12 @@ app.addEventListener('click', (e) => {
       testGame = arg === 'test';
       onlineTab = arg === 'online';
       netError = '';
+      render();
+      break;
+    case 'tafel':
+      readNames();
+      tafelversie = arg === '1';
+      saveTafel();
       render();
       break;
     case 'level':
@@ -1096,6 +1122,22 @@ function loadLevel(): AiLevel {
   return 'normaal';
 }
 
+function loadTafel(): boolean {
+  try {
+    return localStorage.getItem(TAFEL_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function saveTafel(): void {
+  try {
+    localStorage.setItem(TAFEL_KEY, tafelversie ? '1' : '0');
+  } catch {
+    // Opslaan lukt niet: de keuze geldt dan alleen voor deze sessie.
+  }
+}
+
 function saveLevel(): void {
   try {
     localStorage.setItem(LEVEL_KEY, computerLevel);
@@ -1145,7 +1187,7 @@ function beginGame(seed: number | undefined, starter: PlayerId, gameNo: number):
   match.gameNo = gameNo;
   if (gameNo === 1) match.firstStarter = starter;
   const gameNames: [string, string] = net ? netNames : vsComputer ? [names[0], computerName()] : names;
-  game = createGame(gameNames, seed, { starter, bonusGold: vsComputer ? [0, levelInfo().bonusGold] : undefined });
+  game = createGame(gameNames, seed, { starter, bonusGold: vsComputer ? [0, levelInfo().bonusGold] : undefined, tafel: net ? netTafel : tafelversie });
   gameId++;
   prevRendered = null;
   seenZoneCards.clear();
@@ -1265,6 +1307,7 @@ function onNetMessage(m: Msg): void {
       netNames = m.names;
       if (m.gameNo === 1) match = newMatch();
       match.wins = [...m.wins];
+      netTafel = m.tafel;
       beginGame(m.seed, m.starter, m.gameNo);
       break;
     case 'action':
@@ -1286,7 +1329,8 @@ function hostStartGame(): void {
   const starter = nextStarter();
   const seed = Math.floor(Math.random() * 2 ** 31);
   const gameNo = match.gameNo + 1;
-  net.link.send({ t: 'start', protocol: PROTOCOL, seed, starter, gameNo, wins: match.wins, names: netNames });
+  netTafel = tafelversie;
+  net.link.send({ t: 'start', protocol: PROTOCOL, seed, starter, gameNo, wins: match.wins, names: netNames, tafel: netTafel });
   beginGame(seed, starter, gameNo);
 }
 

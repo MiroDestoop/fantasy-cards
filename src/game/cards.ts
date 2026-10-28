@@ -269,6 +269,14 @@ export function getCard(id: string): CardDef {
   return def;
 }
 
+/** De tafelversie (om later met echte kaarten te spelen) laat deze keywords weg van elke kaart. */
+export const TAFEL_WEG: string[] = ['echo', 'herschep', 'schenk'];
+
+/** Een helft van een kaart zoals ze in dit spel werkt: in de tafelversie zonder de keywords uit TAFEL_WEG. */
+export function cardHalf(half: Effect[], tafel: boolean): Effect[] {
+  return tafel ? half.filter((e) => !TAFEL_WEG.includes(e.kw)) : half;
+}
+
 const expand = (counts: [string, number][]) => counts.flatMap(([id, n]) => Array<string>(n).fill(id));
 
 /** Beginstapel van 10 kaarten; beide spelers krijgen dezelfde. */

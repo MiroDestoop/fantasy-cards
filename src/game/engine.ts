@@ -1,10 +1,10 @@
-import { getCard, RACE_IDS, RACES, SHOP_SUPPLY, STARTER_DECK } from './cards';
+import { cardHalf, getCard, RACE_IDS, RACES, SHOP_SUPPLY, STARTER_DECK } from './cards';
 import { getSpecial } from './specials';
 import {
   FIRST_HAND_SIZE, HAND_SIZE, MARKET_SIZE, MAX_HAND, RECALL_PRICE, ZONE_COUNT, ZONE_HP, ZONES_TO_WIN,
 } from './rules';
 import { cardsWord, tr } from './i18n';
-import { leadsZone, makeZone, zoneCapacity, ZONE_EFFECTS, ZONE_NAMES, zoneEffect, zoneName, type ZoneEffectId } from './zones';
+import { leadsZone, makeZone, TAFEL_ZONE_EFFECTS, zoneCapacity, ZONE_EFFECTS, ZONE_NAMES, zoneEffect, zoneName, type ZoneEffectId } from './zones';
 import type {
   Action, ActionResult, CardInstance, Effect, GameState, PlayerId, PlayerState, PlayTarget, Race, Zone,
 } from './types';
@@ -24,6 +24,8 @@ export interface GameOptions {
   plainZones?: boolean;
   /** Alle rassen doen mee (voor tests). */
   allRaces?: boolean;
+  /** Tafelversie: zonder Echo, Herschep en Schenk, met eenvoudige zones en zonder terugtrekken. */
+  tafel?: boolean;
 }
 
 export function createGame(
@@ -55,6 +57,7 @@ export function createGame(
     seed,
     outRace: null,
     curses: 0,
+    tafel: !!options.tafel,
   };
   // Elk spel doet één ras niet mee: zijn kaarten verdwijnen uit de voorraad.
   if (!options.allRaces) {
@@ -71,7 +74,7 @@ export function createGame(
   } else {
     // Elk spel: willekeurige namen, elk met een ander willekeurig effect.
     const names = shuffled(s, ZONE_NAMES).slice(0, ZONE_COUNT);
-    const effects = shuffled(s, Object.keys(ZONE_EFFECTS) as ZoneEffectId[]);
+    const effects = shuffled(s, s.tafel ? TAFEL_ZONE_EFFECTS : Object.keys(ZONE_EFFECTS) as ZoneEffectId[]);
     s.zones = names.map((n, i) => makeZone(n, effects[i]));
     for (const z of s.zones) log(s, `${z.icon} ${zoneName(z)}: ${ZONE_EFFECTS[z.effect!].icon} ${ZONE_EFFECTS[z.effect!].label}. ${ZONE_EFFECTS[z.effect!].text}`);
   }
@@ -177,6 +180,7 @@ export function recallPrice(state: GameState, pid: PlayerId): number {
 }
 
 export function whyCantRecall(state: GameState, zoneIdx: number, cardUid: string): string | null {
+  if (state.tafel) return tr('In de tafelversie kan je niet terugtrekken.', 'You cannot withdraw in the table version.');
   const zone = state.zones[zoneIdx];
   if (!zone) return tr('Die zone bestaat niet.', 'That zone does not exist.');
   if (!zone.cards.some((c) => c.card.uid === cardUid && c.player === state.active)) {
@@ -226,14 +230,16 @@ function playCard(s: GameState, handUid: string, target: PlayTarget): string | n
   const p = s.players[pid];
   const [card] = p.hand.splice(p.hand.findIndex((c) => c.uid === handUid), 1);
   const def = getCard(card.defId);
+  const top = cardHalf(def.top, s.tafel);
+  const bottom = cardHalf(def.bottom, s.tafel);
   // Betaal wordt vooraf betaald, net als de tol van een zone.
-  const cost = payCost(target.kind === 'discard' ? def.top : def.bottom);
+  const cost = payCost(target.kind === 'discard' ? top : bottom);
 
   if (target.kind === 'discard') {
     log(s, tr(`${p.name} legt ${def.name} af.`, `${p.name} discards ${def.name}.`));
     if (cost) payFor(s, p.name, cost);
     p.played.push(card);
-    for (const e of def.top) if (needMet(s, pid, null, e)) applyEffect(s, pid, e, null, card.uid);
+    for (const e of top) if (needMet(s, pid, null, e)) applyEffect(s, pid, e, null, card.uid);
   } else {
     const zone = s.zones[target.zone];
     log(s, tr(`${p.name} speelt ${def.name} in ${zoneName(zone)}.`, `${p.name} plays ${def.name} in ${zoneName(zone)}.`));
@@ -249,8 +255,8 @@ function playCard(s: GameState, handUid: string, target: PlayTarget): string | n
     // Eerst wordt de kaart gelegd, dan pas werken haar effecten. Terugroep en Vernietig slaan de kaart zelf over.
     zone.cards.push({ player: pid, card, turn: s.turn });
     // Rasvoorwaarden worden gecontroleerd vóór de effecten: een Terugroep of Vernietig op dezelfde kaart neemt de bonus niet weg.
-    const met = def.bottom.map((e) => needMet(s, pid, target.zone, e, card.uid));
-    def.bottom.forEach((e, i) => { if (met[i]) applyEffect(s, pid, e, target.zone, card.uid); });
+    const met = bottom.map((e) => needMet(s, pid, target.zone, e, card.uid));
+    bottom.forEach((e, i) => { if (met[i]) applyEffect(s, pid, e, target.zone, card.uid); });
     // Daarna het effect van de zone zelf.
     const onPlay = fx?.onPlay;
     if (onPlay?.gold) {

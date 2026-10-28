@@ -7,7 +7,7 @@ import { tr } from './game/i18n';
 import type { Action, PlayerId } from './game/types';
 
 /** Verhoog dit als berichten of spelregels veranderen, zodat oude en nieuwe versies niet met elkaar spelen. */
-export const PROTOCOL = 17;
+export const PROTOCOL = 18;
 const PREFIX = 'munt-of-zwaard-';
 /** Zonder letters die op elkaar lijken (0/O, 1/I/L). */
 const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -18,7 +18,7 @@ const TIMEOUT_MS = 10000;
 export type Msg =
   | { t: 'hello'; name: string; protocol: number }
   /** De host start een spel; de gast neemt de stand van de match over. */
-  | { t: 'start'; protocol: number; seed: number; starter: PlayerId; gameNo: number; wins: [number, number]; names: [string, string] }
+  | { t: 'start'; protocol: number; seed: number; starter: PlayerId; gameNo: number; wins: [number, number]; names: [string, string]; tafel: boolean }
   /** check: korte samenvatting van de toestand na de actie, om verschillen meteen te zien. */
   | { t: 'action'; action: Action; check: string }
   /** De gast vraagt het volgende spel; de host start het. */

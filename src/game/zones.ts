@@ -77,6 +77,9 @@ export const ZONE_EFFECTS: Record<ZoneEffectId, ZoneEffectDef> = {
   goudader: { id: 'goudader', icon: '💰', goldIfLeading: 1, get label() { return tr('Goudader', 'Gold Vein'); }, get text() { return tr('Sta je hier voor (meer schade dan je tegenstander) aan het begin van je beurt, dan krijg je 1 goud.', 'If you lead here (more damage than your opponent) at the start of your turn, you gain 1 gold.'); } },
 };
 
+/** De tafelversie kent alleen effecten die je op tafel ziet en niet hoeft te onthouden. */
+export const TAFEL_ZONE_EFFECTS: ZoneEffectId[] = ['vesting', 'bouwval', 'schatkamer', 'bibliotheek', 'tolpoort', 'smallepas'];
+
 export function zoneEffect(z: Zone): ZoneEffectDef | null {
   return z.effect ? ZONE_EFFECTS[z.effect] : null;
 }
