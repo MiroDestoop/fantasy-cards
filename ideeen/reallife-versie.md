@@ -17,7 +17,7 @@ Het leidende principe: **alles wat de computer onzichtbaar bijhoudt, moet zichtb
 | Weg | Kaarten die erbij verdwijnen of anders worden |
 |---|---|
 | Echo | Windloper, Schaduwdanser, Tijdmagiër: schrappen, of Echo vervangen door Trek 1 |
-| Herschep | Landmeter, Portaalmagiër, Weermaker: schrappen |
+| Herschep | Landmeter, Aardvormer, Weermaker: schrappen |
 | Terugtrekken voor goud (de ↩-knop) | helemaal weg. Een vaste prijs van 3 kan ook, maar is één regel extra |
 | Handlimiet-waarschuwing, de volgorde bij "Alles afleggen" | vallen vanzelf weg |
 
@@ -44,7 +44,7 @@ Het leidende principe: **alles wat de computer onzichtbaar bijhoudt, moet zichtb
 - **Vloek:** maak 10 Vloekkaarten. Vervloek(x): je steekt x Vloeken ergens in de stapel van de tegenstander. Die schudt niet opnieuw.
 - **Rassen en rasvoorwaarden:** die blijven. Een rasicoon op de kaart is op tafel goed te zien.
 - **Het ras dat niet meedoet:** schud 5 raskaartjes en trek er één. Dat ras haal je uit de voorraad. Je kunt deze regel ook schrappen en altijd met alle rassen spelen.
-- **Huurling:** gaat bij Einde beurt onderaan de voorraad. **Fenix:** keert terug in je hand. Beide blijven, want je ziet ze op tafel.
+- **Huurling:** gaat bij Einde beurt onderaan de voorraad. **Knekelfenix:** keert terug in je hand. Beide blijven, want je ziet ze op tafel.
 - **Begin:** de beginspeler trekt in de eerste beurt 3 kaarten, daarna trekt iedereen 5. De handlimiet blijft 8.
 
 ## 5. Hoeveel kaarten je drukt

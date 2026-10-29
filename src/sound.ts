@@ -130,7 +130,7 @@ export const sfx = {
   whoosh(d = 0) {
     noise(d, 0.45, { filter: 'bandpass', freq: 350, freqTo: 2800, q: 1.2, vol: 0.35 });
   },
-  /** Een Fenix die herrijst: een opstijgende vlam. */
+  /** Een Knekelfenix die herrijst: een opstijgende vlam. */
   rebirth(d = 0) {
     noise(d, 0.6, { filter: 'bandpass', freq: 400, freqTo: 3000, q: 1, vol: 0.3 });
     [523, 784, 1046].forEach((f, i) => tone(d + 0.15 + i * 0.09, f, 0.35, { type: 'triangle', vol: 0.12 }));

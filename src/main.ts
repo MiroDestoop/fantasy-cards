@@ -1855,7 +1855,7 @@ function captureEffects(action: Action, before: GameState, after: GameState): Fl
       if (after.zones[zi].cards.some((c) => c.card.uid === zc.card.uid)) continue;
       const el = app.querySelector<HTMLElement>(`[data-zcard="${zc.card.uid}"] .card`);
       if (!el) continue;
-      // Teruggeroepen kaarten liggen nu op de aflegstapel, een Fenix in de hand, een Huurling in de winkel;
+      // Teruggeroepen kaarten liggen nu op de aflegstapel, een Knekelfenix in de hand, een Huurling in de winkel;
       // vernietigde kaarten zijn nergens meer.
       const owner = after.players[zc.player];
       const has = (cards: CardInstance[]) => cards.some((c) => c.uid === zc.card.uid);

@@ -274,7 +274,7 @@ function playCard(s: GameState, handUid: string, target: PlayTarget): string | n
     const still = zone.cards.find((c) => c.card.uid === card.uid);
     if (echo && still) {
       zone.cards = zone.cards.filter((c) => c !== still);
-      // Een Huurling gaat terug naar de winkel, een Fenix naar je hand, al de rest naar je aflegstapel.
+      // Een Huurling gaat terug naar de winkel, een Knekelfenix naar je hand, al de rest naar je aflegstapel.
       if (hasSpecial(card.defId, 'huur')) s.shop.pile.unshift(card);
       else if (!rebirth(s, p, card)) p.discard.push(card);
       log(s, tr(`🌬️ ${def.name} keert meteen terug uit ${zoneName(zone)}.`, `🌬️ ${def.name} returns from ${zoneName(zone)} right away.`));
@@ -384,7 +384,7 @@ function applyEffect(s: GameState, pid: PlayerId, e: Effect, zoneIdx: number | n
     case 'schenk':
       if (zoneIdx !== null) {
         const gift = takeZoneCards(s, zoneIdx, pid, e.amount, selfUid);
-        // Een Fenix laat zich niet weggeven: ze keert terug in je eigen hand.
+        // Een Knekelfenix laat zich niet weggeven: ze keert terug in je eigen hand.
         for (const c of gift) if (!rebirth(s, p, c)) s.players[opp].discard.push(c);
         if (gift.length) log(s, tr(`🎁 ${p.name} schenkt ${gift.map((c) => getCard(c.defId).name).join(', ')} aan ${s.players[opp].name}.`, `🎁 ${p.name} gives ${gift.map((c) => getCard(c.defId).name).join(', ')} to ${s.players[opp].name}.`));
       }
@@ -424,11 +424,11 @@ function applyEffect(s: GameState, pid: PlayerId, e: Effect, zoneIdx: number | n
   }
 }
 
-/** Vernietig: verbant je andere kaarten in deze zone. Geeft het aantal kaarten dat de zone verliet (ook een herrezen Fenix). */
+/** Vernietig: verbant je andere kaarten in deze zone. Geeft het aantal kaarten dat de zone verliet (ook een herrezen Knekelfenix). */
 function destroyZoneCards(s: GameState, pid: PlayerId, zoneIdx: number, selfUid?: string): number {
   const p = s.players[pid];
   const taken = takeZoneCards(s, zoneIdx, pid, Infinity, selfUid);
-  // Een Fenix verbrandt niet: ze keert terug in je hand.
+  // Een Knekelfenix verbrandt niet: ze keert terug in je hand.
   const banished = taken.filter((c) => !rebirth(s, p, c));
   if (banished.length) log(s, tr(
     `${p.name} verbant ${cardsWord(banished.length)} uit ${zoneName(s.zones[zoneIdx])} uit het spel.`,
@@ -539,7 +539,7 @@ function hasSpecial(defId: string, id: string): boolean {
   return getCard(defId).bottom.some((e) => e.kw === 'speciaal' && e.id === id);
 }
 
-/** Een Fenix die een zone verlaat, keert terug in je hand (als er plaats is). Geeft true als dat gebeurde. */
+/** Een Knekelfenix die een zone verlaat, keert terug in je hand (als er plaats is). Geeft true als dat gebeurde. */
 function rebirth(s: GameState, p: PlayerState, card: CardInstance): boolean {
   if (!hasSpecial(card.defId, 'wedergeboorte')) return false;
   if (p.hand.length >= MAX_HAND) {

@@ -319,7 +319,7 @@ describe('beurten en stapel', () => {
   });
 
   it('een kleine stapel met Trek geeft geen oneindige lus meer', () => {
-    // Alleen Drakenschat en Arcaan Inzicht: vroeger trok Inzicht ze allebei opnieuw, eindeloos.
+    // Alleen Dwergenschat en Sterrenlezer: vroeger trok de Sterrenlezer ze allebei opnieuw, eindeloos.
     let s = createGame(['Ana', 'Bo'], 3, { plainZones: true });
     const ana = s.players[0];
     ana.deck = [];
@@ -604,7 +604,7 @@ describe('Goblin', () => {
   });
 });
 
-describe('Huurling, Belegeringsram en Fenix', () => {
+describe('Huurling, Belegeringsram en Knekelfenix', () => {
   const fresh = () => createGame(['Ana', 'Bo'], 42, { plainZones: true });
 
   it('Huurling doet 4 schade en gaat aan het einde van je beurt terug naar de winkelvoorraad', () => {
@@ -636,7 +636,7 @@ describe('Huurling, Belegeringsram en Fenix', () => {
     expect(s.zones[0].shield[1]).toBe(0);
   });
 
-  it('Fenix keert terug in je hand als ze teruggeroepen wordt', () => {
+  it('Knekelfenix keert terug in je hand als ze teruggeroepen wordt', () => {
     let s = play(fresh(), 'fenix', zone(0));
     expect(s.zones[0].damage[0]).toBe(3);
     const uid = s.zones[0].cards[0].card.uid;
@@ -645,7 +645,7 @@ describe('Huurling, Belegeringsram en Fenix', () => {
     expect(s.players[0].discard.some((c) => c.uid === uid)).toBe(false);
   });
 
-  it('Fenix keert terug in je hand als ze vernietigd wordt, ook bij terugtrekken', () => {
+  it('Knekelfenix keert terug in je hand als ze vernietigd wordt, ook bij terugtrekken', () => {
     let s = play(fresh(), 'fenix', zone(0));
     const uid = s.zones[0].cards[0].card.uid;
     s = play(s, 'offervuur', zone(0));
@@ -796,7 +796,7 @@ describe('Schenk', () => {
     expect(s.zones[0].damage[0]).toBe(2);
   });
 
-  it('een Fenix laat zich niet weggeven: ze keert terug in je hand', () => {
+  it('een Knekelfenix laat zich niet weggeven: ze keert terug in je hand', () => {
     let s = createGame(['Ana', 'Bo'], 42, { plainZones: true, allRaces: true });
     s.zones[0].cards.push({ player: 0, card: { uid: 'fen', defId: 'fenix' }, turn: 0 });
     s = play(s, 'pestdrager', zone(0));
