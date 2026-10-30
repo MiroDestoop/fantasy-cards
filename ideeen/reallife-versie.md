@@ -23,22 +23,29 @@ Het leidende principe: **alles wat de computer onzichtbaar bijhoudt, moet zichtb
 
 ## 3. Eenvoudigere zones
 - Zonder zone-effecten krijgt elke zone **12 levens**. Dat is de eenvoudigste versie, goed voor de eerste spellen.
-- Wie zone-effecten wil, maakt zonekaarten met alleen effecten die je **ziet en niet moet onthouden**. Er liggen 3 zonekaarten open uit een stapel van 6:
-  - **Vesting**: 14 levens
-  - **Bouwval**: 10 levens
+- Wie zone-effecten wil, maakt zonekaarten met alleen effecten die je **ziet en niet moet onthouden**. Elke zone heeft altijd 12 levens en plaats voor 4 kaarten per speler. Nu zijn er 3 zonekaarten:
   - **Schatkamer**: +1 goud per kaart die je er legt
   - **Bibliotheek**: trek 1 kaart per kaart die je er legt
   - **Tolpoort**: een kaart hier leggen kost 1 goud
-  - **Smalle pas**: maximaal 3 kaarten per speler
 - **Effecten die eruit gaan**, met de reden:
+  - Vesting, Bouwval en Smalle pas (30 oktober 2026, keuze van de gebruiker): geen zones met andere levens of een andere kaartlimiet.
   - Slagveld en Dichte mist: de ±1 bij elke aanval vergeet je snel.
   - Goudader, Heilige bron en Handelspost: daarvoor moet je elke beurt vergelijken of iets onthouden.
   - Zware tocht: hangt af van Vertraag-fiches.
 - Zonenamen (Wachttoren, Elfenwoud enzovoort) blijven gewoon sfeer op de kaart.
+- **Voorstellen voor nieuwe zonekaarten (nog niet gekozen of gebouwd).** Ze werken allemaal op het moment dat je er een kaart legt, of staan gewoon op de zonekaart. Je hoeft dus niets te onthouden, en levens en kaartlimiet blijven gelijk:
+  - **Smidse**: leg je hier een kaart, dan krijg je hier 1 blauw fiche (Schild 1).
+  - **Strijdperk**: leg je hier een kaart, dan doe je hier 1 schade extra.
+  - **Marktplein**: leg je hier een kaart, dan mag je 1 winkelkaart onderaan de voorraad schuiven (Verban 1).
+  - **Heksenkring**: leg je hier een kaart, dan krijgt je tegenstander een rood fiche (Vertraag 1).
+  - **Offeraltaar**: leg je hier een kaart, dan mag je 1 kaart uit je hand uit het spel halen.
+  - **Uitkijkpost**: leg je hier een kaart, dan bekijk je de bovenste kaart van je stapel en mag je ze onderaan leggen.
+  - **Heilige grond**: Storm doet hier geen schade.
+  - **Schuilplaats**: Vertraag en Vervloek van je tegenstander werken niet als je ze hier speelt. (Twijfelgeval: kijkt naar de zone waar de tegenstander speelt.)
 
 ## 4. Wat blijft, en hoe het op tafel werkt
 - **Twee helften per kaart.** Een kaart die je aflegt voor de bovenste helft, leg je op een **speelstapel** voor je. Pas bij Einde beurt gaat die stapel samen met je hand naar je aflegstapel. Dat is dezelfde regel als nu (`played`) en ze voorkomt de oneindige Trek-lus.
-- **Zones:** jouw kaarten liggen in een **rij van links naar rechts**. Links ligt de oudste kaart, wat Terugroep en Schenk ("oudste kaarten") eenvoudig maakt. Maximaal 4 kaarten per speler, 3 in een Smalle pas.
+- **Zones:** jouw kaarten liggen in een **rij van links naar rechts**. Links ligt de oudste kaart, wat Terugroep en Schenk ("oudste kaarten") eenvoudig maakt. Maximaal 4 kaarten per speler.
 - **Eerst leggen, dan het effect.** Je kaart neemt dus eerst een plek in, ook bij Terugroep en Vernietig.
 - **Winkel:** 5 open kaarten van een geschudde voorraad. Een gekochte kaart gaat naar je aflegstapel.
 - **Vloek:** maak 10 Vloekkaarten. Vervloek(x): je steekt x Vloeken ergens in de stapel van de tegenstander. Die schudt niet opnieuw.
@@ -50,7 +57,7 @@ Het leidende principe: **alles wat de computer onzichtbaar bijhoudt, moet zichtb
 ## 5. Hoeveel kaarten je drukt
 - Nu liggen er ongeveer 110 winkelkaarten. Op tafel volstaan **1 à 2 exemplaren per soort**, zo'n 60 à 70 kaarten.
 - Per speler 10 startkaarten: 5 Koperen Munt, 3 Rekruut en 2 Zilveren Munt. Twee spelers samen hebben er dus 20.
-- Daarbij komen 10 Vloeken en eventueel 6 zonekaarten.
+- Daarbij komen 10 Vloeken en eventueel 3 zonekaarten.
 - In totaal zijn dat ongeveer 100 kaarten, ruim 11 A4-vellen met 9 kaarten per vel.
 
 ## 6. Nog na te kijken als je verder gaat

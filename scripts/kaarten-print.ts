@@ -63,7 +63,7 @@ function kaart(def: CardDef): string {
   </div>`;
 }
 
-/** De 6 zonekaarten van de tafelversie: elke kaart een zonenaam (sfeer) en een effect. */
+/** De zonekaarten van de tafelversie: elke kaart een zonenaam (sfeer) en een effect. */
 function zoneKaarten(): string[] {
   return TAFEL_ZONE_EFFECTS.map((id, i) => {
     const eff = ZONE_EFFECTS[id];
