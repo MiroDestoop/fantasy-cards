@@ -291,7 +291,8 @@ function renderInfo(g: GameState, pid: PlayerId): string {
           `Je volgende ${p.echo > 1 ? `${p.echo} kaarten` : 'kaart'} in een zone keert na het effect meteen terug naar je aflegstapel`,
           `Your next ${p.echo > 1 ? `${p.echo} cards` : 'card'} in a zone returns to your discard pile right after its effect`,
         )}">🌬️ ${p.echo}</span>` : ''}
-        ${p.slow ? `<span class="slow" title="${tr(`Trekt volgende beurt ${cardsWord(p.slow)} minder`, `Draws ${cardsWord(p.slow)} fewer next turn`)}">⏳ −${p.slow}</span>` : ''}
+        ${p.slow > 0 ? `<span class="slow" title="${tr(`Trekt volgende beurt ${cardsWord(p.slow)} minder`, `Draws ${cardsWord(p.slow)} fewer next turn`)}">⏳ −${p.slow}</span>` : ''}
+        ${p.slow < 0 ? `<span class="slow" title="${tr(`Trekt volgende beurt ${cardsWord(-p.slow)} meer`, `Draws ${cardsWord(-p.slow)} more next turn`)}">🍺 +${-p.slow}</span>` : ''}
       </div>
     </div>
   </div>`;

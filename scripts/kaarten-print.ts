@@ -10,7 +10,7 @@ import { CARDS, KEYWORDS, RACE_IDS, RACES, SHOP_SUPPLY, STARTER_DECK, TAFEL_IN_P
 import { setLang, tr, type Lang } from '../src/game/i18n';
 import { getSpecial } from '../src/game/specials';
 import type { CardDef, Effect, Keyword } from '../src/game/types';
-import { TAFEL_ZONE_EFFECTS, ZONE_EFFECTS, ZONE_NAMES, makeZone, zoneName } from '../src/game/zones';
+import { TAFEL_ZONE_EFFECTS, ZONE_EFFECTS, makeZone } from '../src/game/zones';
 
 const SPELERS = 2;
 /** Zoveel Vloeken liggen klaar (zie ideeen/reallife-versie.md). */
@@ -63,17 +63,15 @@ function kaart(def: CardDef): string {
   </div>`;
 }
 
-/** De zonekaarten van de tafelversie: elke kaart een zonenaam (sfeer) en een effect. */
+/** De zonekaarten van de tafelversie: de naam van het effect is de naam van de zone. */
 function zoneKaarten(): string[] {
-  return TAFEL_ZONE_EFFECTS.map((id, i) => {
+  return TAFEL_ZONE_EFFECTS.map((id) => {
     const eff = ZONE_EFFECTS[id];
-    const naam = ZONE_NAMES[i % ZONE_NAMES.length];
-    const zone = makeZone(naam, id);
     return `<div class="card zone">
-      <div class="art" style="--art:#4a6b3a">${naam.icon}</div>
-      <div class="card-name">${esc(zoneName(naam))}</div>
-      <div class="sect sect-zone"><div class="zone-eff">${eff.icon} ${esc(eff.label)}</div><div class="zone-text">${esc(eff.text)}</div></div>
-      <div class="zone-hp">❤️ ${zone.hp} ${tr('levens', 'health')}</div>
+      <div class="art" style="--art:#4a6b3a">${eff.icon}</div>
+      <div class="card-name">${esc(eff.label)}</div>
+      <div class="sect sect-zone"><div class="zone-text">${esc(eff.text)}</div></div>
+      <div class="zone-hp">❤️ ${makeZone({ name: '', icon: '' }, id).hp} ${tr('levens', 'health')}</div>
     </div>`;
   });
 }
@@ -164,8 +162,7 @@ th, td { text-align: left; padding: 0.6mm 1.5mm; border-bottom: 0.2mm solid #ccc
 .kw-speciaal { --edge: #4a2c6e; padding: 0.6mm 1.5mm; font-size: 8pt; font-weight: normal; font-style: italic; line-height: 1.15; text-align: center; }
 .zone { background: linear-gradient(180deg, #e3ecd0, #b9c99a); border-color: #3e5a2e; }
 .sect-zone { background: rgba(62,90,46,.12); border: 0.3mm solid rgba(62,90,46,.5); text-align: center; padding: 2mm; }
-.zone-eff { font-weight: bold; font-size: 11pt; }
-.zone-text { font-size: 8.5pt; line-height: 1.25; }
+.zone-text { font-size: 10pt; line-height: 1.3; }
 .zone-hp { text-align: center; font-weight: bold; font-size: 10pt; }
 `;
 

@@ -541,6 +541,23 @@ describe('zones', () => {
     expect(s.players[0].hand).toHaveLength(HAND_SIZE - 2);
   });
 
+  it('Smidse geeft Schild 1 in die zone', () => {
+    const s = play(withEffect('smidse'), 'rekruut', zone(0));
+    expect(s.zones[0].shield).toEqual([1, 0]);
+  });
+
+  it('Marktplein laat je 1 winkelkaart verbannen', () => {
+    const s = play(withEffect('marktplein'), 'rekruut', zone(0));
+    expect(s.players[0].banish).toBe(1);
+  });
+
+  it('Herberg laat de tegenstander volgende beurt 1 kaart meer trekken', () => {
+    let s = play(withEffect('herberg'), 'rekruut', zone(0));
+    s = act(s, { type: 'endTurn' });
+    expect(s.players[1].hand).toHaveLength(HAND_SIZE + 1);
+    expect(s.players[1].slow).toBe(0);
+  });
+
   it('Heilige bron wist aan het begin van je beurt 1 schade van je tegenstander uit', () => {
     let s = withEffect('bron');
     s.zones[0].damage = [4, 3];

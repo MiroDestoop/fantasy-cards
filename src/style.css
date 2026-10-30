@@ -1202,5 +1202,8 @@ button { font: inherit; }
 .zfx-bron { --edge: #80deea; }
 .zfx-handelspost { --edge: #aed581; }
 .zfx-smallepas { --edge: #bcaaa4; }
+.zfx-smidse { --edge: #78909c; }
+.zfx-marktplein { --edge: #f48fb1; }
+.zfx-herberg { --edge: #ffb74d; }
 /* Goedkoper door een Handelspost. */
 .price.discount { background: #2e7d32; color: #fff; box-shadow: 0 0 10px rgba(129, 199, 132, 0.8); }

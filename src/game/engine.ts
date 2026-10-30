@@ -271,6 +271,19 @@ function playCard(s: GameState, handUid: string, target: PlayTarget): string | n
       p.slow += onPlay.selfSlow;
       log(s, tr(`${fx!.icon} ${p.name} trekt volgende beurt ${cardsWord(onPlay.selfSlow)} minder.`, `${fx!.icon} ${p.name} draws ${cardsWord(onPlay.selfSlow)} fewer next turn.`));
     }
+    if (onPlay?.shield) {
+      zone.shield[pid] += onPlay.shield;
+      log(s, tr(`${fx!.icon} ${p.name} krijgt Schild ${onPlay.shield} in ${zoneName(zone)}.`, `${fx!.icon} ${p.name} gains Shield ${onPlay.shield} in ${zoneName(zone)}.`));
+    }
+    if (onPlay?.banish) {
+      p.banish += onPlay.banish;
+      log(s, tr(`${fx!.icon} ${p.name} mag een winkelkaart verbannen.`, `${fx!.icon} ${p.name} may banish a shop card.`));
+    }
+    if (onPlay?.oppDraw) {
+      // Een negatieve Vertraag: de tegenstander trekt meer. Een Vertraag op hem heft het weer op.
+      s.players[other(pid)].slow -= onPlay.oppDraw;
+      log(s, tr(`${fx!.icon} ${s.players[other(pid)].name} trekt volgende beurt ${cardsWord(onPlay.oppDraw)} meer.`, `${fx!.icon} ${s.players[other(pid)].name} draws ${cardsWord(onPlay.oppDraw)} more next turn.`));
+    }
     const still = zone.cards.find((c) => c.card.uid === card.uid);
     if (echo && still) {
       zone.cards = zone.cards.filter((c) => c !== still);

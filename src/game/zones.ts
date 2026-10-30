@@ -26,7 +26,8 @@ export function zoneName(z: { name: string }): string {
 export type ZoneEffectId =
   | 'vesting' | 'bouwval' | 'slagveld' | 'mist' | 'goudader'
   | 'schatkamer' | 'tolpoort' | 'zwaretocht' | 'bibliotheek'
-  | 'bron' | 'handelspost' | 'smallepas';
+  | 'bron' | 'handelspost' | 'smallepas'
+  | 'smidse' | 'marktplein' | 'herberg';
 
 export interface ZoneEffectDef {
   id: ZoneEffectId;
@@ -51,6 +52,12 @@ export interface ZoneEffectDef {
     draw?: number;
     /** zoveel kaarten minder trekken in je volgende beurt (Vertraag op jezelf) */
     selfSlow?: number;
+    /** zoveel Schild in deze zone */
+    shield?: number;
+    /** zoveel winkelkaarten mag je deze beurt verbannen (Verban) */
+    banish?: number;
+    /** zoveel kaarten trekt je tegenstander in zijn volgende beurt méér */
+    oppDraw?: number;
   };
   /** Zoveel goud betaal je om hier een kaart te spelen; zonder dat goud kan het niet. */
   playCost?: number;
@@ -74,11 +81,14 @@ export const ZONE_EFFECTS: Record<ZoneEffectId, ZoneEffectDef> = {
   bron: { id: 'bron', icon: '🕊️', healEachTurn: 1, get label() { return tr('Heilige bron', 'Holy Spring'); }, get text() { return tr('Aan het begin van je beurt verdwijnt hier 1 schade van je tegenstander.', 'At the start of your turn, 1 of your opponent\'s damage here disappears.'); } },
   handelspost: { id: 'handelspost', icon: '⚖️', shopDiscountIfLeading: 1, get label() { return tr('Handelspost', 'Trading Post'); }, get text() { return tr('Sta je hier voor (meer schade dan je tegenstander), dan kost elke kaart in de winkel 1 goud minder (minimum 1).', 'If you lead here (more damage than your opponent), every card in the shop costs 1 gold less (minimum 1).'); } },
   smallepas: { id: 'smallepas', icon: '🏔️', maxCards: 3, get label() { return tr('Smalle pas', 'Narrow Pass'); }, get text() { return tr(`Hier passen maar 3 kaarten per speler in plaats van ${MAX_ZONE_CARDS}.`, `Only 3 cards per player fit here instead of ${MAX_ZONE_CARDS}.`); } },
+  smidse: { id: 'smidse', icon: '⚒️', onPlay: { shield: 1 }, get label() { return tr('Smidse', 'Forge'); }, get text() { return tr('Speel je hier een kaart, dan krijg je hier Schild 1.', 'Play a card here and you gain Shield 1 here.'); } },
+  marktplein: { id: 'marktplein', icon: '⛺', onPlay: { banish: 1 }, get label() { return tr('Marktplein', 'Market Square'); }, get text() { return tr('Speel je hier een kaart, dan mag je deze beurt 1 winkelkaart verbannen (Verban 1).', 'Play a card here and you may banish 1 shop card this turn (Banish 1).'); } },
+  herberg: { id: 'herberg', icon: '🍺', onPlay: { oppDraw: 1 }, get label() { return tr('Herberg', 'Tavern'); }, get text() { return tr('Speel je hier een kaart, dan trekt je tegenstander volgende beurt 1 kaart meer.', 'Play a card here and your opponent draws 1 extra card next turn.'); } },
   goudader: { id: 'goudader', icon: '💰', goldIfLeading: 1, get label() { return tr('Goudader', 'Gold Vein'); }, get text() { return tr('Sta je hier voor (meer schade dan je tegenstander) aan het begin van je beurt, dan krijg je 1 goud.', 'If you lead here (more damage than your opponent) at the start of your turn, you gain 1 gold.'); } },
 };
 
 /** De tafelversie kent alleen effecten die je op tafel ziet en niet hoeft te onthouden, en geen andere levens of kaartlimiet. */
-export const TAFEL_ZONE_EFFECTS: ZoneEffectId[] = ['schatkamer', 'bibliotheek', 'tolpoort'];
+export const TAFEL_ZONE_EFFECTS: ZoneEffectId[] = ['schatkamer', 'bibliotheek', 'tolpoort', 'smidse', 'marktplein', 'herberg'];
 
 export function zoneEffect(z: Zone): ZoneEffectDef | null {
   return z.effect ? ZONE_EFFECTS[z.effect] : null;
