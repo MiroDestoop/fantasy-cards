@@ -85,8 +85,8 @@ function overzicht(lijst: [CardDef, number][]): string {
   return `<section class="page text">
     <h1>Munt of Zwaard – ${tr('kaarten voor de tafelversie', 'cards for the tabletop edition')}</h1>
     <p>${tr(
-      `${totaal} kaarten: de beginstapels van ${SPELERS} spelers, ${VLOEKEN} Vloeken, de winkelvoorraad en ${TAFEL_ZONE_EFFECTS.length} zonekaarten. Elke kaart staat zo vaak in deze PDF als je ze nodig hebt. Druk op 100% (niet "passend maken"), dan zijn de kaarten 63 × 88 mm.`,
-      `${totaal} cards: the starting decks of ${SPELERS} players, ${VLOEKEN} Curses, the shop supply and ${TAFEL_ZONE_EFFECTS.length} zone cards. Every card appears in this PDF as many times as you need it. Print at 100% (not "fit to page") and the cards are 63 × 88 mm.`,
+      `${totaal} kaarten: de beginstapels van ${SPELERS} spelers, ${VLOEKEN} Vloeken, de winkelvoorraad en ${TAFEL_ZONE_EFFECTS.length} zonekaarten. Elke kaart staat zo vaak in deze PDF als je ze nodig hebt. Druk op 100% (niet "passend maken"), dan zijn de kaarten 63 × 88 mm. Druk dubbelzijdig af en sla om langs de lange kant: dit blad en het keyword-blad komen op één vel, daarna heeft elk kaartvel zijn ruggen op de achterkant.`,
+      `${totaal} cards: the starting decks of ${SPELERS} players, ${VLOEKEN} Curses, the shop supply and ${TAFEL_ZONE_EFFECTS.length} zone cards. Every card appears in this PDF as many times as you need it. Print at 100% (not "fit to page") and the cards are 63 × 88 mm. Print double-sided, flipping on the long edge: this page and the keyword page share one sheet, after that every card sheet has its backs on the reverse.`,
     )}</p>
     <p>${tr(
       'Tafelregels op de kaarten: Echo is Trek 1, Herschep is Aanval 1, Schenk(x) is Terugroep(x).',
@@ -115,12 +115,27 @@ function keywordBlad(): string {
 function html(lang: Lang): string {
   setLang(lang);
   const lijst = aantallen();
-  const kaarten = [...lijst.flatMap(([d, n]) => Array<string>(n).fill(kaart(d))), ...zoneKaarten()];
+  const kaarten: [string, string][] = [
+    ...lijst.flatMap(([d, n]) => Array<[string, string]>(n).fill([kaart(d), RUG])),
+    ...zoneKaarten().map((z): [string, string] => [z, ZONERUG]),
+  ];
+  // Na elk vel volgt zijn achterkant: dubbelzijdig afdrukken, omslaan langs de lange kant.
+  // Daarom staan de ruggen per rij gespiegeld (de linkse kaart ligt op de achterkant rechts).
   const vellen: string[] = [];
-  for (let i = 0; i < kaarten.length; i += 9) vellen.push(`<section class="page sheet">${kaarten.slice(i, i + 9).join('')}</section>`);
+  for (let i = 0; i < kaarten.length; i += 9) {
+    const vel = kaarten.slice(i, i + 9);
+    vellen.push(`<section class="page sheet">${vel.map(([voor]) => voor).join('')}</section>`);
+    const ruggen: string[] = [];
+    for (let r = 0; r < 3; r++) for (let k = 2; k >= 0; k--) ruggen.push(vel[r * 3 + k]?.[1] ?? '<div></div>');
+    vellen.push(`<section class="page sheet backs">${ruggen.join('')}</section>`);
+  }
   return `<!doctype html><html lang="${lang}"><head><meta charset="utf-8"><title>Munt of Zwaard</title><style>${CSS}</style></head>
     <body>${overzicht(lijst)}${keywordBlad()}${vellen.join('')}</body></html>`;
 }
+
+/** De achterkant van gewone kaarten en van zonekaarten. */
+const RUG = `<div class="rug"><div class="rug-in"><div class="rug-icon">🪙⚔️</div><div class="rug-name">Munt of Zwaard</div></div></div>`;
+const ZONERUG = `<div class="rug zonerug"><div class="rug-in"><div class="rug-icon">🗺️</div><div class="rug-name">Zone</div></div></div>`;
 
 const CSS = `
 @page { size: A4; margin: 0; }
@@ -164,6 +179,20 @@ th, td { text-align: left; padding: 0.6mm 1.5mm; border-bottom: 0.2mm solid #ccc
 .sect-zone { background: rgba(62,90,46,.12); border: 0.3mm solid rgba(62,90,46,.5); text-align: center; padding: 2mm; }
 .zone-text { font-size: 10pt; line-height: 1.3; }
 .zone-hp { text-align: center; font-weight: bold; font-size: 10pt; }
+/* Ruggen lopen tot de rand door, zodat een kleine verschuiving bij dubbelzijdig afdrukken niet opvalt. */
+.rug { width: 63mm; height: 88mm; padding: 4mm; display: grid;
+  background: repeating-linear-gradient(45deg, rgba(255,215,120,.12) 0 2mm, transparent 2mm 4mm),
+    repeating-linear-gradient(-45deg, rgba(255,215,120,.12) 0 2mm, transparent 2mm 4mm),
+    radial-gradient(circle at 50% 50%, #7a1f1f, #3a0d0d); }
+.rug-in { border: 0.8mm solid #d4a73a; border-radius: 3mm; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4mm;
+  box-shadow: inset 0 0 0 1.5mm rgba(0,0,0,.25), inset 0 0 0 2mm #d4a73a; }
+.rug-icon { font-size: 16mm; }
+.rug-name { font: bold 13pt Georgia, serif; color: #f3d27a; letter-spacing: .05em; text-shadow: 0 0.4mm 0 #000; }
+.zonerug { background: repeating-linear-gradient(45deg, rgba(220,255,200,.12) 0 2mm, transparent 2mm 4mm),
+    repeating-linear-gradient(-45deg, rgba(220,255,200,.12) 0 2mm, transparent 2mm 4mm),
+    radial-gradient(circle at 50% 50%, #4a6b3a, #1f3318); }
+.zonerug .rug-in { border-color: #c8e0a0; box-shadow: inset 0 0 0 1.5mm rgba(0,0,0,.25), inset 0 0 0 2mm #c8e0a0; }
+.zonerug .rug-name { color: #e3f2c8; text-transform: uppercase; letter-spacing: .2em; }
 `;
 
 if (!EDGE) throw new Error('Geen Edge of Chrome gevonden om de PDF te maken.');
