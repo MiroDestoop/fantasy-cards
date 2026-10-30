@@ -7,7 +7,7 @@ Het leidende principe: **alles wat de computer onzichtbaar bijhoudt, moet zichtb
 
 ## 1. Materiaal op tafel
 - **Schade:** elke zone heeft 2 tellers, één per speler. Gebruik een d20 of een draaischijf, of turf op het scoreblad. Een zone is van jou zodra jouw teller het aantal levens van de zone haalt.
-- **Schild:** blauwe fiches op jouw kant van de zone. Elke schade van de tegenstander daar kost eerst 1 fiche.
+- **Schild:** blauwe fiches op jouw kant van de zone, 1 fiche per punt Schild. Schild(x) = leg x fiches bij. Doet de tegenstander daar schade, dan haal je eerst per schade 1 fiche weg; alleen wat overblijft, komt op zijn schadeteller. Er is geen maximum en de fiches blijven liggen tot ze opgebruikt zijn. Zo zie je ook meteen of een Poortbeuker of Belegeringsram (+5 als je tegenstander hier een Schild heeft) loont. Glazen kraaltjes, pokerfiches of blauwe pionnetjes; 15 à 20 per speler is ruim genoeg, eventueel met een groter fiche dat 5 waard is.
 - **Goud:** munten. Je houdt ze over van beurt tot beurt, net zoals nu.
 - **Vertraag:** een rood fiche op de stapel van de tegenstander. Die trekt bij zijn volgende beurt 1 kaart minder per fiche en legt de fiches daarna terug.
 - **Verban (winkel):** gewoon met de hand. Je schuift de gekozen kaart onder de voorraad en legt een nieuwe open.
