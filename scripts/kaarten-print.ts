@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { CARDS, KEYWORDS, RACE_IDS, RACES, SHOP_SUPPLY, STARTER_DECK, TAFEL_IN_PLAATS, cardHalf, getCard } from '../src/game/cards';
+import { CARDS, DEEDS, KEYWORDS, RACE_IDS, RACES, SHOP_SUPPLY, STARTER_DECK, TAFEL_IN_PLAATS, cardHalf, getCard } from '../src/game/cards';
 import { setLang, tr, type Lang } from '../src/game/i18n';
 import { getSpecial } from '../src/game/specials';
 import type { CardDef, Effect, Keyword } from '../src/game/types';
@@ -37,8 +37,8 @@ function aantallen(): [CardDef, number][] {
 function kwHtml(effects: Effect[]): string {
   return effects
     .map((e) => {
-      const pre = e.need ? RACES[e.need].icon : '';
-      const cls = e.need ? ' cond' : '';
+      const pre = e.need ? RACES[e.need].icon : e.eerder ? DEEDS[e.eerder].icon : '';
+      const cls = e.need || e.eerder ? ' cond' : '';
       if (e.kw === 'speciaal') return `<span class="kw kw-speciaal${cls}">${pre}${esc(getSpecial(e.id).text)}</span>`;
       const kw = KEYWORDS[e.kw];
       return `<span class="kw kw-${e.kw}${cls}">${pre}${kw.noAmount ? kw.label : `${kw.label} ${e.amount}`}</span>`;
@@ -50,8 +50,10 @@ function kaart(def: CardDef): string {
   const labels = def.price === undefined;
   const helft = (cls: string, label: string, fx: Effect[]) => `
     <div class="sect ${cls}">${labels ? `<div class="sect-label">${label}</div>` : ''}<div class="kws">${kwHtml(cardHalf(fx, true))}</div></div>`;
-  return `<div class="card">
+  const race = def.race ? ` style="--race:${RACES[def.race].color}" data-ras="1"` : '';
+  return `<div class="card"${race}>
     <div class="art" style="--art:${def.color}">${def.icon}
+      ${def.onBuy?.length ? `<span class="on-buy">🛒 ${kwHtml(cardHalf(def.onBuy, true))}</span>` : ''}
       ${def.price !== undefined ? `<span class="price">${def.price}</span>` : ''}
       ${def.race ? `<span class="race">${RACES[def.race].icon}</span>` : ''}
     </div>
@@ -152,6 +154,10 @@ th, td { text-align: left; padding: 0.6mm 1.5mm; border-bottom: 0.2mm solid #ccc
 .sheet { display: grid; grid-template-columns: repeat(3, 63mm); grid-auto-rows: 88mm; justify-content: center; align-content: center; }
 .card { width: 63mm; height: 88mm; outline: 0.2mm dashed #aaa; padding: 3mm; display: flex; flex-direction: column; gap: 1.5mm;
   background: linear-gradient(180deg, #f3e3bf, #d9c08e); border: 2mm solid #6b4a24; border-radius: 4mm; }
+.card[data-ras] { border-color: color-mix(in srgb, var(--race) 75%, black);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--race) 22%, #f3e3bf), color-mix(in srgb, var(--race) 38%, #d9c08e)); }
+.on-buy { position: absolute; left: 1mm; bottom: 1mm; font-size: 3mm; padding: 0.3mm 1mm; border-radius: 1.5mm; background: rgba(20,12,4,.7); color: #fff; }
+.on-buy .kw { font-size: 3mm; }
 .art { position: relative; height: 24mm; flex-shrink: 0; border-radius: 3mm; display: grid; place-items: center; font-size: 15mm;
   border: 0.6mm solid rgba(0,0,0,.35);
   background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--art) 60%, white), var(--art) 55%, color-mix(in srgb, var(--art) 45%, black)); }

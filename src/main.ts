@@ -1,12 +1,12 @@
 import './style.css';
 import { AI_LEVELS, chooseAction, type AiLevel } from './game/ai';
-import { cardHalf, CARDS, getCard, KEYWORDS, RACES, STARTER_DECK } from './game/cards';
+import { cardHalf, CARDS, DEEDS, getCard, KEYWORDS, RACES, STARTER_DECK } from './game/cards';
 import { getSpecial } from './game/specials';
 import {
   applyAction, createGame, drawOverflow, other, recallPrice, shopPrice, whyCantBuy, whyCantPlay, zonesOwnedBy,
 } from './game/engine';
 import { FIRST_HAND_SIZE, GAMES_TO_WIN_MATCH, HAND_SIZE, MAX_HAND, MAX_ZONE_CARDS, RECALL_PRICE, ZONE_HP, ZONES_TO_WIN } from './game/rules';
-import type { Action, CardDef, CardInstance, Effect, GameState, Keyword, PlayerId, PlayTarget, Race } from './game/types';
+import type { Action, CardDef, CardInstance, Daad, Effect, GameState, Keyword, PlayerId, PlayTarget, Race } from './game/types';
 import { hostRoom, joinRoom, makeCode, PROTOCOL, type Link, type Msg } from './online';
 import { isMuted, sfx, toggleMute } from './sound';
 import { cardsWord, getLang, setLang, tr, type Lang } from './game/i18n';
@@ -269,6 +269,7 @@ function renderGame(g: GameState): string {
   ${handoff !== null && g.winner === null ? renderHandoff(g, handoff) : ''}
   ${pendingPlay && g.winner === null ? renderConfirmDraw(pendingPlay.lost) : ''}
   ${testPicker && humanCanAct() ? renderTestPicker() : ''}
+  ${humanCanAct() && g.players[g.active].offer > 0 && g.winner === null ? renderOfferPicker(g) : ''}
   ${g.winner !== null ? renderWinner(g) : ''}`;
 
   for (const z of g.zones) for (const c of z.cards) seenZoneCards.add(`${c.card.uid}@${c.turn}`);
@@ -368,10 +369,11 @@ function keywordText(kw: Keyword, n: number): string {
 function renderKeywords(effects: Effect[]): string {
   return effects
     .map((e) => {
-      // Een rasvoorwaarde staat als icoon voor het effect.
-      const need = e.need ? ` data-need="${e.need}"` : '';
-      const cls = e.need ? ' cond' : '';
-      const pre = e.need ? `${RACES[e.need].icon}` : '';
+      // Een voorwaarde (ras, of iets wat je eerder deze beurt deed) staat als icoon voor het effect.
+      const cond = e.need ?? (e.eerder ? `d-${e.eerder}` : '');
+      const need = cond ? ` data-need="${cond}"` : '';
+      const cls = cond ? ' cond' : '';
+      const pre = e.need ? RACES[e.need].icon : e.eerder ? DEEDS[e.eerder].icon : '';
       return e.kw === 'speciaal'
         ? `<span class="kw kw-speciaal${cls}" data-special="${e.id}"${need}>${pre}${esc(getSpecial(e.id).text)}</span>`
         : `<span class="kw kw-${e.kw}${cls}" data-kw="${e.kw}" data-n="${e.amount}"${need}>${pre}${keywordText(e.kw, e.amount)}</span>`;
@@ -379,9 +381,13 @@ function renderKeywords(effects: Effect[]): string {
     .join(' ');
 }
 
-/** De uitleg van een rasvoorwaarde, onder de uitleg van het effect. */
+/** De uitleg van een voorwaarde (ras, of 'd-' + iets wat je eerder deze beurt deed), onder de uitleg van het effect. */
 function needText(race: string | undefined): string {
   if (!race) return '';
+  if (race.startsWith('d-')) {
+    const d = DEEDS[race.slice(2) as Daad];
+    return `<div class="tip-note">${d.icon} ${d.text}</div>`;
+  }
   const r = RACES[race as Race];
   return `<div class="tip-note">${r.icon} ${tr(
     `Alleen als er al een ${r.label} van jou in deze zone ligt.`,
@@ -391,9 +397,8 @@ function needText(race: string | undefined): string {
 
 function raceTip(race: Race): string {
   const r = RACES[race];
-  const out = game?.outRace === race;
   return `<b>${r.icon} ${r.label}</b><br>${tr(`Deze kaart is een ${r.label}.`, `This card is a ${r.label}.`)}
-    ${out ? `<div class="tip-note">🚫 ${tr(`De ${r.plural} doen dit spel niet mee.`, `The ${r.plural} sit out this game.`)}</div>` : ''}`;
+    <div class="tip-note">${tr(`${r.plural}: ${r.style}.`, `${r.plural}: ${r.style}.`)}</div>`;
 }
 
 function renderFace(def: CardDef): string {
@@ -402,7 +407,8 @@ function renderFace(def: CardDef): string {
   // is die plaats nodig voor de effecten; de kleur van elke helft toont welke welke is.
   const labels = STARTER_DECK.includes(def.id) || def.id === 'vloek';
   return `
-    <div class="art" style="--art:${def.color}">${def.icon}${def.race ? `<span class="race" data-race="${def.race}">${RACES[def.race].icon}</span>` : ''}</div>
+    <div class="art ${def.race ? `r-${def.race}` : ''}" style="--art:${def.color}">${def.icon}${def.race ? `<span class="race" data-race="${def.race}">${RACES[def.race].icon}</span>` : ''}${
+      def.onBuy?.length ? `<span class="on-buy">🛒 ${renderKeywords(cardHalf(def.onBuy, tafel))}</span>` : ''}</div>
     <div class="card-name">${esc(def.name)}</div>
     <div class="sect sect-top ${labels ? '' : 'no-label'}">
       ${labels ? `<div class="sect-label">⤓ ${tr('Afleggen', 'Discard')}</div>` : ''}
@@ -595,7 +601,6 @@ function renderSidePanel(g: GameState): string {
       Hover over a pile to see what is in it.${g.tafel ? '' : ' Hover over your card in a zone to withdraw it (↩).'}`,
     )}</div>
     ${g.tafel ? `<div class="out-race">🎲 ${tr('Tafelversie', 'Table version')}</div>` : ''}
-    ${g.outRace ? `<div class="out-race" data-race="${g.outRace}">🚫 ${RACES[g.outRace].icon} ${tr(`Zonder ${RACES[g.outRace].plural}`, `No ${RACES[g.outRace].plural}`)}</div>` : ''}
     <div class="log">${g.log.slice(-16).reverse().map((l) => `<div>${esc(l)}</div>`).join('')}</div>
     <div class="side-buttons">
       <button class="sound-toggle" data-click="sound">${isMuted() ? `🔇 ${tr('Geluid uit', 'Sound off')}` : `🔊 ${tr('Geluid aan', 'Sound on')}`}</button>
@@ -630,6 +635,26 @@ function renderConfirmDraw(lost: number): string {
         <button class="btn" data-click="confirm-play">${tr('Toch spelen', 'Play anyway')}</button>
         <button class="btn secondary-plain" data-click="cancel-play">${tr('Annuleren', 'Cancel')}</button>
       </div>
+    </div>
+  </div>`;
+}
+
+/** Offer: kies een kaart uit je hand of je gespeelde kaarten die voorgoed verdwijnt, of sla over. */
+function renderOfferPicker(g: GameState): string {
+  const p = g.players[g.active];
+  const pick = (cards: CardInstance[]) => cards.map((c) => `
+        <div class="test-card offer-card" data-click="offer:${c.uid}">
+          <div class="card">${renderFace(getCard(c.defId))}</div>
+        </div>`).join('');
+  return `
+  <div class="overlay test-overlay">
+    <div class="panel test-panel offer-panel">
+      <h2>🔪 ${tr('Offer', 'Sacrifice')}${p.offer > 1 ? ` (${p.offer})` : ''}</h2>
+      <p>${tr('Kies een kaart die voorgoed uit het spel verdwijnt. Zo wordt je stapel kleiner en sterker.', 'Pick a card that leaves the game for good. This makes your deck smaller and stronger.')}</p>
+      ${p.hand.length ? `<h3>${tr('In je hand', 'In your hand')}</h3><div class="test-grid">${pick(p.hand)}</div>` : ''}
+      ${p.played.length ? `<h3>${tr('Deze beurt gespeeld', 'Played this turn')}</h3><div class="test-grid">${pick(p.played)}</div>` : ''}
+      ${!p.hand.length && !p.played.length ? `<p><i>${tr('Je hebt geen kaarten om te offeren.', 'You have no cards to sacrifice.')}</i></p>` : ''}
+      <button class="btn secondary-plain" data-click="offer-skip">${tr('Overslaan', 'Skip')}</button>
     </div>
   </div>`;
 }
@@ -796,6 +821,12 @@ app.addEventListener('click', (e) => {
       break;
     case 'banish':
       if (humanCanAct()) dispatch({ type: 'banish', marketUid: arg });
+      break;
+    case 'offer':
+      if (humanCanAct()) dispatch({ type: 'offer', cardUid: arg });
+      break;
+    case 'offer-skip':
+      if (humanCanAct()) dispatch({ type: 'offer', cardUid: null });
       break;
   }
 });
@@ -1926,6 +1957,20 @@ function captureEffects(action: Action, before: GameState, after: GameState): Fl
     flights.slice(start).forEach((f, i) => (f.index = i));
   } else {
     for (const c of after.shop.market) if (!oldMarket.includes(c.uid)) shopRefill.add(c.uid);
+  }
+
+  // Een geofferde kaart verbrandt: in het Offer-venster als je ze zelf koos, anders op de aflegstapel.
+  if (action.type === 'offer' && action.cardUid) {
+    const pid = before.active;
+    const card = [...before.players[pid].hand, ...before.players[pid].played].find((c) => c.uid === action.cardUid);
+    const picked = app.querySelector<HTMLElement>(`[data-click="offer:${action.cardUid}"] .card`);
+    const pile = app.querySelector(`[data-pile="discard:${pid}"]`);
+    if (card && (picked || pile)) {
+      const clone = document.createElement('div');
+      clone.className = 'card';
+      clone.innerHTML = renderFace(getCard(card.defId));
+      flights.push({ clone, from: (picked ?? pile)!.getBoundingClientRect(), kind: 'banish', pid, index: flights.length, w: CARD_W });
+    }
   }
 
   // Een verbannen winkelkaart zakt weg in de voorraad.

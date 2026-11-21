@@ -1,4 +1,4 @@
-import { cardHalf, getCard, RACE_IDS, RACES, SHOP_SUPPLY, STARTER_DECK } from './cards';
+import { cardHalf, getCard, SHOP_SUPPLY, STARTER_DECK } from './cards';
 import { getSpecial } from './specials';
 import {
   FIRST_HAND_SIZE, HAND_SIZE, MARKET_SIZE, MAX_HAND, RECALL_PRICE, ZONE_COUNT, ZONE_HP, ZONES_TO_WIN,
@@ -6,7 +6,7 @@ import {
 import { cardsWord, tr } from './i18n';
 import { leadsZone, makeZone, TAFEL_ZONE_EFFECTS, zoneCapacity, ZONE_EFFECTS, ZONE_NAMES, zoneEffect, zoneName, type ZoneEffectId } from './zones';
 import type {
-  Action, ActionResult, CardInstance, Effect, GameState, PlayerId, PlayerState, PlayTarget, Race, Zone,
+  Action, ActionResult, CardInstance, Daad, Effect, GameState, PlayerId, PlayerState, PlayTarget, Race, Zone,
 } from './types';
 
 const MAX_LOG = 60;
@@ -22,8 +22,6 @@ export interface GameOptions {
   starter?: PlayerId;
   /** Zones zonder effect en in vaste volgorde (voor tests). */
   plainZones?: boolean;
-  /** Alle rassen doen mee (voor tests). */
-  allRaces?: boolean;
   /** Tafelversie: zonder Echo, Herschep en Schenk, met eenvoudige zones en zonder terugtrekken. */
   tafel?: boolean;
 }
@@ -45,6 +43,8 @@ export function createGame(
     slow: 0,
     echo: 0,
     banish: 0,
+    offer: 0,
+    did: noDeeds(),
   });
   const s: GameState = {
     players: [makePlayer(names[0], 0), makePlayer(names[1], 1)],
@@ -55,17 +55,9 @@ export function createGame(
     shop: { pile: SHOP_SUPPLY.map((defId, i) => ({ uid: `s-${i}`, defId })), market: [] },
     log: [],
     seed,
-    outRace: null,
     curses: 0,
     tafel: !!options.tafel,
   };
-  // Elk spel doet één ras niet mee: zijn kaarten verdwijnen uit de voorraad. In de tafelversie doen ze allemaal mee.
-  if (!options.allRaces && !options.tafel) {
-    const out = RACE_IDS[Math.floor(random(s) * RACE_IDS.length)];
-    s.outRace = out;
-    s.shop.pile = s.shop.pile.filter((c) => getCard(c.defId).race !== out);
-    log(s, tr(`🚫 ${RACES[out].icon} De ${RACES[out].plural} doen dit spel niet mee.`, `🚫 ${RACES[out].icon} The ${RACES[out].plural} sit out this game.`));
-  }
   for (const p of s.players) shuffle(s, p.deck);
   shuffle(s, s.shop.pile);
   refreshShop(s);
@@ -102,6 +94,9 @@ export function applyAction(state: GameState, action: Action): ActionResult {
       break;
     case 'banish':
       error = banishCard(s, action.marketUid);
+      break;
+    case 'offer':
+      error = offerCard(s, action.cardUid);
       break;
     case 'endTurn':
       endTurn(s);
@@ -158,7 +153,7 @@ export function drawOverflow(state: GameState, handUid: string, target: PlayTarg
   const def = getCard(card.defId);
   const half = target.kind === 'discard' ? def.top : def.bottom;
   const zoneIdx = target.kind === 'zone' ? target.zone : null;
-  let draws = half.reduce((t, e) => t + (e.kw === 'trek' && needMet(state, state.active, zoneIdx, e) ? e.amount : 0), 0);
+  let draws = half.reduce((t, e) => t + (e.kw === 'trek' && needMet(state, state.active, zoneIdx, e, card.uid) ? e.amount : 0), 0);
   if (target.kind === 'zone') draws += zoneEffect(state.zones[target.zone])?.onPlay?.draw ?? 0;
   draws = Math.min(draws, p.deck.length + p.discard.length);
   return Math.max(0, p.hand.length - 1 + draws - MAX_HAND);
@@ -169,9 +164,31 @@ export function raceHere(state: GameState, pid: PlayerId, zoneIdx: number, race:
   return state.zones[zoneIdx].cards.some((c) => c.player === pid && c.card.uid !== skipUid && getCard(c.card.defId).race === race);
 }
 
-/** Werkt dit effect hier? Een effect met een rasvoorwaarde werkt alleen in een zone waar dat ras al van jou ligt. */
+/**
+ * Werkt dit effect hier? Een effect met een rasvoorwaarde werkt alleen in een zone waar dat ras al van jou ligt.
+ * Een effect met `eerder` werkt alleen als je dat deze beurt al gedaan hebt (afgelegd of in een zone).
+ */
 export function needMet(state: GameState, pid: PlayerId, zoneIdx: number | null, e: Effect, skipUid?: string): boolean {
+  if (e.eerder && !state.players[pid].did[e.eerder]) return false;
   return !e.need || (zoneIdx !== null && raceHere(state, pid, zoneIdx, e.need, skipUid));
+}
+
+/** Een lege lijst van wat je deze beurt gedaan hebt. */
+export function noDeeds(): Record<Daad, number> {
+  return { offer: 0, vernietig: 0, herstel: 0, vervloek: 0, terugroep: 0, trek: 0, groot: 0 };
+}
+
+/** Vanaf deze prijs is een kaart "groot" (voorwaarde `eerder: 'groot'`). */
+export const BIG_PRICE = 6;
+
+export function whyCantOffer(state: GameState, cardUid: string | null): string | null {
+  const p = state.players[state.active];
+  if (p.offer <= 0) return tr('Je kunt nu geen kaart offeren.', 'You cannot sacrifice a card right now.');
+  if (cardUid === null) return null;
+  if (![...p.hand, ...p.played].some((c) => c.uid === cardUid)) {
+    return tr('Je kunt alleen een kaart uit je hand of een kaart die je deze beurt speelde offeren.', 'You can only sacrifice a card from your hand or one you played this turn.');
+  }
+  return null;
 }
 
 /** Wat het nu kost om een kaart uit een zone terug te trekken. */
@@ -239,7 +256,10 @@ function playCard(s: GameState, handUid: string, target: PlayTarget): string | n
     log(s, tr(`${p.name} legt ${def.name} af.`, `${p.name} discards ${def.name}.`));
     if (cost) payFor(s, p.name, cost);
     p.played.push(card);
-    for (const e of top) if (needMet(s, pid, null, e)) applyEffect(s, pid, e, null, card.uid);
+    // Ook hier eerst alle voorwaarden: wat deze kaart zelf doet, telt niet voor haar eigen `eerder`.
+    const met = top.map((e) => needMet(s, pid, null, e));
+    markBig(p, def.price);
+    top.forEach((e, i) => { if (met[i]) applyEffect(s, pid, e, null, card.uid); });
   } else {
     const zone = s.zones[target.zone];
     log(s, tr(`${p.name} speelt ${def.name} in ${zoneName(zone)}.`, `${p.name} plays ${def.name} in ${zoneName(zone)}.`));
@@ -256,6 +276,7 @@ function playCard(s: GameState, handUid: string, target: PlayTarget): string | n
     zone.cards.push({ player: pid, card, turn: s.turn });
     // Rasvoorwaarden worden gecontroleerd vóór de effecten: een Terugroep of Vernietig op dezelfde kaart neemt de bonus niet weg.
     const met = bottom.map((e) => needMet(s, pid, target.zone, e, card.uid));
+    markBig(p, def.price);
     bottom.forEach((e, i) => { if (met[i]) applyEffect(s, pid, e, target.zone, card.uid); });
     // Daarna het effect van de zone zelf.
     const onPlay = fx?.onPlay;
@@ -264,7 +285,7 @@ function playCard(s: GameState, handUid: string, target: PlayTarget): string | n
       log(s, tr(`${fx!.icon} ${p.name} krijgt ${onPlay.gold} goud in ${zoneName(zone)}.`, `${fx!.icon} ${p.name} gains ${onPlay.gold} gold in ${zoneName(zone)}.`));
     }
     if (onPlay?.draw) {
-      for (let i = 0; i < onPlay.draw; i++) drawCard(s, p);
+      drawFx(s, p, onPlay.draw);
       log(s, tr(`${fx!.icon} ${p.name} trekt ${cardsWord(onPlay.draw)} in ${zoneName(zone)}.`, `${fx!.icon} ${p.name} draws ${cardsWord(onPlay.draw)} in ${zoneName(zone)}.`));
     }
     if (onPlay?.selfSlow) {
@@ -294,6 +315,10 @@ function playCard(s: GameState, handUid: string, target: PlayTarget): string | n
     }
   }
   return null;
+}
+
+function markBig(p: PlayerState, price: number | undefined): void {
+  if ((price ?? 0) >= BIG_PRICE) p.did.groot++;
 }
 
 function payFor(s: GameState, name: string, cost: number): void {
@@ -349,9 +374,7 @@ function applyEffect(s: GameState, pid: PlayerId, e: Effect, zoneIdx: number | n
       damage: (amount) => {
         if (zoneIdx !== null && amount > 0) dealDamage(s, zoneIdx, pid, amount);
       },
-      draw: (count) => {
-        for (let i = 0; i < count; i++) drawCard(s, p);
-      },
+      draw: (count) => drawFx(s, p, count),
       log: (message) => log(s, message),
       zoneIdx,
       destroy: () => (zoneIdx === null ? 0 : destroyZoneCards(s, pid, zoneIdx, selfUid)),
@@ -363,7 +386,11 @@ function applyEffect(s: GameState, pid: PlayerId, e: Effect, zoneIdx: number | n
       p.gold += e.amount;
       break;
     case 'trek':
-      for (let i = 0; i < e.amount; i++) drawCard(s, p);
+      drawFx(s, p, e.amount);
+      break;
+    case 'offer':
+      p.offer += e.amount;
+      log(s, tr(`🔪 ${p.name} mag ${e.amount === 1 ? 'een kaart' : `${e.amount} kaarten`} offeren.`, `🔪 ${p.name} may sacrifice ${e.amount === 1 ? 'a card' : `${e.amount} cards`}.`));
       break;
     case 'vertraag':
       s.players[opp].slow += e.amount;
@@ -379,6 +406,7 @@ function applyEffect(s: GameState, pid: PlayerId, e: Effect, zoneIdx: number | n
       if (zoneIdx !== null) {
         const zone = s.zones[zoneIdx];
         zone.damage[opp] = Math.max(0, zone.damage[opp] - e.amount);
+        p.did.herstel++;
       }
       break;
     case 'schild':
@@ -391,6 +419,7 @@ function applyEffect(s: GameState, pid: PlayerId, e: Effect, zoneIdx: number | n
       if (zoneIdx !== null) {
         const back = takeZoneCards(s, zoneIdx, pid, e.amount, selfUid);
         for (const c of back) if (!rebirth(s, p, c)) p.discard.push(c);
+        p.did.terugroep += back.length;
         if (back.length) log(s, tr(`${p.name} roept ${back.map((c) => getCard(c.defId).name).join(', ')} terug.`, `${p.name} recalls ${back.map((c) => getCard(c.defId).name).join(', ')}.`));
       }
       break;
@@ -419,6 +448,7 @@ function applyEffect(s: GameState, pid: PlayerId, e: Effect, zoneIdx: number | n
       for (let i = 0; i < e.amount; i++) {
         deck.splice(Math.floor(random(s) * (deck.length + 1)), 0, { uid: `vloek-${s.curses++}`, defId: 'vloek' });
       }
+      p.did.vervloek += e.amount;
       log(s, tr(`🕸️ ${p.name} schudt ${e.amount === 1 ? 'een Vloek' : `${e.amount} Vloeken`} in de stapel van ${s.players[opp].name}.`, `🕸️ ${p.name} shuffles ${e.amount === 1 ? 'a Curse' : `${e.amount} Curses`} into ${s.players[opp].name}'s deck.`));
       break;
     }
@@ -443,6 +473,7 @@ function destroyZoneCards(s: GameState, pid: PlayerId, zoneIdx: number, selfUid?
   const taken = takeZoneCards(s, zoneIdx, pid, Infinity, selfUid);
   // Een Knekelfenix verbrandt niet: ze keert terug in je hand.
   const banished = taken.filter((c) => !rebirth(s, p, c));
+  p.did.vernietig += taken.length;
   if (banished.length) log(s, tr(
     `${p.name} verbant ${cardsWord(banished.length)} uit ${zoneName(s.zones[zoneIdx])} uit het spel.`,
     `${p.name} banishes ${cardsWord(banished.length)} in ${zoneName(s.zones[zoneIdx])} from the game.`,
@@ -510,6 +541,8 @@ function buyCard(s: GameState, marketUid: string): string | null {
   if (refill) s.shop.market.splice(idx, 1, refill);
   else s.shop.market.splice(idx, 1);
   log(s, tr(`${p.name} koopt ${def.name} voor ${price} goud.`, `${p.name} buys ${def.name} for ${price} gold.`));
+  // Effecten bij het kopen (bv. Offer) werken zoals afgelegd: zonder zone.
+  for (const e of cardHalf(def.onBuy ?? [], s.tafel)) if (needMet(s, s.active, null, e)) applyEffect(s, s.active, e, null, card.uid);
   return null;
 }
 
@@ -529,6 +562,24 @@ function banishCard(s: GameState, marketUid: string): string | null {
   return null;
 }
 
+/** Offer: een kaart uit je hand of je gespeelde kaarten verdwijnt voorgoed. null slaat over: de rest van je Offer vervalt. */
+function offerCard(s: GameState, cardUid: string | null): string | null {
+  const blocked = whyCantOffer(s, cardUid);
+  if (blocked) return blocked;
+  const p = s.players[s.active];
+  if (cardUid === null) {
+    p.offer = 0;
+    return null;
+  }
+  const card = [...p.hand, ...p.played].find((c) => c.uid === cardUid)!;
+  p.hand = p.hand.filter((c) => c !== card);
+  p.played = p.played.filter((c) => c !== card);
+  p.offer--;
+  p.did.offer++;
+  log(s, tr(`🔪 ${p.name} offert ${getCard(card.defId).name}: ze verdwijnt uit het spel.`, `🔪 ${p.name} sacrifices ${getCard(card.defId).name}: it leaves the game.`));
+  return null;
+}
+
 function recallCard(s: GameState, zoneIdx: number, cardUid: string): string | null {
   const blocked = whyCantRecall(s, zoneIdx, cardUid);
   if (blocked) return blocked;
@@ -540,6 +591,7 @@ function recallCard(s: GameState, zoneIdx: number, cardUid: string): string | nu
   if (!rebirth(s, p, zc.card)) p.discard.push(zc.card);
   p.gold -= price;
   p.recalls++;
+  p.did.terugroep++;
   log(s, tr(
     `${p.name} trekt ${getCard(zc.card.defId).name} terug uit ${zoneName(zone)} voor ${price} goud.`,
     `${p.name} withdraws ${getCard(zc.card.defId).name} from ${zoneName(zone)} for ${price} gold.`,
@@ -582,6 +634,8 @@ function endTurn(s: GameState): void {
   p.played = [];
   p.echo = 0;
   p.banish = 0;
+  p.offer = 0;
+  p.did = noDeeds();
   p.hand = [];
   s.active = other(s.active);
   startTurn(s);
@@ -613,6 +667,12 @@ function startTurn(s: GameState): void {
   const count = Math.max(0, (s.turn === 1 ? FIRST_HAND_SIZE : HAND_SIZE) - p.slow);
   p.slow = 0;
   for (let i = 0; i < count; i++) drawCard(s, p);
+}
+
+/** Trekken door een effect (Trek, een special, een zone): telt mee voor `eerder: 'trek'`. */
+function drawFx(s: GameState, p: PlayerState, count: number): void {
+  for (let i = 0; i < count; i++) drawCard(s, p);
+  if (count > 0) p.did.trek += count;
 }
 
 function drawCard(s: GameState, p: PlayerState): void {

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import './testkaarten';
 import { AI_LEVELS, chooseAction, type AiLevel } from './ai';
 import { applyAction, createGame } from './engine';
 import { MAX_ZONE_CARDS, ZONE_HP } from './rules';
@@ -54,7 +55,8 @@ describe('computertegenstander', () => {
 
   it('Moeilijk wint duidelijk vaker van Normaal', () => {
     let wins = 0;
-    const games = 30;
+    // 80 spellen: met 30 bleef de uitslag te veel van de seeds afhangen.
+    const games = 80;
     for (let g = 0; g < games; g++) {
       // Wissel de zitplaatsen af, zodat beginnen geen voordeel geeft.
       const hard = (g % 2) as 0 | 1;
@@ -62,7 +64,7 @@ describe('computertegenstander', () => {
       if (playOut(createGame(['A', 'B'], 1000 + g), levels, g).winner === hard) wins++;
     }
     expect(wins / games).toBeGreaterThanOrEqual(0.6);
-  }, 120000);
+  }, 240000);
 
   it('Moeilijk trekt een kaart terug om met een volle zone toch te winnen', () => {
     const s = createGame(['A', 'B'], 42, { plainZones: true });

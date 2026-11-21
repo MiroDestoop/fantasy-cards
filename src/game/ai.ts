@@ -68,6 +68,8 @@ const ROLLOUT_SELF: Profile = { ...PROFILES.normaal, buy: 'slim', recall: true, 
 function decide(state: GameState, profile: Profile, level: AiLevel, rnd: () => number): Action {
   const pid = state.active;
   const hand = state.players[pid].hand;
+  // Eerst een Offer afwerken: de zwakste kaart gaat voorgoed weg, of ze slaat over.
+  if (state.players[pid].offer > 0) return offerAction(state, pid);
   // Een Vloek die ze niet kan betalen, blijft in haar hand: dan is ze klaar met spelen.
   if (playActions(state, pid).some((a) => a.type === 'play' && !whyCantPlay(state, a.handUid, a.target))) {
     if (profile.beam) return plannedAction(state, level, profile, rnd);
@@ -80,6 +82,21 @@ function decide(state: GameState, profile: Profile, level: AiLevel, rnd: () => n
   const buy = profile.buy === 'slim' ? smartBuy(state) : bestBuy(state);
   if (buy) return { type: 'buy', marketUid: buy.uid };
   return { type: 'endTurn' };
+}
+
+/** Zo graag offert ze deze kaarten (laagste eerst); andere kaarten offert ze nooit. */
+const OFFER_ORDER = ['vloek', 'koper', 'rekruut', 'zilver'];
+/** Kleiner dan dit laat ze haar stapel niet worden: anders trekt ze te weinig kaarten. */
+const MIN_DECK = 8;
+
+function offerAction(state: GameState, pid: PlayerId): Action {
+  const me = state.players[pid];
+  const total = me.deck.length + me.hand.length + me.discard.length + me.played.length;
+  const pool = [...me.hand, ...me.played].filter((c) => OFFER_ORDER.includes(c.defId));
+  // Een Vloek mag altijd weg; een startkaart alleen als haar stapel groot genoeg blijft.
+  const pick = pool.sort((a, b) => OFFER_ORDER.indexOf(a.defId) - OFFER_ORDER.indexOf(b.defId))[0];
+  if (pick && (pick.defId === 'vloek' || total > MIN_DECK)) return { type: 'offer', cardUid: pick.uid };
+  return { type: 'offer', cardUid: null };
 }
 
 // ---------- Normaal: kaart per kaart ----------
@@ -281,18 +298,47 @@ function expand(node: Node, pid: PlayerId, profile: Profile): Node[] {
   const actions = playActions(s, pid);
   if (profile.recall && !s.tafel) actions.push(...recallActions(s, pid));
   const key = stateKey(s);
+  const known = new Set(s.players[pid].hand.map((c) => c.uid));
   const children: Node[] = [];
   for (const action of actions) {
     const r = applyAction(s, action);
     if (!r.ok) continue;
+    const revealed = reveals(s, r.state, pid);
     children.push({
       state: r.state,
       path: [...node.path, { key, action }],
-      score: evaluate(r.state, pid, profile),
-      revealed: reveals(s, r.state, pid),
+      // Na een onthulling plant ze niet verder, maar ze telt wel wat de rest van haar (al bekende) hand nog oplevert.
+      // Anders lijkt een volledig uitgespeelde beurt altijd beter dan eerst een kaart trekken.
+      score: revealed ? finishKnown(r.state, pid, known, profile) : evaluate(r.state, pid, profile),
+      revealed,
     });
   }
   return children;
+}
+
+/**
+ * Speelt de kaarten die ze al vóór de onthulling in haar hand had kaart per kaart verder (zoals Normaal),
+ * en geeft hoe goed ze er dan voor staat. Nieuw getrokken kaarten tellen alleen mee als kaarten in de hand.
+ */
+function finishKnown(state: GameState, pid: PlayerId, known: Set<string>, profile: Profile): number {
+  let s = state;
+  for (let i = 0; i < 10 && s.winner === null; i++) {
+    let best: GameState | null = null;
+    let bestScore = evaluate(s, pid, profile);
+    for (const action of playActions(s, pid)) {
+      if (action.type !== 'play' || !known.has(action.handUid)) continue;
+      const r = applyAction(s, action);
+      if (!r.ok) continue;
+      const score = evaluate(r.state, pid, profile);
+      if (score > bestScore) {
+        bestScore = score;
+        best = r.state;
+      }
+    }
+    if (!best) break;
+    s = best;
+  }
+  return evaluate(s, pid, profile);
 }
 
 /** Heeft de zet kaarten getrokken, de winkel of een zone-effect veranderd? Wat daarna komt, weet een speler nog niet. */
@@ -399,6 +445,8 @@ function evaluate(s: GameState, pid: PlayerId, profile: Profile): number {
   // Extra kaarten in je hand (door Trek) speel je deze beurt nog.
   score += 1.2 * me.hand.length;
   score += 1.5 * s.players[opp].slow;
+  // Een Offer die nog klaarligt, maakt haar stapel straks sterker.
+  score += 0.8 * Math.min(me.offer, 2);
   // Kaarten in je stapel komen terug; verbannen kaarten niet. Startkaarten zijn weinig waard.
   for (const c of [...me.deck, ...me.discard, ...me.played, ...me.hand]) score += cardWorth(c);
   // Een Vloek in de stapel van de tegenstander is goed voor jou.

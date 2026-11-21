@@ -4,10 +4,16 @@ export type PlayerId = 0 | 1;
 
 export type Keyword =
   | 'goud' | 'aanval' | 'storm' | 'herstel' | 'schild' | 'trek' | 'vertraag' | 'vernietig' | 'terugroep' | 'ververs' | 'herschep' | 'echo'
-  | 'schenk' | 'verban' | 'vervloek' | 'verdwijn' | 'betaal';
+  | 'schenk' | 'verban' | 'vervloek' | 'verdwijn' | 'betaal' | 'offer';
 
-/** De vijf rassen van de winkelkaarten. Elk spel doet er één niet mee. */
-export type Race = 'mens' | 'elf' | 'dwerg' | 'ork' | 'ondood';
+export type Race = 'kultist' | 'goblin' | 'sluip' | 'heks';
+
+/**
+ * Iets wat je eerder in deze beurt gedaan hebt. Een effect met `eerder` werkt alleen als je dat al deed
+ * (met een andere kaart: de voorwaarden van een kaart worden vóór haar eigen effecten gecontroleerd).
+ * groot: je speelde deze beurt al een kaart van 6 goud of meer.
+ */
+export type Daad = 'offer' | 'vernietig' | 'herstel' | 'vervloek' | 'terugroep' | 'trek' | 'groot';
 
 /**
  * Eén effect op een kaart: een keyword met zijn waarde, zoals Aanval(2),
@@ -16,6 +22,8 @@ export type Race = 'mens' | 'elf' | 'dwerg' | 'ork' | 'ondood';
 export type Effect = ({ kw: Keyword; amount: number } | { kw: 'speciaal'; id: string }) & {
   /** Voorwaarde: het effect werkt alleen als er al een kaart van dit ras van jou in deze zone ligt. */
   need?: Race;
+  /** Voorwaarde: het effect werkt alleen als je dit eerder in deze beurt al gedaan hebt. */
+  eerder?: Daad;
 };
 
 export interface CardDef {
@@ -32,6 +40,8 @@ export interface CardDef {
   top: Effect[];
   /** Effect als je de kaart in een zone speelt. Leeg: de kaart kan je alleen afleggen. */
   bottom: Effect[];
+  /** Effect op het moment dat je de kaart koopt (bv. Offer). */
+  onBuy?: Effect[];
 }
 
 /** Een fysieke kaart. Dezelfde kaartsoort kan meerdere keren voorkomen. */
@@ -62,6 +72,10 @@ export interface PlayerState {
   echo: number;
   /** Zoveel winkelkaarten mag je deze beurt nog kiezen om te verbannen (keyword Verban). Vervalt bij Einde beurt. */
   banish: number;
+  /** Zoveel kaarten mag je nu nog offeren: voorgoed uit je hand of uit je gespeelde kaarten verwijderen (keyword Offer). Vervalt bij Einde beurt. */
+  offer: number;
+  /** Wat je deze beurt al gedaan hebt (voor effecten met eerder). Begint elke beurt op nul. */
+  did: Record<Daad, number>;
 }
 
 /** Een kaart in een zone. Ze blijft liggen tot Terugroep of Vernietig, ook nadat de zone veroverd is. */
@@ -103,8 +117,6 @@ export interface GameState {
   winner: PlayerId | null;
   shop: Shop;
   log: string[];
-  /** Het ras dat dit spel niet meedoet: zijn kaarten liggen niet in de winkel. */
-  outRace: Race | null;
   /** Toestand van de toevalsgenerator, zodat een spel volledig reproduceerbaar is. */
   seed: number;
   /** Zoveel Vloeken zijn er al gemaakt (keyword Vervloek); zo krijgt elke Vloek een eigen uid. */
@@ -124,6 +136,8 @@ export type Action =
   | { type: 'recall'; zone: number; cardUid: string }
   /** Verban: een winkelkaart gaat onderaan de voorraad en wordt vervangen. Kan alleen met een Verban van deze beurt. */
   | { type: 'banish'; marketUid: string }
+  /** Offer: verwijder een kaart uit je hand of je gespeelde kaarten voorgoed. null: sla over (de rest van je Offer vervalt). */
+  | { type: 'offer'; cardUid: string | null }
   | { type: 'endTurn' };
 
 export type ActionResult = { ok: true; state: GameState } | { ok: false; error: string };

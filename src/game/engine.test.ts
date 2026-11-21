@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import './testkaarten';
 import { cardHalf, getCard, RACE_IDS, SHOP_SUPPLY } from './cards';
 import { getSpecial } from './specials';
 import { applyAction, createGame, drawOverflow, needMet, recallPrice, shopPrice } from './engine';
@@ -429,13 +430,6 @@ describe('speciale effecten', () => {
     expect(s.players[0].gold).toBe(22);
   });
 
-  it('Wrekende Geest doet 1 schade per kaart van de tegenstander in de zone', () => {
-    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
-    for (let i = 0; i < 3; i++) s.zones[1].cards.push({ player: 1, card: { uid: `bo-${i}`, defId: 'zilver' }, turn: 0 });
-    s = play(s, 'geest', zone(1));
-    expect(s.zones[1].damage[0]).toBe(3);
-  });
-
   it('elke kaart met een speciaal effect verwijst naar een bestaand effect', () => {
     for (const id of [...new Set(SHOP_SUPPLY)]) {
       for (const e of [...getCard(id).top, ...getCard(id).bottom]) {
@@ -601,13 +595,13 @@ describe('zones', () => {
 });
 
 describe('Goblin', () => {
-  it('steelt in een zone al het goud van de tegenstander', () => {
+  it('steelt in een zone max. 3 goud van de tegenstander', () => {
     let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
     s.players[0].gold = 1;
     s.players[1].gold = 7;
     s = play(s, 'goblin', zone(0));
-    expect(s.players[0].gold).toBe(8);
-    expect(s.players[1].gold).toBe(0);
+    expect(s.players[0].gold).toBe(4);
+    expect(s.players[1].gold).toBe(4);
     expect(s.zones[0].cards.some((c) => c.card.defId === 'goblin')).toBe(true);
   });
 
@@ -745,21 +739,36 @@ describe('rassen', () => {
     }
   });
 
-  it('laat elk spel één ras weg uit de winkel', () => {
-    const outs = new Set<string>();
-    for (let seed = 1; seed <= 40; seed++) {
+  it('laat elk spel alle vier de rassen meedoen', () => {
+    expect(RACE_IDS).toHaveLength(4);
+    for (let seed = 1; seed <= 10; seed++) {
       const s = createGame(['Ana', 'Bo'], seed);
-      expect(s.outRace).not.toBeNull();
-      outs.add(s.outRace!);
-      const cards = [...s.shop.pile, ...s.shop.market].map((c) => getCard(c.defId));
-      expect(cards.some((d) => d.race === s.outRace)).toBe(false);
-      expect(new Set(cards.map((d) => d.race)).size).toBe(RACE_IDS.length - 1);
+      const races = new Set([...s.shop.pile, ...s.shop.market].map((c) => getCard(c.defId).race));
+      expect(races.size).toBe(RACE_IDS.length);
     }
-    expect(outs.size).toBe(RACE_IDS.length);
+  });
+
+  it('goedkope kaarten zonder Trek hebben iets speciaals: een special, Offer bij het kopen of een huurling', () => {
+    for (const def of [...new Set(SHOP_SUPPLY)].map(getCard)) {
+      if (def.price! > 4) continue;
+      const all = [...def.top, ...def.bottom];
+      const hasDraw = all.some((e) => e.kw === 'trek');
+      const special = all.some((e) => e.kw === 'speciaal') || !!def.onBuy?.some((e) => e.kw === 'offer');
+      expect(hasDraw || special, def.id).toBe(true);
+    }
+  });
+
+  it('elk ras heeft 1 of 2 kaarten met een bonus voor iets wat je deze beurt al deed', () => {
+    for (const race of RACE_IDS) {
+      const defs = [...new Set(SHOP_SUPPLY)].map(getCard).filter((d) => d.race === race);
+      const n = defs.filter((d) => [...d.top, ...d.bottom].some((e) => e.eerder)).length;
+      expect(n, race).toBeGreaterThanOrEqual(1);
+      expect(n, race).toBeLessThanOrEqual(2);
+    }
   });
 
   it('een effect met een rasvoorwaarde werkt alleen als dat ras al van jou in de zone ligt', () => {
-    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true, allRaces: true });
+    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
     // Zonder ork: Trollenmoker doet alleen haar gewone Aanval 2.
     s = play(s, 'trol', zone(0));
     expect(s.zones[0].damage[0]).toBe(2);
@@ -771,11 +780,11 @@ describe('rassen', () => {
     s = play(s, 'trol', zone(1));
     expect(s.zones[1].damage[0]).toBe(2);
     // Afgelegd werkt de voorwaarde nooit.
-    expect(needMet(s, 0, null, { kw: 'aanval', amount: 1, need: 'ork' })).toBe(false);
+    expect(needMet(s, 0, null, { kw: 'aanval', amount: 1, need: 'kultist' })).toBe(false);
   });
 
   it('een Terugroep op dezelfde kaart neemt de rasbonus niet weg', () => {
-    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true, allRaces: true });
+    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
     s.zones[0].cards.push({ player: 0, card: { uid: 'mens', defId: 'schildknaap' }, turn: 0 });
     // Generaal: Terugroep 3 (neemt de Schildknaap terug), en toch 🧑Aanval 6.
     s = play(s, 'generaal', zone(0));
@@ -798,7 +807,7 @@ describe('rassen', () => {
 
 describe('Schenk', () => {
   it('stuurt je oudste andere kaarten in de zone naar de aflegstapel van je tegenstander', () => {
-    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true, allRaces: true });
+    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
     s.zones[0].cards.push(
       { player: 0, card: { uid: 'oud1', defId: 'rekruut' }, turn: 0 },
       { player: 1, card: { uid: 'bo1', defId: 'zilver' }, turn: 0 },
@@ -814,20 +823,11 @@ describe('Schenk', () => {
   });
 
   it('een Knekelfenix laat zich niet weggeven: ze keert terug in je hand', () => {
-    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true, allRaces: true });
+    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
     s.zones[0].cards.push({ player: 0, card: { uid: 'fen', defId: 'fenix' }, turn: 0 });
     s = play(s, 'pestdrager', zone(0));
     expect(s.players[0].hand.some((c) => c.uid === 'fen')).toBe(true);
     expect(s.players[1].discard.some((c) => c.uid === 'fen')).toBe(false);
-  });
-});
-
-describe('Ravenkoningin', () => {
-  it('doet 2 schade per lege plek van de tegenstander in deze zone', () => {
-    let s = createGame(['Ana', 'Bo'], 6, { plainZones: true });
-    s.zones[0].cards.push({ player: 1, card: { uid: 'x1', defId: 'zilver' }, turn: 1 });
-    s = play(s, 'ravenkoningin', zone(0));
-    expect(s.zones[0].damage[0]).toBe(2 * (MAX_ZONE_CARDS - 1));
   });
 });
 
@@ -883,10 +883,12 @@ describe('echo: de volgende kaart keert meteen terug', () => {
 });
 
 describe('dure kaarten', () => {
-  it('bestaan van 7 tot 12 goud en liggen in de winkelvoorraad', () => {
-    const prices = ['mammoet', 'aartsmagier', 'titaan', 'leegte', 'meteoor', 'drakenkoning'].map((id) => getCard(id).price);
-    expect(prices).toEqual([7, 8, 9, 9, 11, 12]);
-    for (const id of ['mammoet', 'drakenkoning']) expect(SHOP_SUPPLY).toContain(id);
+  it('elk ras heeft dure kaarten (7 goud of meer) met een rasbonus of een special', () => {
+    for (const race of RACE_IDS) {
+      const big = [...new Set(SHOP_SUPPLY)].map(getCard).filter((d) => d.race === race && d.price! >= 7);
+      expect(big.length, race).toBeGreaterThanOrEqual(2);
+      for (const d of big) expect(d.bottom.some((e) => e.need || e.eerder || e.kw === 'speciaal'), d.id).toBe(true);
+    }
   });
 });
 
@@ -899,7 +901,7 @@ describe('tafelversie: eenvoudigere regels voor echte kaarten', () => {
   });
 
   it('vervangt Echo door Trek 1, Herschep door Aanval 1 en Schenk door Terugroep', () => {
-    let s = createGame(['Ana', 'Bo'], 1, { plainZones: true, allRaces: true, tafel: true });
+    let s = createGame(['Ana', 'Bo'], 1, { plainZones: true, tafel: true });
     s.players[0].gold = 0;
     const hand = s.players[0].hand.length;
     // Windloper afgelegd: Goud 1 en (in plaats van Echo) Trek 1.
@@ -930,7 +932,6 @@ describe('tafelversie: eenvoudigere regels voor echte kaarten', () => {
   it('laat alle rassen meedoen', () => {
     for (let seed = 1; seed <= 10; seed++) {
       const s = createGame(['Ana', 'Bo'], seed, { tafel: true });
-      expect(s.outRace).toBeNull();
       const races = new Set([...s.shop.pile, ...s.shop.market].map((c) => getCard(c.defId).race));
       expect(races.size).toBe(RACE_IDS.length);
     }
@@ -946,14 +947,152 @@ describe('tafelversie: eenvoudigere regels voor echte kaarten', () => {
 
 describe('Poortbeuker: een goedkope Belegeringsram', () => {
   it('doet alleen schade (5) als de tegenstander hier een Schild heeft', () => {
-    let s = createGame(['Ana', 'Bo'], 1, { plainZones: true, allRaces: true });
+    let s = createGame(['Ana', 'Bo'], 1, { plainZones: true });
     expect(getCard('poortbeuker').price).toBe(2);
-    expect(getCard('poortbeuker').race).toBe('mens');
     s = play(s, 'poortbeuker', zone(0));
     expect(s.zones[0].damage[0]).toBe(0);
     // Het Schild van 1 houdt 1 van de 5 schade tegen.
     s.zones[1].shield[1] = 1;
     s = play(s, 'poortbeuker', zone(1));
     expect(s.zones[1].damage[0]).toBe(4);
+  });
+});
+
+describe('Offer: een kaart voorgoed verwijderen', () => {
+  const fresh = () => createGame(['Ana', 'Bo'], 3, { plainZones: true });
+
+  it('een kaart met Offer bij het kopen laat je een kaart uit je hand offeren, ook een munt', () => {
+    let s = fresh();
+    s.players[0].gold = 10;
+    s.shop.market[0] = { uid: 'kopen-1', defId: 'ingewijde' };
+    s = act(s, { type: 'buy', marketUid: 'kopen-1' });
+    expect(s.players[0].offer).toBe(1);
+    const koper = s.players[0].hand.find((c) => c.defId === 'koper') ?? s.players[0].hand[0];
+    const total = (g: GameState) => { const p = g.players[0]; return p.deck.length + p.hand.length + p.discard.length + p.played.length; };
+    const before = total(s);
+    s = act(s, { type: 'offer', cardUid: koper.uid });
+    expect(total(s)).toBe(before - 1);
+    expect(s.players[0].hand.some((c) => c.uid === koper.uid)).toBe(false);
+    expect(s.players[0].offer).toBe(0);
+    expect(s.players[0].did.offer).toBe(1);
+  });
+
+  it('kan ook een kaart offeren die je deze beurt al speelde', () => {
+    let s = fresh();
+    const uid = give(s, 0, 'zilver');
+    s = act(s, { type: 'play', handUid: uid, target: DISCARD });
+    s.players[0].offer = 1;
+    s = act(s, { type: 'offer', cardUid: uid });
+    expect(s.players[0].played.some((c) => c.uid === uid)).toBe(false);
+    s = act(s, { type: 'endTurn' });
+    expect([...s.players[0].discard, ...s.players[0].deck, ...s.players[0].hand].some((c) => c.uid === uid)).toBe(false);
+  });
+
+  it('weigert zonder Offer of met een kaart van iemand anders, en overslaan wist de Offer', () => {
+    let s = fresh();
+    const uid = s.players[0].hand[0].uid;
+    expect(applyAction(s, { type: 'offer', cardUid: uid }).ok).toBe(false);
+    s.players[0].offer = 2;
+    expect(applyAction(s, { type: 'offer', cardUid: 'bestaat-niet' }).ok).toBe(false);
+    s = act(s, { type: 'offer', cardUid: null });
+    expect(s.players[0].offer).toBe(0);
+    expect(s.players[0].hand.some((c) => c.uid === uid)).toBe(true);
+  });
+
+  it('vervalt aan het einde van je beurt', () => {
+    let s = fresh();
+    s = play(s, 'offerpriester', DISCARD);
+    expect(s.players[0].offer).toBe(1);
+    s = act(s, { type: 'endTurn' });
+    expect(s.players[0].offer).toBe(0);
+  });
+});
+
+describe('eerder: een bonus voor iets wat je deze beurt al deed', () => {
+  const fresh = () => createGame(['Ana', 'Bo'], 3, { plainZones: true });
+
+  it('Wilgenheks: Aanval 4 alleen als je deze beurt al hersteld hebt (met een andere kaart)', () => {
+    let s = fresh();
+    s = play(s, 'wilgenheks', zone(0));
+    expect(s.zones[0].damage[0]).toBe(0);
+    s = play(s, 'kruidenvrouw', zone(1));
+    s = play(s, 'wilgenheks', zone(2));
+    expect(s.zones[2].damage[0]).toBe(4);
+  });
+
+  it('Bloedzuster: +3 schade na een Offer; telt opnieuw vanaf nul na Einde beurt', () => {
+    let s = fresh();
+    s.players[0].offer = 1;
+    s = act(s, { type: 'offer', cardUid: s.players[0].hand[0].uid });
+    s = play(s, 'bloedzuster', zone(0));
+    expect(s.zones[0].damage[0]).toBe(5);
+    s = act(s, { type: 'endTurn' });
+    s = act(s, { type: 'endTurn' });
+    s = play(s, 'bloedzuster', zone(1));
+    expect(s.zones[1].damage[0]).toBe(2);
+  });
+
+  it('Opperbaas: +3 schade als je deze beurt al een kaart van 6 goud of meer speelde', () => {
+    let s = fresh();
+    s = play(s, 'opperbaas', zone(0));
+    expect(s.zones[0].damage[0]).toBe(4);
+    s = play(s, 'opperbaas', zone(1));
+    expect(s.zones[1].damage[0]).toBe(7);
+  });
+
+  it('Nachtmes telt terugroepen, ook terugtrekken voor goud', () => {
+    let s = fresh();
+    s.players[0].gold = 10;
+    s = play(s, 'rekruut', zone(0));
+    s = act(s, { type: 'recall', zone: 0, cardUid: s.zones[0].cards[0].card.uid });
+    s = play(s, 'nachtmes', zone(1));
+    expect(s.zones[1].damage[0]).toBe(5);
+  });
+});
+
+describe('speciale effecten van de rassen', () => {
+  const fresh = () => createGame(['Ana', 'Bo'], 3, { plainZones: true });
+
+  it('Asverzamelaar vernietigt en geeft 1 goud per verbannen kaart', () => {
+    let s = fresh();
+    for (let i = 0; i < 2; i++) s.zones[0].cards.push({ player: 0, card: { uid: 'as-' + i, defId: 'koper' }, turn: 1 });
+    const gold = s.players[0].gold;
+    s = play(s, 'asverzamelaar', zone(0));
+    expect(s.players[0].gold).toBe(gold + 2);
+    expect(s.players[0].did.vernietig).toBe(2);
+  });
+
+  it('Sekteleider doet 2 schade per kaart die je deze beurt offerde of vernietigde', () => {
+    let s = fresh();
+    s = play(s, 'rekruut', zone(0));
+    s = play(s, 'asverzamelaar', zone(0));
+    s.players[0].offer = 1;
+    s = act(s, { type: 'offer', cardUid: s.players[0].hand[0].uid });
+    s = play(s, 'sekteleider', zone(1));
+    expect(s.zones[1].damage[0]).toBe(2 + 4);
+  });
+
+  it('Goudhamer doet 1 schade extra per 3 goud, max. 4', () => {
+    let s = fresh();
+    s.players[0].gold = 7;
+    s = play(s, 'goudhamer', zone(0));
+    expect(s.zones[0].damage[0]).toBe(1 + 2);
+    s.players[0].gold = 30;
+    s = play(s, 'goudhamer', zone(1));
+    expect(s.zones[1].damage[0]).toBe(1 + 4);
+  });
+
+  it('Moerasheks doet 1 schade per Vloek van de tegenstander', () => {
+    let s = fresh();
+    s.players[1].deck.push({ uid: 'v-a', defId: 'vloek' }, { uid: 'v-b', defId: 'vloek' });
+    s = play(s, 'moerasheks', zone(0));
+    expect(s.zones[0].damage[0]).toBe(1 + 2);
+  });
+
+  it('Grootmeester doet 1 schade per kaart in je hand', () => {
+    let s = fresh();
+    const hand = s.players[0].hand.length;
+    s = play(s, 'grootmeester', zone(0));
+    expect(s.zones[0].damage[0]).toBe(3 + Math.min(6, hand));
   });
 });

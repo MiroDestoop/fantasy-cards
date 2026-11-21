@@ -1,6 +1,5 @@
 import { tr } from './i18n';
 import type { GameState, PlayerId, PlayerState, Zone } from './types';
-import { zoneCapacity } from './zones';
 
 /** Alles wat een speciaal effect mag gebruiken. Wat je hier aanpast, werkt op een kopie van het spel. */
 export interface SpecialContext {
@@ -40,11 +39,11 @@ export const SPECIALS: Record<string, SpecialDef> = {
     },
   },
   diefstal: {
-    get text() { return tr('Steel al het goud van je tegenstander.', "Steal all your opponent's gold."); },
+    get text() { return tr('Steel max. 3 goud van je tegenstander.', "Steal up to 3 of your opponent's gold."); },
     run: ({ me, opp, log }) => {
-      const stolen = opp.gold;
+      const stolen = Math.min(3, opp.gold);
       me.gold += stolen;
-      opp.gold = 0;
+      opp.gold -= stolen;
       log(stolen
         ? tr(`👺 ${me.name} steelt ${stolen} goud van ${opp.name}!`, `👺 ${me.name} steals ${stolen} gold from ${opp.name}!`)
         : tr(`👺 ${opp.name} heeft geen goud om te stelen.`, `👺 ${opp.name} has no gold to steal.`));
@@ -76,16 +75,41 @@ export const SPECIALS: Record<string, SpecialDef> = {
       damage(destroy() * 2);
     },
   },
-  leegveld: {
-    get text() { return tr('2 schade per lege plek van je tegenstander hier.', "2 damage per empty opponent's slot here."); },
-    run: ({ zone, oppId, damage }) => {
-      if (zone) damage(2 * Math.max(0, zoneCapacity(zone) - zone.cards.filter((c) => c.player === oppId).length));
+  asoogst: {
+    get text() { return tr('Vernietig. 1 goud per verbannen kaart.', 'Destroy. 1 gold per banished card.'); },
+    run: ({ destroy, me }) => {
+      me.gold += destroy();
     },
   },
-  wraak: {
-    get text() { return tr('1 schade per kaart van je tegenstander hier.', "1 damage per opponent's card here."); },
-    run: ({ zone, oppId, damage }) => {
-      if (zone) damage(zone.cards.filter((c) => c.player === oppId).length);
+  offerkracht: {
+    get text() { return tr('+2 schade per kaart die je deze beurt offerde of vernietigde (max. 8).', '+2 damage per card you sacrificed or destroyed this turn (max. 8).'); },
+    run: ({ me, damage }) => {
+      damage(Math.min(8, 2 * (me.did.offer + me.did.vernietig)));
+    },
+  },
+  goudslag: {
+    get text() { return tr('+1 schade per 3 goud dat je hebt (max. 4).', '+1 damage per 3 gold you have (max. 4).'); },
+    run: ({ me, damage }) => {
+      damage(Math.min(4, Math.floor(me.gold / 3)));
+    },
+  },
+  schaduwslag: {
+    get text() { return tr('+2 schade per kaart die je deze beurt terugriep (max. 8).', '+2 damage per card you recalled this turn (max. 8).'); },
+    run: ({ me, damage }) => {
+      damage(Math.min(8, 2 * me.did.terugroep));
+    },
+  },
+  handkracht: {
+    get text() { return tr('+1 schade per kaart in je hand (max. 6).', '+1 damage per card in your hand (max. 6).'); },
+    run: ({ me, damage }) => {
+      damage(Math.min(6, me.hand.length));
+    },
+  },
+  vloekschade: {
+    get text() { return tr('+1 schade per Vloek van je tegenstander (max. 5).', "+1 damage per Curse your opponent owns (max. 5)."); },
+    run: ({ opp, damage }) => {
+      const curses = [...opp.deck, ...opp.hand, ...opp.discard, ...opp.played].filter((c) => c.defId === 'vloek').length;
+      damage(Math.min(5, curses));
     },
   },
 };

@@ -1,7 +1,7 @@
 import { cardsWord, tr } from './i18n';
 import { MAX_HAND, MAX_ZONE_CARDS, ZONE_HP } from './rules';
 import { getSpecial } from './specials';
-import type { CardDef, Effect, Keyword, Race } from './types';
+import type { CardDef, Daad, Effect, Keyword, Race } from './types';
 
 // label is een getter: zo geeft KEYWORDS[kw].label altijd de gekozen taal.
 export const KEYWORDS: Record<Keyword, { readonly label: string; noAmount?: boolean; explain: (n: number) => string }> = {
@@ -117,23 +117,62 @@ export const KEYWORDS: Record<Keyword, { readonly label: string; noAmount?: bool
       'Replace all cards in the shop with new ones. The old ones go to the bottom of the supply.',
     ),
   },
+  offer: {
+    get label() { return tr('Offer', 'Sacrifice'); },
+    explain: (n) => tr(
+      `Kies ${n === 1 ? 'een kaart' : `${n} kaarten`} uit je hand of uit de kaarten die je deze beurt speelde (ook munten): ${n === 1 ? 'ze verdwijnt' : 'ze verdwijnen'} voorgoed uit het spel. Zo wordt je stapel kleiner en sterker. Je mag ook overslaan. Vervalt aan het einde van je beurt.`,
+      `Pick ${n === 1 ? 'a card' : `${n} cards`} from your hand or from the cards you played this turn (coins too): ${n === 1 ? 'it leaves' : 'they leave'} the game for good. This makes your deck smaller and stronger. You may also skip. Expires at the end of your turn.`,
+    ),
+  },
 };
 
-/** De rassen: elk spel doet er één niet mee. */
-export const RACES: Record<Race, { icon: string; readonly label: string; readonly plural: string }> = {
-  mens: { icon: '🧑', get label() { return tr('Mens', 'Human'); }, get plural() { return tr('Mensen', 'Humans'); } },
-  elf: { icon: '🧝', get label() { return tr('Elf', 'Elf'); }, get plural() { return tr('Elfen', 'Elves'); } },
-  dwerg: { icon: '⛏️', get label() { return tr('Dwerg', 'Dwarf'); }, get plural() { return tr('Dwergen', 'Dwarves'); } },
-  ork: { icon: '🪓', get label() { return tr('Ork', 'Orc'); }, get plural() { return tr('Orks', 'Orcs'); } },
-  ondood: { icon: '💀', get label() { return tr('Ondode', 'Undead'); }, get plural() { return tr('Ondoden', 'Undead'); } },
+/**
+ * De vier rassen, elk met een eigen speelstijl. `color` kleurt de achtergrond van hun kaarten.
+ * Kultisten: offeren en vernietigen. Goblins: veel goud en grote kaarten.
+ * Sluipmoordenaars: veel trekken en terugroepen. Heksen: herstel, vloeken en vertragen.
+ */
+export const RACES: Record<Race, { icon: string; color: string; readonly label: string; readonly plural: string; readonly style: string }> = {
+  kultist: {
+    icon: '🕯️', color: '#8b1a2b',
+    get label() { return tr('Kultist', 'Cultist'); }, get plural() { return tr('Kultisten', 'Cultists'); },
+    get style() { return tr('offeren en vernietigen', 'sacrificing and destroying'); },
+  },
+  goblin: {
+    icon: '👺', color: '#4f7d1f',
+    get label() { return tr('Goblin', 'Goblin'); }, get plural() { return tr('Goblins', 'Goblins'); },
+    get style() { return tr('veel goud en grote kaarten', 'lots of gold and big cards'); },
+  },
+  sluip: {
+    icon: '🥷', color: '#3a2f7a',
+    get label() { return tr('Sluipmoordenaar', 'Assassin'); }, get plural() { return tr('Sluipmoordenaars', 'Assassins'); },
+    get style() { return tr('veel trekken en terugroepen', 'lots of drawing and recalling'); },
+  },
+  heks: {
+    icon: '🧙‍♀️', color: '#1f6b5e',
+    get label() { return tr('Heks', 'Witch'); }, get plural() { return tr('Heksen', 'Witches'); },
+    get style() { return tr('herstel, vloeken en vertragen', 'healing, curses and slowing'); },
+  },
 };
 export const RACE_IDS = Object.keys(RACES) as Race[];
+
+/** Wat je eerder in deze beurt gedaan kunt hebben (voorwaarde `eerder`): icoon en uitleg voor op de kaart. */
+export const DEEDS: Record<Daad, { icon: string; readonly text: string }> = {
+  offer: { icon: '🔪', get text() { return tr('Alleen als je deze beurt al een kaart offerde.', 'Only if you already sacrificed a card this turn.'); } },
+  vernietig: { icon: '🔥', get text() { return tr('Alleen als je deze beurt al kaarten vernietigde.', 'Only if you already destroyed cards this turn.'); } },
+  herstel: { icon: '💚', get text() { return tr('Alleen als je deze beurt al hersteld hebt.', 'Only if you already healed this turn.'); } },
+  vervloek: { icon: '🕸️', get text() { return tr('Alleen als je deze beurt al iemand vervloekte.', 'Only if you already cursed this turn.'); } },
+  terugroep: { icon: '↩️', get text() { return tr('Alleen als je deze beurt al een kaart terugriep.', 'Only if you already recalled a card this turn.'); } },
+  trek: { icon: '🃏', get text() { return tr('Alleen als je deze beurt al een kaart trok met een effect.', 'Only if you already drew a card with an effect this turn.'); } },
+  groot: { icon: '💎', get text() { return tr('Alleen als je deze beurt al een kaart van 6 goud of meer speelde.', 'Only if you already played a card costing 6 gold or more this turn.'); } },
+};
 
 const fx = (kw: Keyword, amount: number): Effect => ({ kw, amount });
 /** Een effect dat alleen werkt als er al een kaart van dat ras van jou in de zone ligt. */
 const als = (race: Race, e: Effect): Effect => ({ ...e, need: race });
 /** Een speciaal effect uit specials.ts. Een tikfout in de naam geeft meteen een foutmelding. */
 const special = (id: string): Effect => (getSpecial(id), { kw: 'speciaal', id });
+/** Een effect dat alleen werkt als je dit eerder in deze beurt al gedaan hebt. */
+const na = (daad: Daad, e: Effect): Effect => ({ ...e, eerder: daad });
 
 // Kaarten: pas namen, prijzen en keywords hier gerust aan.
 // `top` krijg je door de kaart naar je aflegstapel te slepen, `bottom` door ze in een zone te spelen.
@@ -145,113 +184,82 @@ const CARD_LIST: CardDef[] = [
   { id: 'vloek', name: 'Vloek', icon: '🕸️', color: '#2e1a2e', top: [fx('betaal', 1), fx('verdwijn', 0)], bottom: [special('bezet')] },
   { id: 'rekruut', name: 'Rekruut', icon: '🗡️', color: '#6b8e23', top: [fx('goud', 1)], bottom: [fx('aanval', 1), fx('terugroep', 1)] },
 
-  // Winkelkaarten
-  { id: 'vuurbal', name: 'Vuurgooier', price: 4, icon: '🔥', color: '#e65100', top: [fx('storm', 1)], bottom: [fx('aanval', 4), als('ork', fx('storm', 1))] },
-  { id: 'trol', name: 'Trollenmoker', price: 5, icon: '👹', color: '#6d4c41', top: [fx('trek', 2)], bottom: [fx('aanval', 2), als('ork', fx('aanval', 5))] },
-  { id: 'draak', name: 'Drakenrijder', price: 8, icon: '🐉', color: '#b23a48', top: [fx('storm', 3)], bottom: [fx('aanval', 7), als('ork', fx('aanval', 3))] },
-  { id: 'storm', name: 'Stormroeper', price: 6, icon: '⚡', color: '#3949ab', top: [fx('storm', 2), fx('trek', 1)], bottom: [fx('aanval', 3), fx('trek', 2)] },
-  { id: 'vampier', name: 'Vampier', price: 5, icon: '🧛', color: '#6a1b2a', top: [fx('trek', 2)], bottom: [fx('aanval', 2),als('ondood', fx('herstel', 5))] },
-  { id: 'uil', name: 'Uilenhoeder', price: 3, icon: '🦉', color: '#795548', top: [fx('trek', 1), fx('goud', 1)], bottom: [fx('aanval', 1), fx('trek', 1), als('elf', fx('verban', 1))] },
-  { id: 'inzicht', name: 'Sterrenlezer', price: 5, icon: '🔭', color: '#8e24aa', top: [fx('trek', 2)], bottom: [fx('aanval', 2), fx('trek', 2)] },
-  { id: 'heks', name: 'Vorstschim', price: 4, icon: '❄️', color: '#0277bd', top: [fx('vertraag', 1),fx('verban', 1)], bottom: [fx('aanval', 3), als('ondood', fx('vertraag', 2))] },
-  { id: 'zandloper', name: 'Mummie', price: 6, icon: '🧟', color: '#a1887f', top: [fx('vertraag', 2)], bottom: [fx('aanval', 2), als('elf',fx('vertraag', 3))] },
-  { id: 'golem', name: 'Runengolem', price: 4, icon: '🗿', color: '#757575', top: [fx('goud', 2)], bottom: [fx('schild', 4), als('dwerg', fx('schild', 3))] },
-  { id: 'bron', name: 'Woudgenezeres', price: 3, icon: '🌿', color: '#00897b', top: [fx('trek', 1)], bottom: [fx('herstel', 4)] },
-  { id: 'schat', name: 'Dwergenschat', price: 5, icon: '👑', color: '#c9a227', top: [fx('goud', 4)], bottom: [fx('aanval', 2), als('dwerg', fx('goud', 5))] },
-  { id: 'offervuur', name: 'Bloedpriester', price: 4, icon: '🩸', color: '#d84315', top: [fx('trek', 1)], bottom: [fx('vernietig', 0), fx('aanval', 3)] },
-  { id: 'terugtocht', name: 'Mijnwerker', price: 3, icon: '🪨', color: '#607d8b', top: [fx('trek', 1), fx('goud', 1)], bottom: [fx('vernietig', 0), fx('schild', 2)] },
-  { id: 'koerier', name: 'Koerier', price: 3, icon: '🐎', color: '#8d6e63', top: [fx('trek', 1), fx('goud', 1)], bottom: [fx('aanval', 2), fx('terugroep', 1)] },
-  { id: 'hoornblazer', name: 'Hoornblazer', price: 5, icon: '📯', color: '#bf8f00', top: [fx('goud', 3)], bottom: [fx('aanval', 2), fx('terugroep', 2), als('mens', fx('goud', 3))] },
-  { id: 'marskramer', name: 'Marskramer', price: 2, icon: '🛒', color: '#ad1457', top: [fx('goud', 2), fx('ververs', 0)], bottom: [fx('aanval', 2), als('mens', fx('trek', 2))] },
-  { id: 'bard', name: 'Elfenbard', price: 3, icon: '🪕', color: '#7b1fa2', top: [fx('ververs', 0), fx('trek', 1)], bottom: [fx('terugroep', 2), als('mens', fx('trek', 2))] },
-  { id: 'valkenier', name: 'Valkenier', price: 4, icon: '🦅', color: '#8d6e63', top: [fx('verban', 1), fx('goud', 3)], bottom: [fx('aanval', 1), fx('terugroep', 2)] },
-  { id: 'getijde', name: 'Spookschip', price: 5, icon: '🏴‍☠️', color: '#00695c', top: [fx('ververs', 0), fx('goud', 3)], bottom: [fx('terugroep', 3), fx('schild', 3)] },
-  { id: 'bol', name: 'Juwelier', price: 4, icon: '💍', color: '#5e35b1', top: [fx('goud', 3), fx('verban', 1)], bottom: [fx('schenk', 1), fx('goud', 4)] },
-  { id: 'generaal', name: 'Generaal', price: 7, icon: '🎖️', color: '#4e342e', top: [fx('goud', 3),fx('trek', 1)], bottom: [fx('terugroep', 3), als('mens', fx('aanval', 6))] },
+  // Winkelkaarten, per ras van goedkoop naar duur. Goedkope kaarten zonder Trek hebben iets speciaals
+  // (een special, Offer bij het kopen of een huurling); dure kaarten hebben kleinere getallen maar meer rasbonussen.
 
-  { id: 'schildknaap', name: 'Schildknaap', price: 2, icon: '🛡️', color: '#78909c', top: [fx('goud', 1)], bottom: [fx('schild', 3), als('mens', fx('schild', 2))] },
-  { id: 'pestdrager', name: 'Pestdrager', price: 3, icon: '🐀', color: '#5f6b3a', top: [fx('verban', 1),fx('trek', 1)], bottom: [fx('aanval', 2), fx('schenk', 1)] },
+  // 🕯️ Kultisten: offeren en vernietigen
+  { id: 'ingewijde', name: 'Ingewijde', price: 2, icon: '🧎', color: '#7a2333', onBuy: [fx('offer', 1)], top: [fx('goud', 1)], bottom: [fx('aanval', 2)] },
+  { id: 'asverzamelaar', name: 'Asverzamelaar', price: 3, icon: '⚱️', color: '#5a2a2a', top: [fx('trek', 1)], bottom: [special('asoogst')] },
+  { id: 'bloedzuster', name: 'Bloedzuster', price: 3, icon: '🩸', color: '#9b1c2e', onBuy: [fx('offer', 1)], top: [fx('goud', 1)], bottom: [fx('aanval', 2), na('offer', fx('aanval', 3))] },
+  { id: 'vuurprediker', name: 'Vuurprediker', price: 4, icon: '🔥', color: '#b33a1f', onBuy: [fx('offer', 1)], top: [fx('storm', 1)], bottom: [fx('aanval', 3), fx('schenk', 1)] },
+  { id: 'zielenoogster', name: 'Zielenoogster', price: 5, icon: '💀', color: '#3b1f2b', top: [fx('trek', 1), fx('goud', 1)], bottom: [special('zielenoogst')] },
+  { id: 'offerpriester', name: 'Offerpriester', price: 5, icon: '📿', color: '#6e1423', top: [fx('offer', 1), fx('trek', 2)], bottom: [fx('aanval', 2), na('vernietig', fx('aanval', 4))] },
+  { id: 'bloedfenix', name: 'Bloedfenix', price: 6, icon: '🐦‍🔥', color: '#c2410c', top: [fx('goud', 2)], bottom: [fx('aanval', 3), special('wedergeboorte')] },
+  { id: 'sekteleider', name: 'Sekteleider', price: 7, icon: '👁️', color: '#4a0f1c', top: [fx('offer', 2), fx('goud', 2)], bottom: [fx('aanval', 2), special('offerkracht')] },
+  { id: 'demonenroeper', name: 'Demonenroeper', price: 8, icon: '😈', color: '#5b0e2d', top: [fx('storm', 1), fx('offer', 1)], bottom: [fx('vernietig', 0), fx('aanval', 3), als('kultist', fx('aanval', 3))] },
+  { id: 'ontwaaktegod', name: 'Ontwaakte God', price: 10, icon: '🌑', color: '#2a0a14', top: [fx('storm', 2), fx('offer', 1)], bottom: [fx('aanval', 4), special('offerkracht'), als('kultist', fx('storm', 1))] },
 
-  // Kaarten met een speciaal effect (zie specials.ts)
-  { id: 'alchemist', name: 'Alchemist', price: 6, icon: '⚗️', color: '#6a1b9a', top: [special('dubbelgoud')], bottom: [fx('aanval', 3)] },
-  { id: 'huurling', name: 'Huurling', price: 4, icon: '⚔️', color: '#5d4037', top: [fx('goud', 1)], bottom: [fx('aanval', 4), special('huur')] },
-  { id: 'poortbeuker', name: 'Poortbeuker', price: 2, icon: '🪵', color: '#8d6e4a', top: [fx('goud', 2)], bottom: [special('ram'),] },
-  { id: 'ram', name: 'Belegeringsram', price: 4, icon: '🐏', color: '#6d4c41', top: [fx('goud', 2),fx('verban', 1)], bottom: [special('ram'), fx('aanval', 2)] },
-  { id: 'fenix', name: 'Knekelfenix', price: 6, icon: '🐦‍🔥', color: '#e64a19', top: [fx('goud', 2)], bottom: [fx('aanval', 3), special('wedergeboorte')] },
-  { id: 'goblin', name: 'Goblin', price: 2, icon: '👺', color: '#558b2f', top: [fx('goud', 1)], bottom: [special('diefstal')] },
-  { id: 'geest', name: 'Wrekende Geest', price: 4, icon: '👻', color: '#455a64', top: [fx('trek', 1), fx('verban', 1)], bottom: [special('wraak'), fx('schild', 2)] },
+  // 👺 Goblins: veel goud en grote kaarten
+  { id: 'zakkenroller', name: 'Zakkenroller', price: 2, icon: '🤏', color: '#557a2b', top: [fx('goud', 1), fx('ververs', 0)], bottom: [special('diefstal'), fx('aanval', 1)] },
+  { id: 'deurtrapper', name: 'Deurtrapper', price: 2, icon: '🚪', color: '#6b7a2b', top: [fx('goud', 2)], bottom: [special('ram'), fx('aanval', 1)] },
+  { id: 'huurgoblin', name: 'Huurgoblin', price: 3, icon: '⚔️', color: '#4f6b1f', top: [fx('goud', 1)], bottom: [fx('aanval', 4), special('huur')] },
+  { id: 'schatgraver', name: 'Schatgraver', price: 3, icon: '⛏️', color: '#7a6a1f', top: [fx('trek', 1), fx('goud', 1)], bottom: [fx('goud', 3)] },
+  { id: 'goudhamer', name: 'Goudhamer', price: 4, icon: '🔨', color: '#a68a1f', top: [fx('goud', 2)], bottom: [fx('aanval', 1), special('goudslag')] },
+  { id: 'goblinbende', name: 'Goblinbende', price: 5, icon: '👥', color: '#3f6b2b', top: [fx('goud', 2), fx('trek', 1)], bottom: [fx('aanval', 3), als('goblin', fx('aanval', 3))] },
+  { id: 'opperbaas', name: 'Opperbaas', price: 6, icon: '🪖', color: '#5a4a1a', top: [fx('goud', 3)], bottom: [fx('aanval', 4), na('groot', fx('aanval', 3))] },
+  { id: 'goudalchemist', name: 'Goudalchemist', price: 7, icon: '⚗️', color: '#8a7a10', top: [special('dubbelgoud')], bottom: [fx('aanval', 3), als('goblin', fx('goud', 3))] },
+  { id: 'goblinkanon', name: 'Goblinkanon', price: 8, icon: '💣', color: '#3a4a1a', top: [fx('storm', 2), fx('verban', 1)], bottom: [fx('aanval', 5), als('goblin', fx('storm', 2))] },
+  { id: 'schatdraak', name: 'Schatdraak', price: 10, icon: '🐉', color: '#6b5a0f', top: [fx('goud', 3), fx('storm', 1)], bottom: [fx('aanval', 4), special('goudslag'), als('goblin', fx('schild', 4))] },
 
-  // Kaarten die het effect van een zone veranderen
-  { id: 'landmeter', name: 'Landmeter', price: 4, icon: '🧭', color: '#5d7b3a', top: [fx('goud', 2),fx('trek', 1)], bottom: [fx('herschep', 0), fx('aanval', 2)] },
-  { id: 'portaal', name: 'Aardvormer', price: 6, icon: '🌋', color: '#4527a0', top: [fx('trek', 2), fx('verban', 1)], bottom: [fx('herschep', 0), fx('aanval', 3)] },
-  { id: 'weermaker', name: 'Weermaker', price: 7, icon: '🌦️', color: '#0288d1', top: [fx('goud', 5), fx('verban', 1)], bottom: [fx('herschep', 0), fx('aanval', 3), fx('schild', 4)] },
+  // 🥷 Sluipmoordenaars: veel trekken en terugroepen
+  { id: 'sluiper', name: 'Sluiper', price: 2, icon: '👤', color: '#3a3560', top: [fx('trek', 1)], bottom: [fx('aanval', 1), fx('terugroep', 1)] },
+  { id: 'dolkwerper', name: 'Dolkwerper', price: 3, icon: '🎯', color: '#463a7a', top: [fx('trek', 1), fx('echo', 0)], bottom: [fx('aanval', 2), fx('terugroep', 1)] },
+  { id: 'schaduwloper', name: 'Schaduwloper', price: 3, icon: '🌘', color: '#2e2a5c', top: [fx('trek', 1), fx('goud', 1)], bottom: [fx('aanval', 1), fx('trek', 1), fx('terugroep', 1)] },
+  { id: 'gifmenger', name: 'Gifmenger', price: 4, icon: '🧪', color: '#4a2d6b', top: [fx('trek', 2)], bottom: [fx('aanval', 2), fx('vertraag', 1)] },
+  { id: 'nachtmes', name: 'Nachtmes', price: 4, icon: '🌙', color: '#262252', top: [fx('trek', 1)], bottom: [fx('aanval', 2), na('terugroep', fx('aanval', 3))] },
+  { id: 'spion', name: 'Spion', price: 5, icon: '🕵️', color: '#3d3a5c', top: [fx('trek', 2), fx('goud', 1)], bottom: [fx('trek', 2), fx('terugroep', 2)] },
+  { id: 'schimmenmeester', name: 'Schimmenmeester', price: 5, icon: '👻', color: '#4b3f7a', top: [fx('trek', 1), fx('echo', 0)], bottom: [fx('echo', 0), als('sluip', fx('aanval', 4))] },
+  { id: 'meestermoordenaar', name: 'Meestermoordenaar', price: 7, icon: '🗡️', color: '#1f1a40', top: [fx('trek', 2)], bottom: [fx('aanval', 3), fx('terugroep', 1), na('trek', fx('aanval', 3))] },
+  { id: 'schaduwkoningin', name: 'Schaduwkoningin', price: 9, icon: '🦇', color: '#2a1f4a', top: [fx('trek', 3)], bottom: [fx('terugroep', 2), special('schaduwslag'), als('sluip', fx('trek', 2))] },
+  { id: 'grootmeester', name: 'Grootmeester', price: 10, icon: '🌀', color: '#15112e', top: [fx('trek', 2), fx('storm', 1)], bottom: [fx('echo', 0), fx('aanval', 3), special('handkracht')] },
 
-  // Meer Vernietig
-  { id: 'zuiveraar', name: 'Runenpriester', price: 5, icon: '✨', color: '#9e8c3a', top: [fx('goud', 3)], bottom: [fx('vernietig', 0), fx('herstel', 4)] },
-  { id: 'brandstichter', name: 'Brandstichter', price: 4, icon: '🧨', color: '#bf360c', top: [fx('storm', 1)], bottom: [fx('vernietig', 0), fx('aanval', 2), fx('vertraag', 1)] },
-  { id: 'dodenbezweerder', name: 'Dodenbezweerder', price: 5, icon: '⚰️', color: '#37474f', top: [fx('trek', 1), fx('goud', 2)], bottom: [special('zielenoogst'), als('ondood', fx('trek', 1))] },
-
-  // Je volgende kaart in een zone keert meteen terug
-  { id: 'windloper', name: 'Windloper', price: 3, icon: '🌬️', color: '#4f8a8b', top: [fx('goud', 1), fx('echo', 0)], bottom: [fx('aanval', 2)] },
-  { id: 'schaduwdanser', name: 'Schaduwdanser', price: 4, icon: '🥷', color: '#3e2a4f', top: [fx('vervloek', 1), fx('goud', 2)], bottom: [fx('aanval', 2), fx('echo', 0), fx('terugroep', 1)] },
-  { id: 'tijdmagier', name: 'Tijdmagiër', price: 5, icon: '🕰️', color: '#6d5a2b', top: [fx('trek', 1), fx('echo', 0)], bottom: [fx('echo', 0), als('elf', fx('aanval', 6))] },
-
-  // Vervloek: Vloeken in de stapel van de tegenstander
-  { id: 'sjamaan', name: 'Orkse Sjamaan', price: 3, icon: '🪬', color: '#5d4037', top: [fx('goud', 1), fx('vervloek', 1)], bottom: [fx('aanval', 2), als('ork', fx('vervloek', 1))] },
-  { id: 'moerasheks', name: 'Moerasheks', price: 3, icon: '🧙‍♀️', color: '#4e5d2a', top: [fx('vervloek', 1),fx('verban', 1)], bottom: [fx('terugroep', 1), fx('vervloek', 1)] },
-  { id: 'voodoo', name: 'Voodoopop', price: 4, icon: '🪆', color: '#6a1b4d', top: [fx('trek', 1), fx('vervloek', 1)], bottom: [fx('aanval', 2), als('ondood', fx('vervloek', 2))] },
-  { id: 'vloekschat', name: 'Vervloekte Schat', price: 4, icon: '💎', color: '#4a3b6b', top: [fx('goud', 3), fx('vervloek', 1)], bottom: [fx('schild', 3), fx('vervloek', 1)] },
-  { id: 'duisterelf', name: 'Duistere Elf', price: 5, icon: '🏹', color: '#2c2a4a', top: [fx('trek', 2)], bottom: [fx('vervloek', 1), als('elf', fx('aanval', 4))] },
-  { id: 'lich', name: 'Lich', price: 8, icon: '🦴', color: '#1f2b3a', top: [fx('storm', 2), fx('vervloek', 2)], bottom: [fx('aanval', 5), fx('vervloek', 2)] },
-
-  // Heel dure kaarten
-  { id: 'mammoet', name: 'Oorlogsmammoet', price: 7, icon: '🦣', color: '#6d4c41', top: [fx('goud', 4), fx('trek', 2)], bottom: [fx('aanval', 3), fx('schild', 5)] },
-  { id: 'aartsmagier', name: 'Aartsmagiër', price: 8, icon: '🧙', color: '#311b92', top: [fx('trek', 4)], bottom: [fx('storm', 3), fx('trek', 2)] },
-  { id: 'titaan', name: 'Bergkoning', price: 9, icon: '🏔️', color: '#546e7a', top: [fx('trek', 2), fx('storm', 2)], bottom: [fx('terugroep', 2), fx('schild', 5), als('dwerg', fx('aanval', 10))] },
-  { id: 'leegte', name: 'Zielenvreter', price: 9, icon: '🕳️', color: '#1a1030', top: [fx('storm', 2), fx('vertraag', 3)], bottom: [fx('vernietig', 0),fx('vertraag', 3)] },
-  { id: 'meteoor', name: 'Sterrenroeper', price: 11, icon: '☄️', color: '#d84315', top: [fx('storm', 5), fx('vervloek', 1)], bottom: [fx('storm', 7)] },
-  { id: 'ravenkoningin', name: 'Ravenkoningin', price: 7, icon: '🐦‍⬛', color: '#263238', top: [fx('goud', 2), fx('trek', 2)], bottom: [special('leegveld')] },
-  { id: 'drakenkoning', name: 'Drakenkoning', price: 12, icon: '🐲', color: '#7f0000', top: [fx('storm', 4), fx('trek', 1)], bottom: [fx('aanval', 10), fx('schild', 6)] },
+  // 🧙‍♀️ Heksen: herstel, vloeken en vertragen
+  { id: 'kruidenvrouw', name: 'Kruidenvrouw', price: 2, icon: '🌿', color: '#2e6b4f', top: [fx('trek', 1)], bottom: [fx('herstel', 3)] },
+  { id: 'vloekfluisteraar', name: 'Vloekfluisteraar', price: 3, icon: '🪬', color: '#4a2d5c', top: [fx('trek', 1), fx('vervloek', 1)], bottom: [fx('aanval', 2), fx('vertraag', 1)] },
+  { id: 'moerasheks', name: 'Moerasheks', price: 3, icon: '🐸', color: '#4e5d2a', top: [fx('goud', 1)], bottom: [fx('aanval', 1), special('vloekschade')] },
+  { id: 'vorstheks', name: 'Vorstheks', price: 4, icon: '❄️', color: '#2a6b8a', top: [fx('vertraag', 1), fx('trek', 1)], bottom: [fx('aanval', 3), als('heks', fx('vertraag', 2))] },
+  { id: 'genezeres', name: 'Genezeres', price: 4, icon: '💚', color: '#2e7d5a', top: [fx('trek', 1)], bottom: [fx('herstel', 3), fx('schild', 2)] },
+  { id: 'wilgenheks', name: 'Wilgenheks', price: 5, icon: '🌳', color: '#3a6b3a', top: [fx('goud', 2)], bottom: [fx('herstel', 2), na('herstel', fx('aanval', 4))] },
+  { id: 'voodoopriesteres', name: 'Voodoopriesteres', price: 5, icon: '🪆', color: '#6a1b4d', top: [fx('trek', 1), fx('vervloek', 1)], bottom: [fx('vervloek', 1), na('vervloek', fx('aanval', 4))] },
+  { id: 'weerheks', name: 'Weerheks', price: 6, icon: '🌦️', color: '#1f5a6b', top: [fx('trek', 2)], bottom: [fx('herschep', 0), fx('herstel', 2), fx('vertraag', 1)] },
+  { id: 'mistmoeder', name: 'Moeder van de Mist', price: 8, icon: '🌫️', color: '#2a4a5a', top: [fx('vertraag', 2), fx('trek', 1)], bottom: [fx('herstel', 3), fx('vertraag', 1), als('heks', fx('vervloek', 2))] },
+  { id: 'heksenkoningin', name: 'Heksenkoningin', price: 10, icon: '👑', color: '#1a3a3a', top: [fx('vervloek', 2), fx('vertraag', 1)], bottom: [fx('herstel', 3), special('vloekschade'), als('heks', fx('vertraag', 2))] },
 ];
 
 /** Engelse kaartnamen. Een kaart zonder vertaling hier houdt haar Nederlandse naam. */
 const NAMES_EN: Record<string, string> = {
   koper: 'Copper Coin', zilver: 'Silver Coin', rekruut: 'Recruit', vloek: 'Curse',
-  sjamaan: 'Orc Shaman', moerasheks: 'Swamp Witch', voodoo: 'Voodoo Doll', vloekschat: 'Cursed Treasure',
-  duisterelf: 'Dark Elf', lich: 'Lich',
-  vuurbal: 'Fire Hurler', trol: 'Troll Smasher', draak: 'Dragon Rider', storm: 'Stormcaller',
-  vampier: 'Vampire', uil: 'Owl Keeper', inzicht: 'Stargazer', heks: 'Frost Wraith', zandloper: 'Mummy',
-  golem: 'Rune Golem', bron: 'Grove Healer', schat: 'Dwarven Hoard', offervuur: 'Blood Priest',
-  terugtocht: 'Miner', koerier: 'Courier', hoornblazer: 'Horn Blower', marskramer: 'Peddler',
-  bard: 'Elven Bard', valkenier: 'Falconer', getijde: 'Ghost Ship', bol: 'Jeweler', generaal: 'General',
-  alchemist: 'Alchemist', huurling: 'Mercenary', ram: 'Battering Ram', poortbeuker: 'Gate Basher', fenix: 'Bone Phoenix', goblin: 'Goblin',
-  geest: 'Vengeful Spirit',
-  landmeter: 'Surveyor', portaal: 'Earthshaper', weermaker: 'Weather Maker',
-  zuiveraar: 'Rune Priest', brandstichter: 'Arsonist', dodenbezweerder: 'Necromancer',
-  windloper: 'Windrunner', schaduwdanser: 'Shadow Dancer', tijdmagier: 'Chronomancer',
-  mammoet: 'War Mammoth', aartsmagier: 'Archmage', titaan: 'Mountain King', leegte: 'Soul Eater', meteoor: 'Starcaller',
-  ravenkoningin: 'Raven Queen', drakenkoning: 'Dragon King',
-  schildknaap: 'Squire', pestdrager: 'Plague Bearer',
+  ingewijde: 'Initiate', asverzamelaar: 'Ash Gatherer', bloedzuster: 'Blood Sister', vuurprediker: 'Flame Preacher',
+  zielenoogster: 'Soul Reaper', offerpriester: 'Sacrifice Priest', bloedfenix: 'Blood Phoenix', sekteleider: 'Cult Leader',
+  demonenroeper: 'Demon Caller', ontwaaktegod: 'Awakened God',
+  zakkenroller: 'Pickpocket', deurtrapper: 'Door Kicker', huurgoblin: 'Goblin for Hire', schatgraver: 'Treasure Digger',
+  goudhamer: 'Gold Hammer', goblinbende: 'Goblin Gang', opperbaas: 'Warboss', goudalchemist: 'Gold Alchemist',
+  goblinkanon: 'Goblin Cannon', schatdraak: 'Hoard Dragon',
+  sluiper: 'Lurker', dolkwerper: 'Knife Thrower', schaduwloper: 'Shadow Walker', gifmenger: 'Poisoner',
+  nachtmes: 'Night Blade', spion: 'Spy', schimmenmeester: 'Shade Master', meestermoordenaar: 'Master Assassin',
+  schaduwkoningin: 'Shadow Queen', grootmeester: 'Grandmaster',
+  kruidenvrouw: 'Herbalist', vloekfluisteraar: 'Hex Whisperer', moerasheks: 'Bog Witch', vorstheks: 'Frost Witch',
+  genezeres: 'Healer', wilgenheks: 'Willow Witch', voodoopriesteres: 'Voodoo Priestess', weerheks: 'Storm Witch',
+  mistmoeder: 'Mother of Mist', heksenkoningin: 'Witch Queen',
 };
 
-/**
- * Het ras van elke winkelkaart. Elk ras heeft van alles wat: goedkope en dure kaarten, goud, trekken, aanval en verdediging.
- * Mensen: goud, terugroepen en de winkel. Elfen: trekken, echo en herstel. Dwergen: schild en goud.
- * Orks: veel schade en vernietig. Ondoden: vertragen, vernietigen en duistere specials.
- */
-const RACE_OF: Record<string, Race> = {
-  marskramer: 'mens', schildknaap: 'mens', koerier: 'mens', valkenier: 'mens', ram: 'mens', poortbeuker: 'mens',
-  landmeter: 'mens', hoornblazer: 'mens', generaal: 'mens', aartsmagier: 'mens',
-  uil: 'elf', bron: 'elf', windloper: 'elf', bard: 'elf', schaduwdanser: 'elf',
-  inzicht: 'elf', tijdmagier: 'elf', weermaker: 'elf', meteoor: 'elf',
-  terugtocht: 'dwerg', golem: 'dwerg', bol: 'dwerg', schat: 'dwerg', alchemist: 'dwerg',
-  zuiveraar: 'dwerg', portaal: 'dwerg', mammoet: 'dwerg', titaan: 'dwerg',
-  duisterelf: 'elf', vloekschat: 'dwerg', sjamaan: 'ork', moerasheks: 'ondood', voodoo: 'ondood', lich: 'ondood',
-  goblin: 'ork', vuurbal: 'ork', huurling: 'ork', offervuur: 'ork', brandstichter: 'ork',
-  trol: 'ork', storm: 'ork', draak: 'ork', drakenkoning: 'ork',
-  pestdrager: 'ondood', heks: 'ondood', geest: 'ondood', vampier: 'ondood', dodenbezweerder: 'ondood',
-  getijde: 'ondood', zandloper: 'ondood', fenix: 'ondood', ravenkoningin: 'ondood', leegte: 'ondood',
-};
+/** Het ras van elke winkelkaart. */
+const RACE_OF: Record<string, Race> = Object.fromEntries(([
+  ['kultist', ['ingewijde', 'asverzamelaar', 'bloedzuster', 'vuurprediker', 'zielenoogster', 'offerpriester', 'bloedfenix', 'sekteleider', 'demonenroeper', 'ontwaaktegod']],
+  ['goblin', ['zakkenroller', 'deurtrapper', 'huurgoblin', 'schatgraver', 'goudhamer', 'goblinbende', 'opperbaas', 'goudalchemist', 'goblinkanon', 'schatdraak']],
+  ['sluip', ['sluiper', 'dolkwerper', 'schaduwloper', 'gifmenger', 'nachtmes', 'spion', 'schimmenmeester', 'meestermoordenaar', 'schaduwkoningin', 'grootmeester']],
+  ['heks', ['kruidenvrouw', 'vloekfluisteraar', 'moerasheks', 'vorstheks', 'genezeres', 'wilgenheks', 'voodoopriesteres', 'weerheks', 'mistmoeder', 'heksenkoningin']],
+] as [Race, string[]][]).flatMap(([race, ids]) => ids.map((id) => [id, race])));
 
 // De naam wordt een getter: def.name geeft altijd de naam in de gekozen taal.
 for (const def of CARD_LIST) {
@@ -301,16 +309,14 @@ const expand = (counts: [string, number][]) => counts.flatMap(([id, n]) => Array
 /** Beginstapel van 10 kaarten; beide spelers krijgen dezelfde. */
 export const STARTER_DECK = expand([['koper', 5], ['rekruut', 3], ['zilver', 2]]);
 
-/** De gedeelde voorraad van de winkel. */
+/** De gedeelde voorraad van de winkel: goedkope kaarten 3 keer, dure 1 of 2 keer. */
 export const SHOP_SUPPLY = expand([
-  ['vuurbal', 3], ['trol', 3], ['draak', 2], ['storm', 3], ['vampier', 3], ['uil', 3],
-  ['inzicht', 3], ['heks', 3], ['zandloper', 2], ['golem', 3], ['bron', 3], ['schat', 3],
-  ['offervuur', 3], ['terugtocht', 3], ['koerier', 3], ['hoornblazer', 3], ['marskramer', 3],
-  ['schildknaap', 3], ['pestdrager', 3], ['bard', 3], ['valkenier', 3], ['getijde', 2], ['bol', 2], ['generaal', 2],
-  ['alchemist', 2], ['geest', 3], ['goblin', 3], ['huurling', 3], ['ram', 3], ['poortbeuker', 3], ['fenix', 2],
-  ['landmeter', 3], ['portaal', 2], ['weermaker', 2],
-  ['zuiveraar', 3], ['brandstichter', 2], ['dodenbezweerder', 2],
-  ['windloper', 3], ['schaduwdanser', 2], ['tijdmagier', 2],
-  ['sjamaan', 3], ['moerasheks', 3], ['voodoo', 2], ['vloekschat', 2], ['duisterelf', 2], ['lich', 1],
-  ['mammoet', 2], ['aartsmagier', 1], ['titaan', 1], ['ravenkoningin', 1], ['leegte', 1], ['meteoor', 1], ['drakenkoning', 1],
+  ['ingewijde', 3], ['asverzamelaar', 3], ['bloedzuster', 3], ['vuurprediker', 3], ['zielenoogster', 2], ['offerpriester', 2],
+  ['bloedfenix', 2], ['sekteleider', 2], ['demonenroeper', 1], ['ontwaaktegod', 1],
+  ['zakkenroller', 3], ['deurtrapper', 3], ['huurgoblin', 3], ['schatgraver', 3], ['goudhamer', 3], ['goblinbende', 2],
+  ['opperbaas', 2], ['goudalchemist', 2], ['goblinkanon', 1], ['schatdraak', 1],
+  ['sluiper', 3], ['dolkwerper', 3], ['schaduwloper', 3], ['gifmenger', 3], ['nachtmes', 3], ['spion', 2],
+  ['schimmenmeester', 2], ['meestermoordenaar', 2], ['schaduwkoningin', 1], ['grootmeester', 1],
+  ['kruidenvrouw', 3], ['vloekfluisteraar', 3], ['moerasheks', 3], ['vorstheks', 3], ['genezeres', 3], ['wilgenheks', 2],
+  ['voodoopriesteres', 2], ['weerheks', 2], ['mistmoeder', 1], ['heksenkoningin', 1],
 ]);

@@ -302,7 +302,33 @@ button { font: inherit; }
   pointer-events: auto;
   cursor: help;
 }
-/* Een effect met een rasvoorwaarde: gestippelde rand en het rasicoon ervoor. */
+/* Elk ras kleurt de achtergrond en de rand van zijn kaarten, zodat je ze in de winkel meteen herkent. */
+.card:has(> .art.r-kultist) { --race: #8b1a2b; }
+.card:has(> .art.r-goblin) { --race: #4f7d1f; }
+.card:has(> .art.r-sluip) { --race: #3a2f7a; }
+.card:has(> .art.r-heks) { --race: #1f6b5e; }
+.card:has(> .art[class*='r-']) {
+  border-color: color-mix(in srgb, var(--race) 75%, black);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--race) 22%, #f3e3bf), color-mix(in srgb, var(--race) 38%, #d9c08e));
+}
+/* Wat er gebeurt als je de kaart koopt (bv. Offer), onderaan in de illustratie. */
+.on-buy {
+  position: absolute;
+  left: 2px;
+  bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 3px;
+  font-size: 10px;
+  border-radius: 6px;
+  background: rgba(20, 12, 4, 0.7);
+  color: #fff;
+}
+.on-buy .kw { font-size: 10px; padding: 0 4px; }
+.kw-offer { --edge: #b71c1c; }
+.offer-panel h3 { margin: 6px 0 4px; font-size: 15px; }
+/* Een effect met een voorwaarde (ras of iets wat je deze beurt al deed): gestippelde rand en een icoon ervoor. */
 .kw.cond { outline: 1.5px dashed rgba(255, 255, 255, 0.85); outline-offset: -2px; }
 .out-race { text-align: center; font-size: 15px; color: var(--ink-dim); cursor: help; }
 .card-name { font-size: 13.5px; font-weight: bold; text-align: center; line-height: 1.1; }
