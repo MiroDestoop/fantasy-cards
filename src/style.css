@@ -889,7 +889,7 @@ button { font: inherit; }
 }
 .lang-toggle:hover { background: rgba(230, 192, 104, 0.15); }
 .start .lang-toggle { position: absolute; top: 24px; right: 28px; }
-.start .version-link { position: absolute; top: 24px; left: 28px; text-decoration: none; }
+.start .version-link { position: absolute; top: 24px; left: 28px; right: auto; text-decoration: none; }
 .lang-toggle.small { padding: 6px 12px; font-size: 14px; }
 
 /* ---------- Effecten ---------- */
