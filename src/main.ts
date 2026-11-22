@@ -1642,7 +1642,7 @@ function playSounds(action: Action, before: GameState, after: GameState, flights
 // ---------- Inslagen: dure kaarten in een zone en veroverde zones ----------
 
 /** Vanaf deze prijs slaat een kaart met een klap neer in een zone. */
-const SLAM_PRICE = 6;
+const SLAM_PRICE = 7;
 /** Tijd tot de dure kaart de tafel raakt. */
 const SLAM_IMPACT_MS = 300;
 

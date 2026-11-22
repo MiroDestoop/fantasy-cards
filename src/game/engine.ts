@@ -179,7 +179,7 @@ export function noDeeds(): Record<Daad, number> {
 }
 
 /** Vanaf deze prijs is een kaart "groot" (voorwaarde `eerder: 'groot'`). */
-export const BIG_PRICE = 6;
+export const BIG_PRICE = 7;
 
 export function whyCantOffer(state: GameState, cardUid: string | null): string | null {
   const p = state.players[state.active];

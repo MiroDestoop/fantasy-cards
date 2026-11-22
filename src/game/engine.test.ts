@@ -734,8 +734,8 @@ describe('rassen', () => {
     for (const race of RACE_IDS) {
       const prices = shop.filter((d) => d.race === race).map((d) => d.price!);
       expect(prices.length).toBeGreaterThanOrEqual(8);
-      expect(Math.min(...prices)).toBeLessThanOrEqual(4);
-      expect(Math.max(...prices)).toBeGreaterThanOrEqual(7);
+      expect(Math.min(...prices)).toBeLessThanOrEqual(5);
+      expect(Math.max(...prices)).toBeGreaterThanOrEqual(8);
     }
   });
 
@@ -750,7 +750,7 @@ describe('rassen', () => {
 
   it('goedkope kaarten zonder Trek hebben iets speciaals: een special, Offer bij het kopen of een huurling', () => {
     for (const def of [...new Set(SHOP_SUPPLY)].map(getCard)) {
-      if (def.price! > 4) continue;
+      if (def.price! > 5) continue;
       const all = [...def.top, ...def.bottom];
       const hasDraw = all.some((e) => e.kw === 'trek');
       const special = all.some((e) => e.kw === 'speciaal') || !!def.onBuy?.some((e) => e.kw === 'offer');
@@ -758,12 +758,11 @@ describe('rassen', () => {
     }
   });
 
-  it('elk ras heeft 1 of 2 kaarten met een bonus voor iets wat je deze beurt al deed', () => {
+  it('elk ras heeft kaarten met een bonus voor iets wat je deze beurt al deed', () => {
     for (const race of RACE_IDS) {
       const defs = [...new Set(SHOP_SUPPLY)].map(getCard).filter((d) => d.race === race);
       const n = defs.filter((d) => [...d.top, ...d.bottom].some((e) => e.eerder)).length;
       expect(n, race).toBeGreaterThanOrEqual(1);
-      expect(n, race).toBeLessThanOrEqual(2);
     }
   });
 
@@ -883,9 +882,9 @@ describe('echo: de volgende kaart keert meteen terug', () => {
 });
 
 describe('dure kaarten', () => {
-  it('elk ras heeft dure kaarten (7 goud of meer) met een rasbonus of een special', () => {
+  it('elk ras heeft dure kaarten (8 goud of meer) met een rasbonus of een special', () => {
     for (const race of RACE_IDS) {
-      const big = [...new Set(SHOP_SUPPLY)].map(getCard).filter((d) => d.race === race && d.price! >= 7);
+      const big = [...new Set(SHOP_SUPPLY)].map(getCard).filter((d) => d.race === race && d.price! >= 8);
       expect(big.length, race).toBeGreaterThanOrEqual(2);
       for (const d of big) expect(d.bottom.some((e) => e.need || e.eerder || e.kw === 'speciaal'), d.id).toBe(true);
     }

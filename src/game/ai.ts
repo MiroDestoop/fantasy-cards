@@ -137,11 +137,11 @@ function priceFloor(state: GameState, floor: number): number {
   return state.shop.market.some((c) => (getCard(c.defId).price ?? 0) >= floor) ? floor : 0;
 }
 
-/** Koopt de duurste betaalbare kaart; goedkope kaarten (onder 3 goud) laat ze liggen, tenzij er niets anders ligt. */
+/** Koopt de duurste betaalbare kaart; goedkope kaarten (onder 4 goud) laat ze liggen, tenzij er niets anders ligt. */
 function bestBuy(state: GameState): CardInstance | null {
   let best: CardInstance | null = null;
   let bestRating = 0;
-  const floor = priceFloor(state, 3);
+  const floor = priceFloor(state, 4);
   for (const card of state.shop.market) {
     if (whyCantBuy(state, card.uid)) continue;
     const def = getCard(card.defId);
@@ -164,7 +164,7 @@ function smartBuy(state: GameState): CardInstance | null {
   const pid = state.active;
   const gold = state.players[pid].gold;
   // Laat in het spel helpen goedkope kaarten niet meer: ze komen te laat in je hand.
-  const minPrice = priceFloor(state, state.turn >= 20 ? 5 : 3);
+  const minPrice = priceFloor(state, state.turn >= 20 ? 6 : 4);
   const rated = state.shop.market
     .map((card) => ({ card, def: getCard(card.defId) }))
     .filter(({ def }) => (def.price ?? 0) >= minPrice)
