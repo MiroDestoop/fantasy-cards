@@ -12,7 +12,7 @@ npm test         # vitest, tests voor de spelregels
 npm run build    # tsc + vite build naar dist/
 ```
 
-Elke push naar `main` publiceert het spel automatisch op GitHub Pages (`.github/workflows/deploy.yml`).
+Elke push naar `main` of `experimenten` publiceert het spel automatisch op GitHub Pages (`.github/workflows/deploy.yml`, die altijd vanuit `main` loopt; een push naar `experimenten` start haar via `experimenten.yml`). `main` staat op de hoofdmap, `experimenten` in de submap `experimenten/`. Op het startscherm wisselt een knop linksboven tussen de twee (`renderVersionLink` in `main.ts`, kijkt naar het adres, alleen in de build). Houd die code en beide workflows gelijk op de twee branches.
 Repository: https://github.com/MiroDestoop/fantasy-cards. `vite.config.ts` gebruikt `base: "./"` voor de Pages-submap.
 
 ## Spelregels (huidige stand)

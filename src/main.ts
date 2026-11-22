@@ -108,6 +108,7 @@ function renderStart(): string {
   return `
   <div class="start">
     ${renderLangButton()}
+    ${renderVersionLink()}
     <h1>${tr('Munt of Zwaard', 'Coin or Sword')}</h1>
     <p class="subtitle">${tr('Een fantasy-kaartduel aan één tafel, online, of tegen de computer', 'A fantasy card duel at one table, online, or against the computer')}</p>
     <div class="mode">
@@ -183,6 +184,20 @@ function renderLangButton(extra = ''): string {
   return `<button class="lang-toggle ${extra}" data-click="lang" title="${tr('Switch to English', 'Schakel naar Nederlands')}">
     ${getLang() === 'nl' ? '🇬🇧 English' : '🇳🇱 Nederlands'}
   </button>`;
+}
+
+/**
+ * Wisselen tussen de hoofdversie (branch main) en de experimentele versie (branch experimenten).
+ * GitHub Pages publiceert main in de hoofdmap en experimenten in de submap experimenten/.
+ * Dezelfde code staat op beide branches: het adres zegt welke versie draait. Niet in de dev-server.
+ */
+const EXPERIMENTEEL = location.pathname.includes('/experimenten/');
+
+function renderVersionLink(): string {
+  if (!import.meta.env.PROD) return '';
+  return EXPERIMENTEEL
+    ? `<a class="lang-toggle version-link" href="../" title="${tr('Terug naar de gewone versie van het spel', 'Back to the regular version of the game')}">← ${tr('Hoofdversie', 'Main version')}</a>`
+    : `<a class="lang-toggle version-link" href="./experimenten/" title="${tr('Probeer de versie waaraan nog gewerkt wordt', 'Try the version that is still being worked on')}">⚗️ ${tr('Experimentele versie', 'Experimental version')}</a>`;
 }
 
 function renderOnlineStart(): string {
