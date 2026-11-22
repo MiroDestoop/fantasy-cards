@@ -1,8 +1,17 @@
 name: Publiceer op GitHub Pages
 
+# Publiceert twee versies op dezelfde site:
+#   main         -> https://mirodestoop.github.io/fantasy-cards/
+#   experimenten -> https://mirodestoop.github.io/fantasy-cards/experimenten/
+# Een push naar experimenten start eerst "Experimenten bijgewerkt"; die start daarna deze workflow.
+# Zo loopt het publiceren altijd vanuit main (GitHub Pages laat standaard alleen main publiceren).
+
 on:
   push:
     branches: [main]
+  workflow_run:
+    workflows: [Experimenten bijgewerkt]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -19,15 +28,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
+          path: hoofd
+      - uses: actions/checkout@v4
+        with:
+          ref: experimenten
+          path: exp
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm run build
+      - name: Bouw main
+        working-directory: hoofd
+        run: npm ci && npm run build
+      - name: Bouw experimenten
+        working-directory: exp
+        run: npm ci && npm run build
+      - name: Zet experimenten in de submap
+        run: |
+          mkdir -p site
+          cp -r hoofd/dist/. site/
+          mkdir -p site/experimenten
+          cp -r exp/dist/. site/experimenten/
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: site
 
   deploy:
     needs: build

@@ -1,0 +1,13 @@
+name: Experimenten bijgewerkt
+
+# Doet zelf niets: na een push naar experimenten start ze "Publiceer op GitHub Pages" (deploy.yml, vanuit main).
+
+on:
+  push:
+    branches: [experimenten]
+
+jobs:
+  signaal:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "experimenten is bijgewerkt"
