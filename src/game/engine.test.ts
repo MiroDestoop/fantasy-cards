@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import './testkaarten';
-import { cardHalf, getCard, RACE_IDS, SHOP_SUPPLY } from './cards';
+import { CARDS, cardHalf, getCard, RACE_IDS, SHOP_SUPPLY } from './cards';
 import { getSpecial } from './specials';
 import { applyAction, createGame, drawOverflow, needMet, recallPrice, shopPrice } from './engine';
 import { FIRST_HAND_SIZE, HAND_SIZE, MARKET_SIZE, MAX_HAND, MAX_ZONE_CARDS, RECALL_PRICE, ZONE_HP } from './rules';
@@ -767,10 +767,13 @@ describe('rassen', () => {
     expect(getCard('genezeres').top.some((e) => e.kw === 'verban')).toBe(true);
   });
 
-  it('elk ras heeft kaarten met een bonus voor iets wat je deze beurt al deed', () => {
+  it('de enige voorwaarden op kaarten zijn rasvoorwaarden, en elk ras heeft er bovenaan (afgelegd)', () => {
+    const defs = Object.values(CARDS).filter((d) => d.price !== undefined && SHOP_SUPPLY.includes(d.id));
+    for (const d of defs) {
+      for (const e of [...d.top, ...d.bottom, ...(d.onBuy ?? [])]) expect(e.eerder, d.id).toBeUndefined();
+    }
     for (const race of RACE_IDS) {
-      const defs = [...new Set(SHOP_SUPPLY)].map(getCard).filter((d) => d.race === race);
-      const n = defs.filter((d) => [...d.top, ...d.bottom].some((e) => e.eerder)).length;
+      const n = defs.filter((d) => d.race === race && d.top.some((e) => e.need === race)).length;
       expect(n, race).toBeGreaterThanOrEqual(1);
     }
   });
@@ -1034,45 +1037,49 @@ describe('Offer: een kaart voorgoed verwijderen', () => {
   });
 });
 
-describe('eerder: een bonus voor iets wat je deze beurt al deed', () => {
+describe('rasvoorwaarden op de echte kaarten', () => {
   const fresh = () => createGame(['Ana', 'Bo'], 3, { plainZones: true });
 
-  it('Wilgenheks: Aanval 4 alleen als je deze beurt al hersteld hebt (met een andere kaart)', () => {
+  it('Wilgenheks: Aanval 4 alleen als je deze beurt al een andere Heks in dezelfde zone speelde', () => {
     let s = fresh();
     s = play(s, 'wilgenheks', zone(0));
     expect(s.zones[0].damage[0]).toBe(0);
     s = play(s, 'kruidenvrouw', zone(1));
+    // Een Heks in een andere zone telt niet.
     s = play(s, 'wilgenheks', zone(2));
-    expect(s.zones[2].damage[0]).toBe(4);
+    expect(s.zones[2].damage[0]).toBe(0);
+    s = play(s, 'wilgenheks', zone(1));
+    expect(s.zones[1].damage[0]).toBe(4);
   });
 
-  it('Bloedzuster: +3 schade na een Offer; telt opnieuw vanaf nul na Einde beurt', () => {
+  it('Bloedzuster: +3 schade na een andere Kultist in die zone; telt opnieuw vanaf nul na Einde beurt', () => {
     let s = fresh();
-    s.players[0].offer = 1;
-    s = act(s, { type: 'offer', cardUid: s.players[0].hand[0].uid });
+    s = play(s, 'ingewijde', zone(0));
     s = play(s, 'bloedzuster', zone(0));
-    expect(s.zones[0].damage[0]).toBe(5);
+    expect(s.zones[0].damage[0]).toBe(2 + 5);
     s = act(s, { type: 'endTurn' });
     s = act(s, { type: 'endTurn' });
-    s = play(s, 'bloedzuster', zone(1));
-    expect(s.zones[1].damage[0]).toBe(2);
+    s = play(s, 'bloedzuster', zone(0));
+    expect(s.zones[0].damage[0]).toBe(7 + 2);
   });
 
-  it('Opperbaas: +3 schade als je deze beurt al een kaart van 6 goud of meer speelde', () => {
+  it('Opperbaas: een vernietigde Goblin die je deze beurt hier speelde, telt nog mee', () => {
     let s = fresh();
     s = play(s, 'opperbaas', zone(0));
     expect(s.zones[0].damage[0]).toBe(4);
-    s = play(s, 'opperbaas', zone(1));
-    expect(s.zones[1].damage[0]).toBe(7);
+    s = play(s, 'opperbaas', zone(0));
+    expect(s.zones[0].cards).toHaveLength(1);
+    expect(s.zones[0].damage[0]).toBe(4 + 7);
   });
 
-  it('Nachtmes telt terugroepen, ook terugtrekken voor goud', () => {
+  it('Vorstheks trekt afgelegd alleen als je deze beurt al een andere Heks aflegde', () => {
     let s = fresh();
-    s.players[0].gold = 10;
-    s = play(s, 'rekruut', zone(0));
-    s = act(s, { type: 'recall', zone: 0, cardUid: s.zones[0].cards[0].card.uid });
-    s = play(s, 'nachtmes', zone(1));
-    expect(s.zones[1].damage[0]).toBe(5);
+    const h = s.players[0].hand.length;
+    s = play(s, 'vorstheks', DISCARD);
+    expect(s.players[0].hand).toHaveLength(h);
+    s = play(s, 'moerasheks', DISCARD);
+    s = play(s, 'vorstheks', DISCARD);
+    expect(s.players[0].hand).toHaveLength(h + 1);
   });
 });
 
