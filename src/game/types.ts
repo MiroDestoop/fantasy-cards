@@ -76,6 +76,8 @@ export interface PlayerState {
   offer: number;
   /** Wat je deze beurt al gedaan hebt (voor effecten met eerder). Begint elke beurt op nul. */
   did: Record<Daad, number>;
+  /** Welke rassen je deze beurt waar speelde (`zone` null = afgelegd), voor rasvoorwaarden. Leeg bij Einde beurt. */
+  races: { zone: number | null; race: Race }[];
 }
 
 /** Een kaart in een zone. Ze blijft liggen tot Terugroep of Vernietig, ook nadat de zone veroverd is. */

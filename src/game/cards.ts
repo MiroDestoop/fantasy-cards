@@ -167,7 +167,7 @@ export const DEEDS: Record<Daad, { icon: string; readonly text: string }> = {
 };
 
 const fx = (kw: Keyword, amount: number): Effect => ({ kw, amount });
-/** Een effect dat alleen werkt als er al een kaart van dat ras van jou in de zone ligt. */
+/** Een effect dat alleen werkt als je deze beurt al een kaart van dat ras in deze zone speelde (afgelegd: al een kaart van dat ras aflegde). */
 const als = (race: Race, e: Effect): Effect => ({ ...e, need: race });
 /** Een speciaal effect uit specials.ts. Een tikfout in de naam geeft meteen een foutmelding. */
 const special = (id: string): Effect => (getSpecial(id), { kw: 'speciaal', id });
@@ -200,8 +200,8 @@ const CARD_LIST: CardDef[] = [
   { id: 'ontwaaktegod', name: 'Ontwaakte God', price: 11, icon: '🌑', color: '#2a0a14', top: [fx('storm', 2), fx('offer', 1), fx('goud', 1)], bottom: [fx('aanval', 4), special('offerkracht'), als('kultist', fx('storm', 1))] },
 
   // 👺 Goblins: veel goud en grote kaarten
-  { id: 'zakkenroller', name: 'Zakkenroller', price: 3, icon: '🤏', color: '#557a2b', top: [fx('goud', 2), fx('verban', 2)], bottom: [special('diefstal'), fx('aanval', 1)] },
-  { id: 'deurtrapper', name: 'Deurtrapper', price: 3, icon: '🚪', color: '#6b7a2b', top: [fx('goud', 3)], bottom: [special('ram'), fx('aanval', 1)] },
+  { id: 'zakkenroller', name: 'Zakkenroller', price: 3, icon: '🤏', color: '#557a2b', top: [fx('goud', 2), fx('verban', 2)], bottom: [special('diefstal'), special('huur')] },
+  { id: 'deurtrapper', name: 'Deurtrapper', price: 3, icon: '🚪', color: '#6b7a2b', top: [fx('goud', 3)], bottom: [special('ram'), special('huur')] },
   { id: 'huurgoblin', name: 'Huurgoblin', price: 4, icon: '⚔️', color: '#4f6b1f', top: [fx('goud', 2)], bottom: [fx('aanval', 4), special('huur')] },
   { id: 'schatgraver', name: 'Schatgraver', price: 4, icon: '⛏️', color: '#7a6a1f', top: [fx('goud', 2), na('groot', fx('trek', 1))], bottom: [fx('goud', 3), fx('terugroep', 1)] },
   { id: 'goudhamer', name: 'Goudhamer', price: 5, icon: '🔨', color: '#a68a1f', top: [fx('goud', 3)], bottom: [fx('aanval', 1), fx('schild', 2), special('goudslag')] },
@@ -228,7 +228,7 @@ const CARD_LIST: CardDef[] = [
   { id: 'vloekfluisteraar', name: 'Vloekfluisteraar', price: 4, icon: '🪬', color: '#4a2d5c', top: [fx('vervloek', 1), na('vervloek', fx('trek', 1))], bottom: [fx('aanval', 2), fx('terugroep', 1)] },
   { id: 'moerasheks', name: 'Moerasheks', price: 4, icon: '🐸', color: '#4e5d2a', top: [fx('goud', 2), fx('verban', 1)], bottom: [fx('aanval', 1), fx('schild', 1), special('vloekschade')] },
   { id: 'vorstheks', name: 'Vorstheks', price: 5, icon: '❄️', color: '#2a6b8a', top: [fx('goud', 2), na('herstel', fx('trek', 1))], bottom: [fx('aanval', 3), fx('schild', 2), als('heks', fx('schild', 2))] },
-  { id: 'genezeres', name: 'Genezeres', price: 5, icon: '💚', color: '#2e7d5a', top: [fx('trek', 1)], bottom: [fx('herstel', 3), fx('schild', 2)] },
+  { id: 'genezeres', name: 'Genezeres', price: 5, icon: '💚', color: '#2e7d5a', top: [fx('verban', 1), fx('trek', 1)], bottom: [fx('herstel', 3), fx('schild', 2)] },
   { id: 'wilgenheks', name: 'Wilgenheks', price: 6, icon: '🌳', color: '#3a6b3a', top: [fx('goud', 3)], bottom: [fx('herstel', 2), na('herstel', fx('aanval', 4))] },
   { id: 'voodoopriesteres', name: 'Voodoopriesteres', price: 6, icon: '🪆', color: '#6a1b4d', top: [fx('vervloek', 1), na('vervloek', fx('trek', 2))], bottom: [fx('vervloek', 1), na('vervloek', fx('aanval', 4))] },
   { id: 'weerheks', name: 'Weerheks', price: 7, icon: '🌦️', color: '#1f5a6b', top: [fx('trek', 2)], bottom: [fx('vernietig', 0), fx('herstel', 2), fx('schild', 3)] },

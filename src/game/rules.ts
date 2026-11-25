@@ -8,7 +8,8 @@ export const ZONE_HP = 12;
 export const ZONES_TO_WIN = 2;
 /** Zoveel kaarten mag elke speler in één zone hebben liggen. */
 export const MAX_ZONE_CARDS = 4;
-export const MARKET_SIZE = 5;
+/** Zoveel kaarten liggen er tegelijk in de winkel. */
+export const MARKET_SIZE = 6;
 /** Handlimiet: wat je daarboven trekt, gaat meteen naar je aflegstapel. */
 export const MAX_HAND = 8;
 

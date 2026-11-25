@@ -758,6 +758,15 @@ describe('rassen', () => {
     }
   });
 
+  it('Zakkenroller en Deurtrapper zijn huurlingen zonder Aanval; de Genezeres verbant bovenaan', () => {
+    for (const id of ['zakkenroller', 'deurtrapper']) {
+      const bottom = getCard(id).bottom;
+      expect(bottom.some((e) => e.kw === 'speciaal' && e.id === 'huur'), id).toBe(true);
+      expect(bottom.some((e) => e.kw === 'aanval'), id).toBe(false);
+    }
+    expect(getCard('genezeres').top.some((e) => e.kw === 'verban')).toBe(true);
+  });
+
   it('elk ras heeft kaarten met een bonus voor iets wat je deze beurt al deed', () => {
     for (const race of RACE_IDS) {
       const defs = [...new Set(SHOP_SUPPLY)].map(getCard).filter((d) => d.race === race);
@@ -766,7 +775,7 @@ describe('rassen', () => {
     }
   });
 
-  it('een effect met een rasvoorwaarde werkt alleen als dat ras al van jou in de zone ligt', () => {
+  it('een effect met een rasvoorwaarde werkt alleen als je dat ras deze beurt al in die zone speelde', () => {
     let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
     // Zonder ork: Trollenmoker doet alleen haar gewone Aanval 2.
     s = play(s, 'trol', zone(0));
@@ -778,16 +787,34 @@ describe('rassen', () => {
     s.zones[1].cards.push({ player: 1, card: { uid: 'bo-trol', defId: 'trol' }, turn: 0 });
     s = play(s, 'trol', zone(1));
     expect(s.zones[1].damage[0]).toBe(2);
-    // Afgelegd werkt de voorwaarde nooit.
-    expect(needMet(s, 0, null, { kw: 'aanval', amount: 1, need: 'kultist' })).toBe(false);
+    // Een eigen kultist die er al lag van een vorige beurt, telt ook niet.
+    s.zones[2].cards.push({ player: 0, card: { uid: 'oud-trol', defId: 'trol' }, turn: 0 });
+    s = play(s, 'trol', zone(2));
+    expect(s.zones[2].damage[0]).toBe(2);
+  });
+
+  it('afgelegd werkt een rasvoorwaarde als je deze beurt al een kaart van dat ras aflegde', () => {
+    let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
+    const need = { kw: 'aanval', amount: 1, need: 'kultist' } as const;
+    expect(needMet(s, 0, null, need)).toBe(false);
+    // Een kultist in een zone telt niet voor de afleghelft.
+    s = play(s, 'trol', zone(0));
+    expect(needMet(s, 0, null, need)).toBe(false);
+    s = play(s, 'trol', { kind: 'discard' });
+    expect(needMet(s, 0, null, need)).toBe(true);
+    // Een andere ras telt niet, en bij Einde beurt vervalt het.
+    expect(needMet(s, 0, null, { ...need, need: 'heks' })).toBe(false);
+    s = act(s, { type: 'endTurn' });
+    expect(needMet(s, 0, null, need)).toBe(false);
   });
 
   it('een Terugroep op dezelfde kaart neemt de rasbonus niet weg', () => {
     let s = createGame(['Ana', 'Bo'], 42, { plainZones: true });
-    s.zones[0].cards.push({ player: 0, card: { uid: 'mens', defId: 'schildknaap' }, turn: 0 });
-    // Generaal: Terugroep 3 (neemt de Schildknaap terug), en toch 🧑Aanval 6.
+    s = play(s, 'schildknaap', zone(0));
+    const knaap = s.zones[0].cards[0].card.uid;
+    // Generaal: Terugroep 3 (neemt de Schildknaap terug), en toch 👺Aanval 6.
     s = play(s, 'generaal', zone(0));
-    expect(s.players[0].discard.some((c) => c.uid === 'mens')).toBe(true);
+    expect(s.players[0].discard.some((c) => c.uid === knaap)).toBe(true);
     expect(s.zones[0].damage[0]).toBe(6);
   });
 
@@ -799,7 +826,7 @@ describe('rassen', () => {
     p.hand.push({ uid: 'mk', defId: 'marskramer' });
     p.deck = Array.from({ length: 10 }, (_, i) => ({ uid: `d${i}`, defId: 'koper' }));
     expect(drawOverflow(s, 'mk', zone(0))).toBe(0);
-    s.zones[0].cards.push({ player: 0, card: { uid: 'mens', defId: 'schildknaap' }, turn: 0 });
+    s.players[0].races.push({ zone: 0, race: 'goblin' });
     expect(drawOverflow(s, 'mk', zone(0))).toBe(2);
   });
 });

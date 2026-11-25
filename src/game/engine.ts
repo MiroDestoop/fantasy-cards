@@ -45,6 +45,7 @@ export function createGame(
     banish: 0,
     offer: 0,
     did: noDeeds(),
+    races: [],
   });
   const s: GameState = {
     players: [makePlayer(names[0], 0), makePlayer(names[1], 1)],
@@ -153,24 +154,28 @@ export function drawOverflow(state: GameState, handUid: string, target: PlayTarg
   const def = getCard(card.defId);
   const half = target.kind === 'discard' ? def.top : def.bottom;
   const zoneIdx = target.kind === 'zone' ? target.zone : null;
-  let draws = half.reduce((t, e) => t + (e.kw === 'trek' && needMet(state, state.active, zoneIdx, e, card.uid) ? e.amount : 0), 0);
+  let draws = half.reduce((t, e) => t + (e.kw === 'trek' && needMet(state, state.active, zoneIdx, e) ? e.amount : 0), 0);
   if (target.kind === 'zone') draws += zoneEffect(state.zones[target.zone])?.onPlay?.draw ?? 0;
   draws = Math.min(draws, p.deck.length + p.discard.length);
   return Math.max(0, p.hand.length - 1 + draws - MAX_HAND);
 }
 
-/** Ligt er in deze zone al een kaart van dit ras van deze speler (de gespeelde kaart zelf niet meegeteld)? */
-export function raceHere(state: GameState, pid: PlayerId, zoneIdx: number, race: Race, skipUid?: string): boolean {
-  return state.zones[zoneIdx].cards.some((c) => c.player === pid && c.card.uid !== skipUid && getCard(c.card.defId).race === race);
+/**
+ * Speelde deze speler deze beurt al een kaart van dit ras op deze plek: in deze zone, of afgelegd (`zoneIdx` null)?
+ * De gespeelde kaart zelf telt niet: ze wordt pas na de controle van haar voorwaarden genoteerd.
+ */
+export function racePlayed(state: GameState, pid: PlayerId, zoneIdx: number | null, race: Race): boolean {
+  return state.players[pid].races.some((r) => r.zone === zoneIdx && r.race === race);
 }
 
 /**
- * Werkt dit effect hier? Een effect met een rasvoorwaarde werkt alleen in een zone waar dat ras al van jou ligt.
+ * Werkt dit effect hier? Een effect met een rasvoorwaarde werkt alleen als je deze beurt al een kaart van dat ras
+ * in deze zone speelde (afgelegd: als je al een kaart van dat ras aflegde).
  * Een effect met `eerder` werkt alleen als je dat deze beurt al gedaan hebt (afgelegd of in een zone).
  */
-export function needMet(state: GameState, pid: PlayerId, zoneIdx: number | null, e: Effect, skipUid?: string): boolean {
+export function needMet(state: GameState, pid: PlayerId, zoneIdx: number | null, e: Effect): boolean {
   if (e.eerder && !state.players[pid].did[e.eerder]) return false;
-  return !e.need || (zoneIdx !== null && raceHere(state, pid, zoneIdx, e.need, skipUid));
+  return !e.need || racePlayed(state, pid, zoneIdx, e.need);
 }
 
 /** Een lege lijst van wat je deze beurt gedaan hebt. */
@@ -259,6 +264,7 @@ function playCard(s: GameState, handUid: string, target: PlayTarget): string | n
     // Ook hier eerst alle voorwaarden: wat deze kaart zelf doet, telt niet voor haar eigen `eerder`.
     const met = top.map((e) => needMet(s, pid, null, e));
     markBig(p, def.price);
+    if (def.race) p.races.push({ zone: null, race: def.race });
     top.forEach((e, i) => { if (met[i]) applyEffect(s, pid, e, null, card.uid); });
   } else {
     const zone = s.zones[target.zone];
@@ -275,8 +281,9 @@ function playCard(s: GameState, handUid: string, target: PlayTarget): string | n
     // Eerst wordt de kaart gelegd, dan pas werken haar effecten. Terugroep en Vernietig slaan de kaart zelf over.
     zone.cards.push({ player: pid, card, turn: s.turn });
     // Rasvoorwaarden worden gecontroleerd vóór de effecten: een Terugroep of Vernietig op dezelfde kaart neemt de bonus niet weg.
-    const met = bottom.map((e) => needMet(s, pid, target.zone, e, card.uid));
+    const met = bottom.map((e) => needMet(s, pid, target.zone, e));
     markBig(p, def.price);
+    if (def.race) p.races.push({ zone: target.zone, race: def.race });
     bottom.forEach((e, i) => { if (met[i]) applyEffect(s, pid, e, target.zone, card.uid); });
     // Daarna het effect van de zone zelf.
     const onPlay = fx?.onPlay;
@@ -636,6 +643,7 @@ function endTurn(s: GameState): void {
   p.banish = 0;
   p.offer = 0;
   p.did = noDeeds();
+  p.races = [];
   p.hand = [];
   s.active = other(s.active);
   startTurn(s);

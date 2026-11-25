@@ -381,11 +381,12 @@ function keywordText(kw: Keyword, n: number): string {
   return KEYWORDS[kw].noAmount ? KEYWORDS[kw].label : `${KEYWORDS[kw].label}(${n})`;
 }
 
-function renderKeywords(effects: Effect[]): string {
+/** `discard`: de helft die je aflegt; een rasvoorwaarde kijkt daar naar wat je al aflegde (`af-<ras>`). */
+function renderKeywords(effects: Effect[], discard = false): string {
   return effects
     .map((e) => {
       // Een voorwaarde (ras, of iets wat je eerder deze beurt deed) staat als icoon voor het effect.
-      const cond = e.need ?? (e.eerder ? `d-${e.eerder}` : '');
+      const cond = e.need ? `${discard ? 'af-' : ''}${e.need}` : e.eerder ? `d-${e.eerder}` : '';
       const need = cond ? ` data-need="${cond}"` : '';
       const cls = cond ? ' cond' : '';
       const pre = e.need ? RACES[e.need].icon : e.eerder ? DEEDS[e.eerder].icon : '';
@@ -396,17 +397,19 @@ function renderKeywords(effects: Effect[]): string {
     .join(' ');
 }
 
-/** De uitleg van een voorwaarde (ras, of 'd-' + iets wat je eerder deze beurt deed), onder de uitleg van het effect. */
+/** De uitleg van een voorwaarde (ras, 'af-' + ras op de afleghelft, of 'd-' + iets wat je eerder deze beurt deed), onder de uitleg van het effect. */
 function needText(race: string | undefined): string {
   if (!race) return '';
+  const discard = race.startsWith('af-');
+  if (discard) race = race.slice(3);
   if (race.startsWith('d-')) {
     const d = DEEDS[race.slice(2) as Daad];
     return `<div class="tip-note">${d.icon} ${d.text}</div>`;
   }
   const r = RACES[race as Race];
   return `<div class="tip-note">${r.icon} ${tr(
-    `Alleen als er al een ${r.label} van jou in deze zone ligt.`,
-    `Only if one of your ${r.plural} is already in this zone.`,
+    discard ? `Alleen als je deze beurt al een andere ${r.label} aflegde.` : `Alleen als je deze beurt al een andere ${r.label} in deze zone speelde.`,
+    discard ? `Only if you already discarded another ${r.label} this turn.` : `Only if you already played another ${r.label} in this zone this turn.`,
   )}</div>`;
 }
 
@@ -423,11 +426,11 @@ function renderFace(def: CardDef): string {
   const labels = STARTER_DECK.includes(def.id) || def.id === 'vloek';
   return `
     <div class="art ${def.race ? `r-${def.race}` : ''}" style="--art:${def.color}">${def.icon}${def.race ? `<span class="race" data-race="${def.race}">${RACES[def.race].icon}</span>` : ''}${
-      def.onBuy?.length ? `<span class="on-buy">🛒 ${renderKeywords(cardHalf(def.onBuy, tafel))}</span>` : ''}</div>
+      def.onBuy?.length ? `<span class="on-buy">🛒 ${renderKeywords(cardHalf(def.onBuy, tafel), true)}</span>` : ''}</div>
     <div class="card-name">${esc(def.name)}</div>
     <div class="sect sect-top ${labels ? '' : 'no-label'}">
       ${labels ? `<div class="sect-label">⤓ ${tr('Afleggen', 'Discard')}</div>` : ''}
-      <div class="kws">${renderKeywords(cardHalf(def.top, tafel))}</div>
+      <div class="kws">${renderKeywords(cardHalf(def.top, tafel), true)}</div>
     </div>
     ${def.bottom.length
       ? `<div class="sect sect-bottom ${labels ? '' : 'no-label'}">
